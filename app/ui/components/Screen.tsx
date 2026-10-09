@@ -1,5 +1,6 @@
 import type { JSX, ReactNode } from 'react';
-import { ScrollView, View, StyleSheet } from 'react-native';
+import { Pressable, ScrollView, View, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme, useThemedStyles } from '../theme';
 import type { Theme } from '../theme';
@@ -13,6 +14,12 @@ export interface ScreenProps {
   right?: ReactNode;
   /** Rendered at the header's end when the active theme places the mascot there. */
   mascot?: ReactNode;
+  /** Stack screens: shows a back arrow before the title. */
+  back?: { label: string; onPress: () => void };
+  /** App-wide banners (phase switch, stale warning) rendered above the body, outside the scroll. */
+  banner?: ReactNode;
+  /** Hides the language toggle (full-bleed screens such as the photo studio). */
+  hideLanguage?: boolean;
 }
 
 /**
@@ -20,7 +27,7 @@ export interface ScreenProps {
  * language toggle and optional trailing actions, and a gutter-spaced body. In the "during"
  * (essentials) theme the mascot sits at the header end.
  */
-export function Screen({ title, children, scroll = true, right, mascot }: ScreenProps): JSX.Element {
+export function Screen({ title, children, scroll = true, right, mascot, back, banner, hideLanguage = false }: ScreenProps): JSX.Element {
   const t = useTheme();
   const styles = useThemedStyles(makeStyles);
   const headerMascot = t.mascot.placement === 'headerEnd' ? mascot : null;
@@ -36,15 +43,27 @@ export function Screen({ title, children, scroll = true, right, mascot }: Screen
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <View style={styles.header}>
+        {back ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={back.label}
+            onPress={back.onPress}
+            hitSlop={t.space.md}
+            style={styles.back}
+          >
+            <Ionicons name="arrow-back" size={t.type.roles.title.fontSize} color={t.colors.text} />
+          </Pressable>
+        ) : null}
         <Txt role="headline" accessibilityRole="header" numberOfLines={1} style={styles.title}>
           {title}
         </Txt>
         <View style={styles.actions}>
           {headerMascot}
-          <LanguageToggle />
+          {hideLanguage ? null : <LanguageToggle />}
           {right}
         </View>
       </View>
+      {banner ? <View style={styles.banner}>{banner}</View> : null}
       {body}
     </SafeAreaView>
   );
@@ -64,7 +83,18 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     paddingHorizontal: t.space.gutter,
   },
   title: {
-    flexShrink: 1,
+    flex: 1,
+  },
+  back: {
+    minWidth: t.minTouch,
+    minHeight: t.minTouch,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: t.radius.pill,
+  },
+  banner: {
+    paddingHorizontal: t.space.gutter,
+    gap: t.space.sm,
   },
   actions: {
     flexDirection: 'row',

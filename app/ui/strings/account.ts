@@ -8,6 +8,7 @@ import { defineStrings } from '../i18n';
 export const accountStrings = defineStrings({
   tl: {
     title: 'Account',
+    back: 'Bumalik',
     signInTitle: 'Mag-sign in',
     signUpTitle: 'Gumawa ng account',
     forgotTitle: 'Nakalimutan ang password',
@@ -30,6 +31,7 @@ export const accountStrings = defineStrings({
   },
   en: {
     title: 'Account',
+    back: 'Back',
     signInTitle: 'Sign in',
     signUpTitle: 'Create an account',
     forgotTitle: 'Forgot password',

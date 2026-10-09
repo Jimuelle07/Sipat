@@ -15,6 +15,7 @@ export const commonStrings = defineStrings({
     tabHotlines: 'Hotline',
     tabProfile: 'Pamilya',
     tabAccount: 'Account',
+    back: 'Bumalik',
     languageTag_tl: 'Tagalog',
     languageTag_en: 'English',
 
@@ -31,6 +32,12 @@ export const commonStrings = defineStrings({
     undo: 'Ibalik',
     dismiss: 'Isara',
     switchedTo: 'Lumipat sa {phase}.',
+    aiReady: 'AI handa',
+    aiUnavailable: 'Buod muna',
+    aiPreparing: 'Inihahanda ang AI',
+    lowBattery: 'Mahina ang baterya',
+    aiReasonHint: 'Dahilan: {reason}',
+    staleReconfirm: 'Pareho pa rin',
 
     householdName: 'Pangalan ng sambahayan',
     personName: 'Pangalan ng pangunahing tao',
@@ -93,6 +100,7 @@ export const commonStrings = defineStrings({
     tabHotlines: 'Hotlines',
     tabProfile: 'Family',
     tabAccount: 'Account',
+    back: 'Back',
     languageTag_tl: 'Tagalog',
     languageTag_en: 'English',
 
@@ -109,6 +117,12 @@ export const commonStrings = defineStrings({
     undo: 'Undo',
     dismiss: 'Close',
     switchedTo: 'Switched to {phase}.',
+    aiReady: 'AI ready',
+    aiUnavailable: 'Summary only',
+    aiPreparing: 'Preparing AI',
+    lowBattery: 'Low battery',
+    aiReasonHint: 'Reason: {reason}',
+    staleReconfirm: 'Still the same',
 
     householdName: 'Household name',
     personName: "Main person's name",

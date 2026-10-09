@@ -1,20 +1,16 @@
 import type { JSX } from 'react';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { accountStrings } from '../strings/account';
 import { useT } from '../i18n';
+import { AppBanners } from '../context/AppChrome';
+import type { RootNavigation } from '../navigation/types';
 import { Button, Field, InlineError, Screen, Tile, Txt } from '../components';
 import { useThemedStyles } from '../theme';
 import type { Theme } from '../theme';
 
-export type AccountMode = 'signIn' | 'signUp' | 'forgot';
-
-/** Pure mode transitions, exported for tests. */
-export function accountNext(mode: AccountMode, action: 'goSignUp' | 'goForgot' | 'goSignIn'): AccountMode {
-  if (action === 'goSignIn') return 'signIn';
-  if (mode === 'signIn') return action === 'goSignUp' ? 'signUp' : 'forgot';
-  return 'signIn';
-}
+type AccountMode = 'signIn' | 'signUp' | 'forgot';
 
 export function emailValid(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
@@ -35,6 +31,7 @@ function validate(mode: AccountMode, email: string, password: string, confirm: s
  */
 export function AccountScreen(): JSX.Element {
   const t = useT(accountStrings);
+  const nav = useNavigation<RootNavigation>();
   const styles = useThemedStyles(makeStyles);
   const [mode, setMode] = useState<AccountMode>('signIn');
   const [email, setEmail] = useState('');
@@ -54,7 +51,11 @@ export function AccountScreen(): JSX.Element {
   const switchMode = (next: AccountMode): void => { setMode(next); setError(null); setNotice(null); };
 
   return (
-    <Screen title={t.title}>
+    <Screen
+      title={t.title}
+      back={{ label: t.back, onPress: () => nav.goBack() }}
+      banner={<AppBanners />}
+    >
       <Tile title={mode === 'signIn' ? t.signInTitle : mode === 'signUp' ? t.signUpTitle : t.forgotTitle}>
         <Field label={t.email} value={email} onChangeText={setEmail} autoCapitalize="none" autoComplete="email" keyboardType="email-address" />
         {mode !== 'forgot' ? (

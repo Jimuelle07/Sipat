@@ -9,29 +9,11 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('@expo/vector-icons', () => ({ Ionicons: 'Ionicons' }));
 vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' }));
+vi.mock('@react-navigation/native', () => ({ useNavigation: () => ({ goBack: () => undefined }) }));
+vi.mock('../context/AppChrome', () => ({ AppBanners: 'AppBanners' }));
 
-import { accountNext, emailValid } from './AccountScreen';
+import { emailValid } from './AccountScreen';
 import { accountStrings } from '../strings/account';
-
-describe('accountNext', () => {
-  it('moves from sign in to sign up and forgot password', () => {
-    expect(accountNext('signIn', 'goSignUp')).toBe('signUp');
-    expect(accountNext('signIn', 'goForgot')).toBe('forgot');
-  });
-
-  it('returns to sign in from sign up and forgot password', () => {
-    expect(accountNext('signUp', 'goSignIn')).toBe('signIn');
-    expect(accountNext('forgot', 'goSignIn')).toBe('signIn');
-  });
-
-  it('never leaves a known mode', () => {
-    for (const mode of ['signIn', 'signUp', 'forgot'] as const) {
-      expect(['signIn', 'signUp', 'forgot']).toContain(accountNext(mode, 'goSignIn'));
-      expect(['signIn', 'signUp', 'forgot']).toContain(accountNext(mode, 'goSignUp'));
-      expect(['signIn', 'signUp', 'forgot']).toContain(accountNext(mode, 'goForgot'));
-    }
-  });
-});
 
 describe('emailValid', () => {
   it('accepts plain email addresses', () => {
