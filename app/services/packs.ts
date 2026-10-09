@@ -1,21 +1,29 @@
 import type {
   ApplyResult,
+  BlobRef,
+  ContentFileName,
   ImportPreview,
   InstalledPack,
+  KeySet,
+  PackEntry,
   PackError,
-  PackKind,
   PackManager,
+  PinnedKey,
   Result,
   Store,
+  TrustStore,
+  VerifiedPack,
 } from '../types/index.ts';
 import type { BundledContent } from '../core/validateContent.ts';
+import { unzipSync, gunzipSync } from 'fflate';
 import { rawContent } from '../content/index.ts';
 import { validateContent } from '../core/validateContent.ts';
+import { verifyPack } from '../core/verifyPack.ts';
+import { PINNED_ROOT_KEYS } from '../core/pinnedKeys.ts';
 import { toManilaIso } from '../core/time.ts';
 
 const CORE_PACK_ID = 'core-tl';
-const SUPPORTED_SCHEMA_VERSION = 1;
-const PACK_KINDS: readonly PackKind[] = ['core', 'area', 'model'];
+const DEFAULT_APP_VERSION = '0.0.0';
 
 type Rec = Record<string, unknown>;
 const isRec = (v: unknown): v is Rec => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -46,8 +54,12 @@ function newestGuideDate(): string {
   return '';
 }
 
-function blobSize(full: unknown): number {
-  return isRec(full) && typeof full.size === 'number' ? full.size : 0;
+function parseGzipJson(bytes: Uint8Array): Rec | null {
+  try {
+    return JSON.parse(new TextDecoder().decode(gunzipSync(bytes))) as Rec;
+  } catch {
+    return null;
+  }
 }
 
 function countUpserts(files: unknown): number {
@@ -60,17 +72,61 @@ function countUpserts(files: unknown): number {
   return count;
 }
 
-function decode(data: string | Uint8Array): string {
-  return typeof data === 'string' ? data : new TextDecoder().decode(data);
+/** Counts the upserts and deletes a full payload or a delta blob carries, for the preview. */
+function countChanges(bytes: Uint8Array, isDelta: boolean): { upserts: number; deletes: number } {
+  const blob = parseGzipJson(bytes);
+  if (!blob) return { upserts: 0, deletes: 0 };
+  if (isDelta) {
+    let upserts = 0;
+    let deletes = 0;
+    if (isRec(blob.changes)) {
+      for (const change of Object.values(blob.changes)) {
+        if (!isRec(change)) continue;
+        if (Array.isArray(change.upserts)) upserts += change.upserts.length;
+        if (Array.isArray(change.deletes)) deletes += change.deletes.length;
+      }
+    }
+    return { upserts, deletes };
+  }
+  return { upserts: countUpserts(blob.files), deletes: 0 };
+}
+
+/** The ref of a verified pack that actually landed in `blobs`: its delta first, else its full blob. */
+function verifiedRef(
+  pack: PackEntry,
+  installed: number | undefined,
+  blobs: Map<string, Uint8Array>,
+): (BlobRef & { from_version?: number }) | null {
+  const candidates: (BlobRef & { from_version?: number })[] = [];
+  if (installed !== undefined && pack.deltas) {
+    const delta = pack.deltas.find((entry) => entry.from_version === installed);
+    if (delta) candidates.push(delta);
+  }
+  candidates.push(pack.full);
+  return candidates.find((candidate) => blobs.has(candidate.sha256)) ?? null;
+}
+
+interface StagedPack {
+  preview: ImportPreview;
+  contentRaw?: Partial<Record<ContentFileName, unknown>>;
 }
 
 export function createPackManager(deps: {
   store: Store;
   now?: () => string;
-  readFile?: (uri: string) => Promise<string | Uint8Array>;
-  publicKeys?: Record<string, string>;
-}): PackManager & { content(): Result<BundledContent, 'content_invalid'>; corePack(): InstalledPack } {
-  const { store, publicKeys } = deps;
+  readFile?: (uri: string) => Promise<string | Uint8Array | Map<string, Uint8Array>>;
+  publicKeys?: Record<string, string>; // legacy; trust now goes through verifyPack
+  rootKeys?: PinnedKey[];
+  keySet?: KeySet;
+  appVersion?: string;
+}): PackManager & {
+  content(): Result<BundledContent, 'content_invalid'>;
+  /** The raw content files behind `content()`, including optional files such as evacuation centers. */
+  raw(): Partial<Record<ContentFileName, unknown>>;
+  corePack(): InstalledPack;
+  importArchive(files: Map<string, Uint8Array>): Promise<Result<ImportPreview, PackError>>;
+} {
+  const { store } = deps;
 
   // Never validate or throw here: the engine's init() validates and returns content_invalid.
   const guideDate = newestGuideDate();
@@ -94,119 +150,126 @@ export function createPackManager(deps: {
 
   ensureCore();
 
-  const previews = new Map<string, ImportPreview>();
+  const staged = new Map<string, StagedPack>();
   let previewCounter = 0;
+  let learnedKeySet = deps.keySet;
+  let activeContent: BundledContent | null = null;
+  let activeRaw: Partial<Record<ContentFileName, unknown>> | null = null;
 
-  const fail = (code: PackError, message: string): Result<ImportPreview, PackError> => ({
-    ok: false,
-    error: { code, message },
-  });
-
-  const importFile = async (uri: string): Promise<Result<ImportPreview, PackError>> => {
-    if (!deps.readFile) return fail('bad_archive', 'No file reader available');
-
-    let text: string;
+  const readEntries = async (uri: string): Promise<Map<string, Uint8Array> | null> => {
+    if (!deps.readFile) return null;
+    let raw: string | Uint8Array | Map<string, Uint8Array>;
     try {
-      text = decode(await deps.readFile(uri));
+      raw = await deps.readFile(uri);
     } catch {
-      return fail('bad_archive', 'Could not read the file');
+      return null;
     }
-
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(text);
-    } catch {
-      return fail('bad_archive', 'The file is not a valid pack archive');
-    }
-    if (!isRec(parsed)) return fail('bad_archive', 'The file is not a valid pack archive');
-
-    const bundle = parsed;
-    const manifest = isRec(bundle.manifest) ? bundle.manifest : bundle;
-
-    if (manifest.schema_version !== SUPPORTED_SCHEMA_VERSION) {
-      return fail('schema', 'Unsupported schema version');
-    }
-    if (!nonEmpty(manifest.manifest_id) || !Array.isArray(manifest.packs)) {
-      return fail('schema', 'Manifest is missing required fields');
-    }
-
-    const packs = manifest.packs.filter(isRec);
-    if (packs.length !== manifest.packs.length) return fail('schema', 'Invalid pack entry');
-    for (const pack of packs) {
-      if (!nonEmpty(pack.pack_id) || !nonEmpty(pack.kind) || !PACK_KINDS.includes(pack.kind as PackKind)) {
-        return fail('schema', 'Invalid pack entry');
-      }
-      if (typeof pack.version !== 'number' || !Number.isInteger(pack.version) || pack.version < 1) {
-        return fail('schema', 'Invalid pack version');
+    if (raw instanceof Map) return raw;
+    if (raw instanceof Uint8Array) {
+      try {
+        return new Map(Object.entries(unzipSync(raw)));
+      } catch {
+        return null;
       }
     }
+    return null; // the plain-JSON manifest path is gone; a pack must be a real archive
+  };
 
-    const current = installedPacks();
-    for (const pack of packs) {
-      const existing = current.find((installed) => installed.packId === pack.pack_id);
-      if (existing && (pack.version as number) <= existing.version) {
-        return fail('rollback', 'Pack version is not newer than the installed one');
-      }
+  const contentFromBlobs = (verified: VerifiedPack, installed: Record<string, number>): StagedPack['contentRaw'] => {
+    let files: Partial<Record<ContentFileName, unknown>> | undefined;
+    for (const pack of verified.manifest.packs ?? []) {
+      const ref = verifiedRef(pack, installed[pack.pack_id], verified.blobs);
+      if (!ref || ref.from_version !== undefined) continue; // deltas are not merged into content here
+      const blob = verified.blobs.get(ref.sha256);
+      if (!blob) continue;
+      const payload = parseGzipJson(blob);
+      if (payload && isRec(payload.files)) files = { ...(files ?? {}), ...payload.files };
+    }
+    return files;
+  };
+
+  const importArchive = async (entries: Map<string, Uint8Array>): Promise<Result<ImportPreview, PackError>> => {
+    const installed: Record<string, number> = {};
+    for (const pack of installedPacks()) installed[pack.packId] = pack.version;
+
+    const trust: TrustStore = {
+      rootKeys: deps.rootKeys ?? PINNED_ROOT_KEYS,
+      ...(learnedKeySet ? { keySet: learnedKeySet } : {}),
+      installed,
+    };
+    const verified = verifyPack(entries, trust, deps.appVersion ?? DEFAULT_APP_VERSION);
+    if (!verified.ok) return { ok: false, error: verified.error };
+    const value = verified.value;
+    if (value.keySet) learnedKeySet = value.keySet;
+
+    const packs: ImportPreview['packs'] = [];
+    for (const pack of value.manifest.packs ?? []) {
+      const ref = verifiedRef(pack, installed[pack.pack_id], value.blobs);
+      if (!ref) continue;
+      const bytes = value.blobs.get(ref.sha256);
+      if (!bytes) continue;
+      const counts = countChanges(bytes, ref.from_version !== undefined);
+      packs.push({
+        packId: pack.pack_id,
+        kind: pack.kind,
+        ...(installed[pack.pack_id] !== undefined ? { fromVersion: installed[pack.pack_id] } : {}),
+        toVersion: pack.version,
+        sizeBytes: ref.size,
+        ...(nonEmpty(pack.guide_date) ? { guideDate: pack.guide_date } : guideDate ? { guideDate } : {}),
+        upserts: counts.upserts,
+        deletes: counts.deletes,
+      });
     }
 
-    if (!publicKeys || Object.keys(publicKeys).length === 0) {
-      return fail('unknown_key', 'No trusted signing key for this pack');
-    }
-    const signature = manifest.signature;
-    if (!isRec(signature) || !nonEmpty(signature.kid)) {
-      return fail('bad_signature', 'Manifest has no signature');
-    }
-    if (!(signature.kid in publicKeys)) {
-      return fail('unknown_key', `Unknown signing key ${signature.kid}`);
-    }
-
-    const payloads = isRec(bundle.payloads) ? bundle.payloads : {};
     const preview: ImportPreview = {
       previewId: `preview-${++previewCounter}`,
-      signedBy: signature.kid,
-      packs: packs.map((pack) => {
-        const existing = current.find((installed) => installed.packId === pack.pack_id);
-        const payload = payloads[pack.pack_id as string];
-        return {
-          packId: pack.pack_id as string,
-          kind: pack.kind as PackKind,
-          fromVersion: existing?.version,
-          toVersion: pack.version as number,
-          sizeBytes: blobSize(pack.full),
-          guideDate: nonEmpty(pack.guide_date) ? pack.guide_date : guideDate,
-          upserts: countUpserts(isRec(payload) ? payload.files : undefined),
-          deletes: 0,
-        };
-      }),
+      signedBy: value.manifest.signature?.kid ?? '',
+      packs,
     };
-    previews.set(preview.previewId, preview);
+    const contentRaw = contentFromBlobs(value, installed);
+    staged.set(preview.previewId, { preview, ...(contentRaw ? { contentRaw } : {}) });
     return { ok: true, value: preview };
   };
 
+  const importFile = async (uri: string): Promise<Result<ImportPreview, PackError>> => {
+    const entries = await readEntries(uri);
+    if (!entries) return { ok: false, error: { code: 'bad_archive', message: 'The file is not a valid pack archive' } };
+    return importArchive(entries);
+  };
+
   const apply = async (previewId: string): Promise<Result<ApplyResult, PackError | 'io'>> => {
-    const preview = previews.get(previewId);
-    if (!preview) return { ok: false, error: { code: 'io', message: 'Unknown preview' } };
+    const entry = staged.get(previewId);
+    if (!entry) return { ok: false, error: { code: 'io', message: 'Unknown preview' } };
     try {
+      // Stage the merged content, swap it in one step, then move the version pointer.
+      if (entry.contentRaw) {
+        const mergedRaw = { ...rawContent, ...entry.contentRaw };
+        const merged = validateContent(mergedRaw);
+        if (merged.ok) {
+          activeContent = merged.value;
+          activeRaw = mergedRaw;
+        }
+      }
       const current = [...installedPacks()];
       const applied: { packId: string; version: number }[] = [];
-      for (const pack of preview.packs) {
+      for (const pack of entry.preview.packs) {
         const index = current.findIndex((installed) => installed.packId === pack.packId);
         const existing = index >= 0 ? current[index] : undefined;
         const next: InstalledPack = {
           packId: pack.packId,
           kind: pack.kind,
           version: pack.toVersion,
-          guideDate: pack.guideDate,
+          ...(pack.guideDate ? { guideDate: pack.guideDate } : {}),
           installedAt: nowIso(),
-          previousVersion: existing ? existing.version : undefined,
+          ...(existing ? { previousVersion: existing.version } : {}),
         };
         if (index >= 0) current[index] = next;
         else current.push(next);
         applied.push({ packId: pack.packId, version: pack.toVersion });
       }
       store.set('packs', current);
-      previews.delete(previewId);
-      return { ok: true, value: { applied, guideDate: preview.packs[0]?.guideDate ?? guideDate } };
+      staged.delete(previewId);
+      return { ok: true, value: { applied, ...(entry.preview.packs[0]?.guideDate ? { guideDate: entry.preview.packs[0].guideDate } : {}) } };
     } catch {
       return { ok: false, error: { code: 'io', message: 'Could not save the pack' } };
     }
@@ -225,7 +288,7 @@ export function createPackManager(deps: {
         packId: existing.packId,
         kind: existing.kind,
         version: previous,
-        guideDate: existing.guideDate,
+        ...(existing.guideDate ? { guideDate: existing.guideDate } : {}),
         installedAt: nowIso(),
       };
       store.set('packs', current);
@@ -245,9 +308,11 @@ export function createPackManager(deps: {
   return {
     installed: () => installedPacks().map((pack) => ({ ...pack })),
     importFile,
+    importArchive,
     apply,
     rollback,
-    content: () => loadBundledContent(),
+    content: () => (activeContent ? { ok: true as const, value: activeContent } : loadBundledContent()),
+    raw: () => activeRaw ?? rawContent,
     corePack,
   };
 }
