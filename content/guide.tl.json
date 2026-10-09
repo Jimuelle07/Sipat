@@ -1,0 +1,499 @@
+{
+  "schema_version": 1,
+  "content_version": 1,
+  "generated_at": "2026-10-09T00:00:00+08:00",
+  "items": [
+    {
+      "id": "before-signals-tcws-01",
+      "lang": "tl",
+      "title": "Ano ang ibig sabihin ng wind signal",
+      "topic": "signals",
+      "phase": [
+        "before",
+        "during"
+      ],
+      "warnings": {
+        "tcws": [],
+        "rainfall": [],
+        "surge": [],
+        "gale": false
+      },
+      "profile_tags": [],
+      "hazards": [
+        "wind"
+      ],
+      "critical": false,
+      "text": "Ang Tropical Cyclone Wind Signal ay babala ng PAGASA para sa lugar na maaaring tamaan ng malakas na hangin dahil sa bagyo. May limang antas ang signal. Kapag mas mataas ang numero ng signal, mas malakas ang inaasahang hangin at mas maikli ang oras bago ito dumating. Karaniwang itinataas ang signal sa buong probinsya o lungsod. Maaaring mas malakas pa ang hangin sa tabing-dagat at sa matataas na lugar. Maaari ring tumalon ang signal, halimbawa mula Signal No. 1 diretso sa Signal No. 3. Kaya bantayan palagi ang pinakabagong bulletin ng PAGASA at huwag hintaying tumaas pa ang signal bago maghanda.",
+      "summary": "Ang wind signal ng PAGASA ay babala sa lakas ng hangin ng bagyo; mas mataas na numero, mas malakas na hangin at mas maikling oras para maghanda.",
+      "source_id": "pagasa-tcws",
+      "locator": "Intro and considerations when using the TCWS system",
+      "reviewed_by": "PLACEHOLDER: pending human reviewer",
+      "reviewed_at": "2026-10-09",
+      "version": 1
+    },
+    {
+      "id": "before-gobag-01",
+      "lang": "tl",
+      "title": "Ano ang laman ng go bag",
+      "topic": "go_bag",
+      "phase": [
+        "before"
+      ],
+      "warnings": {
+        "tcws": [],
+        "rainfall": [],
+        "surge": [],
+        "gale": false
+      },
+      "profile_tags": [],
+      "hazards": [],
+      "critical": false,
+      "text": "Ang go bag ay bag ng mahahalagang gamit na madaling madampot kapag may sakuna o kailangang lumikas. Ilagay dito ang inuming tubig, pagkain tulad ng de-lata at biskwit, at mga kubyertos. Isama ang first aid kit at mga personal na gamot. Magdala ng damit, tsinelas, kumot, at jacket. Huwag kalimutan ang flashlight, powerbank, ekstrang baterya, at charger. Isama rin ang sabon, sipilyo, toothpaste, at tissue. Ilagay ang ID at mahahalagang dokumento. Regular na suriin ang go bag, tingnan ang expiration date ng pagkain at gamot, at palitan ang mga ito kung kailangan.",
+      "summary": "Ihanda ang go bag na may tubig, pagkain, gamot, flashlight, damit, gamit sa kalinisan at mga dokumento, at suriin ito nang regular.",
+      "source_id": "qc-guide-go-bag",
+      "locator": "Things to Pack in an Emergency Go Bag",
+      "reviewed_by": "PLACEHOLDER: pending human reviewer",
+      "reviewed_at": "2026-10-09",
+      "version": 1
+    },
+    {
+      "id": "before-home-prep-01",
+      "lang": "tl",
+      "title": "Paghahanda ng bahay bago ang bagyo",
+      "topic": "home_prep",
+      "phase": [
+        "before"
+      ],
+      "warnings": {
+        "tcws": [],
+        "rainfall": [],
+        "surge": [],
+        "gale": false
+      },
+      "profile_tags": [
+        "light_materials"
+      ],
+      "hazards": [
+        "wind"
+      ],
+      "critical": false,
+      "text": "Bago pa dumating ang bagyo, suriin ang bahay kung may sira ang kisame, pinto, o bintana, at ipaayos ito agad. Itali ang bubong at iba pang bagay na maaaring liparin ng hangin. Putulin ang mga sanga ng puno na maaaring bumagsak. Tiyaking kumpleto ang emergency go bag at naka-charge ang cellphone at powerbank. Kung madalas bumaha sa inyong lugar, itaas ang mga gamit na maaaring abutin ng tubig-baha. Kapag kailangang lumikas, patayin ang kuryente, isara ang tangke ng gas, at i-lock ang mga pinto ng bahay. Ipaliwanag din sa mga bata kung paano maghanda para hindi sila matakot.",
+      "summary": "Bago ang bagyo, ipaayos ang sirang bintana o kisame, itali ang bubong, at putulin ang mga sangang maaaring bumagsak.",
+      "source_id": "unicef-ph-typhoon",
+      "locator": "Maging handa at alerto bago pa man dumating ang bagyo",
+      "reviewed_by": "PLACEHOLDER: pending human reviewer",
+      "reviewed_at": "2026-10-09",
+      "version": 1
+    },
+    {
+      "id": "during-flood-river-01",
+      "lang": "tl",
+      "title": "Kapag malapit sa ilog at tumataas ang tubig",
+      "topic": "evacuation",
+      "phase": [
+        "during"
+      ],
+      "warnings": {
+        "tcws": [
+          2,
+          3,
+          4,
+          5
+        ],
+        "rainfall": [
+          "orange",
+          "red"
+        ],
+        "surge": [],
+        "gale": false
+      },
+      "profile_tags": [
+        "near_river",
+        "low_lying"
+      ],
+      "hazards": [
+        "flood"
+      ],
+      "critical": true,
+      "text": "Nagkakaroon ng baha kapag umaapaw ang ilog o dahil sa malakas na ulan. Kung malapit ang bahay sa ilog, gumawa ng evacuation plan at alamin ang ligtas na lugar kung saan maaaring lumikas ang pamilya. Iakyat sa mataas na lugar ang mahahalagang gamit. Sundin ang mga alituntunin sa paglikas ng inyong lugar at barangay. Kung kailangang lumikas, isara ang switch ng kuryente, tubig, at tangke ng LPG, at dalhin ang go bag. Huwag lumangoy o mamangka sa umaapaw na ilog. Huwag maglakad o magmaneho sa lugar na baha. Huwag bumalik sa bahay hangga't hindi idinedeklarang ligtas ng mga awtoridad.",
+      "summary": "Kung malapit sa ilog, maghanda nang lumikas at sumunod agad sa utos ng barangay.",
+      "source_id": "qc-guide-flood",
+      "locator": "Bago Bumaha; Habang may Baha; Pagtapos ng Baha",
+      "reviewed_by": "PLACEHOLDER: pending human reviewer",
+      "reviewed_at": "2026-10-09",
+      "version": 1
+    },
+    {
+      "id": "during-flood-01",
+      "lang": "tl",
+      "title": "Ano ang gagawin habang may baha",
+      "topic": "flood",
+      "phase": [
+        "during"
+      ],
+      "warnings": {
+        "tcws": [],
+        "rainfall": [],
+        "surge": [],
+        "gale": false
+      },
+      "profile_tags": [
+        "low_lying"
+      ],
+      "hazards": [
+        "flood"
+      ],
+      "critical": false,
+      "text": "Habang may baha, manatili sa loob ng bahay at patuloy na makinig sa balita at ulat ng panahon. Sundin ang mga alituntunin sa paglikas sa inyong lugar. Huwag hawakan ang anumang de-kuryenteng kagamitan kung ikaw ay basa o nakalubog sa tubig. Huwag maglakad o magmaneho sa lugar na may baha. Pagkatapos ng baha, linisin ang mga bagay na maaaring nadumihan ng tubig-baha. Siguraduhing hindi nahaluan ng baha ang inyong pagkain at inuming tubig. Itapon ang naipong tubig sa mga lata, paso, at gulong para hindi pamahayan ng lamok.",
+      "summary": "Habang may baha, manatili sa loob, huwag lumusong o humawak ng kuryente kapag basa, at tiyaking malinis ang tubig at pagkain pagkatapos.",
+      "source_id": "qc-guide-flood",
+      "locator": "Habang may Baha; Pagtapos ng Baha",
+      "reviewed_by": "PLACEHOLDER: pending human reviewer",
+      "reviewed_at": "2026-10-09",
+      "version": 1
+    },
+    {
+      "id": "during-surge-01",
+      "lang": "tl",
+      "title": "Storm surge sa tabing-dagat",
+      "topic": "surge",
+      "phase": [
+        "before",
+        "during"
+      ],
+      "warnings": {
+        "tcws": [],
+        "rainfall": [],
+        "surge": [
+          "yellow",
+          "orange",
+          "red"
+        ],
+        "gale": false
+      },
+      "profile_tags": [
+        "near_sea"
+      ],
+      "hazards": [
+        "surge"
+      ],
+      "critical": true,
+      "text": "Ang storm surge o daluyong ng bagyo ay ang di-pangkaraniwang pagtaas ng dagat habang may bagyo. Itinutulak ng malakas na hangin ang tubig ng dagat papunta sa mabababang lugar sa baybayin, kaya maaaring bumaha. Mas mapanganib ito kapag sumabay sa high tide, at may kasama pang malalaking alon. Kung nasa lugar na madalas tamaan ng storm surge, makinig sa balita at sa mga babala ng PAGASA. Alamin ang pinakaligtas at pinakamabilis na daan papunta sa mataas na lugar. Lumikas agad kapag sinabi ng barangay o ng lokal na DRRM. Dalhin ang emergency kit at patayin ang kuryente at tangke ng gas.",
+      "summary": "Kung nasa tabing-dagat at may babala ng storm surge, lumikas agad sa mataas na lugar kapag inutos ng barangay.",
+      "source_id": "pagasa-storm-surge",
+      "locator": "What is Storm Surge?; What should I do if I am in a storm-surge prone area?",
+      "reviewed_by": "PLACEHOLDER: pending human reviewer",
+      "reviewed_at": "2026-10-09",
+      "version": 1
+    },
+    {
+      "id": "during-landslide-01",
+      "lang": "tl",
+      "title": "Kapag may banta ng landslide",
+      "topic": "landslide",
+      "phase": [
+        "before",
+        "during"
+      ],
+      "warnings": {
+        "tcws": [],
+        "rainfall": [],
+        "surge": [],
+        "gale": false
+      },
+      "profile_tags": [
+        "slope"
+      ],
+      "hazards": [
+        "landslide"
+      ],
+      "critical": true,
+      "text": "Ang landslide o guho ay ang pagbaba ng lupa, bato, at putik mula sa mataas na lugar. Maaari itong mangyari kapag may malakas at tuloy-tuloy na ulan. Alamin kung may banta ng pagguho sa inyong lugar at ang mga palatandaan nito. Alamin ang evacuation site at ang pinakamabilis at ligtas na daan papunta roon. Kapag inabisuhan ng kinauukulan, lumikas agad sa ligtas na lugar. Kung nasa loob at hindi makalikas, pumunta sa ilalim ng matibay na mesa. Kung nasa labas, lumayo sa gumuguhong lupa. Kung nagmamaneho, huwag dumaan sa tulay at sirang kalsada.",
+      "summary": "Kung may banta ng landslide, alamin ang ligtas na daan at lumikas agad kapag inabisuhan ng kinauukulan.",
+      "source_id": "qc-guide-landslide",
+      "locator": "Bago/Habang may Pagguho ng Lupa",
+      "reviewed_by": "PLACEHOLDER: pending human reviewer",
+      "reviewed_at": "2026-10-09",
+      "version": 1
+    },
+    {
+      "id": "before-infant-01",
+      "lang": "tl",
+      "title": "Paghahanda para sa sanggol",
+      "topic": "infant",
+      "phase": [
+        "before"
+      ],
+      "warnings": {
+        "tcws": [],
+        "rainfall": [],
+        "surge": [],
+        "gale": false
+      },
+      "profile_tags": [
+        "infant"
+      ],
+      "hazards": [
+        "health"
+      ],
+      "critical": false,
+      "text": "Kung may sanggol sa pamilya, tandaan ang panawagan ng DOH kasama ang UNICEF at WHO: protektahan at suportahan ang pagpapasuso tuwing may sakuna. Kaya ng ina na magpasuso kahit mahirap ang sitwasyon, at mahalagang malaman ito para hindi tumigil sa pagpapasuso. Ang gatas ng ina ang pinakamahusay na nutrisyon para sa sanggol at nakatutulong itong protektahan siya laban sa ilang sakit tulad ng pagtatae. Mapanganib ang basta-bastang paggamit ng formula o ibang pamalit na gatas dahil kadalasang kulang ang malinis na tubig at kalinisan pagkatapos ng bagyo. Kung hindi nagpapasuso ang sanggol, ipaalam agad sa mga health worker para matulungan kayo.",
+      "summary": "Ipagpatuloy ang pagpapasuso sa sanggol tuwing may sakuna dahil ang gatas ng ina ang pinakaligtas at pinakamahusay na nutrisyon.",
+      "source_id": "doh-unicef-who-breastfeeding-2014",
+      "locator": "DOH, UNICEF and WHO call to protect, promote and support breastfeeding during emergencies",
+      "reviewed_by": "PLACEHOLDER: pending human reviewer",
+      "reviewed_at": "2026-10-09",
+      "version": 1
+    },
+    {
+      "id": "before-senior-01",
+      "lang": "tl",
+      "title": "Paghahanda para sa senior at may maintenance na gamot",
+      "topic": "senior",
+      "phase": [
+        "before"
+      ],
+      "warnings": {
+        "tcws": [],
+        "rainfall": [],
+        "surge": [],
+        "gale": false
+      },
+      "profile_tags": [
+        "senior",
+        "maintenance_meds"
+      ],
+      "hazards": [
+        "health"
+      ],
+      "critical": false,
+      "text": "Kung may senior o kasamang umiinom ng maintenance na gamot, isama sa go bag ang kanilang gamot bago pa dumating ang bagyo. Isama rin ang first aid kit, thermometer, at mga gamot para sa lagnat, ubo, sipon, at pagtatae. Ilagay sa go bag ang government ID, medical records, at iba pang mahahalagang dokumento. Magdala ng ID na may blood type at emergency contact information ng senior. Magdala ng ekstrang damit at kumot para manatiling komportable sila. Gumamit ng waterproof na bag na madaling mabuhat ng kahit sino sa pamilya, at ilagay ito sa lugar na madaling kunin.",
+      "summary": "Ihanda ang maintenance na gamot, medical records at ID ng senior sa go bag bago pa dumating ang bagyo.",
+      "source_id": "unicef-ph-go-bag",
+      "locator": "Food, medicines at first aid kit; Important documents and cash",
+      "reviewed_by": "PLACEHOLDER: pending human reviewer",
+      "reviewed_at": "2026-10-09",
+      "version": 1
+    },
+    {
+      "id": "before-disability-01",
+      "lang": "tl",
+      "title": "Paghahanda para sa kasamang PWD",
+      "topic": "disability",
+      "phase": [
+        "before"
+      ],
+      "warnings": {
+        "tcws": [],
+        "rainfall": [],
+        "surge": [],
+        "gale": false
+      },
+      "profile_tags": [
+        "pwd"
+      ],
+      "hazards": [],
+      "critical": false,
+      "text": "(placeholder: write from the official source) Ang talatang ito ay para sa pamilyang may kasamang PWD o taong gumagamit ng wheelchair, saklay o iba pang assistive device. Wala pang nakuhang opisyal na gabay mula sa NDRRMC o OCD na tiyak para sa PWD sa panahon ng bagyo, kaya hindi pa ito napupunan. Habang hinihintay ang opisyal na nilalaman, sundin ang abiso ng barangay at lokal na pamahalaan tungkol sa paglikas, at sabihan sila nang maaga kung may kasama kayong PWD na mangangailangan ng tulong. Isama ang wheelchair at iba pang kagamitan ng PWD sa plano ng pamilya.",
+      "summary": "Placeholder: wala pang opisyal na gabay para sa PWD at wheelchair; sundin ang abiso ng barangay.",
+      "source_id": "ndrrmc-preparedness",
+      "locator": "(placeholder: no fetched official PWD guidance)",
+      "reviewed_by": "PLACEHOLDER: pending human reviewer",
+      "reviewed_at": "2026-10-09",
+      "version": 1
+    },
+    {
+      "id": "before-pregnancy-01",
+      "lang": "tl",
+      "title": "Paghahanda para sa buntis",
+      "topic": "pregnancy",
+      "phase": [
+        "before"
+      ],
+      "warnings": {
+        "tcws": [],
+        "rainfall": [],
+        "surge": [],
+        "gale": false
+      },
+      "profile_tags": [
+        "pregnant"
+      ],
+      "hazards": [
+        "health"
+      ],
+      "critical": false,
+      "text": "(placeholder: write from the official source) Ang talatang ito ay para sa pamilyang may kasamang buntis. Wala pang nakuhang opisyal na pahina ng DOH na tiyak na nagsasabi kung paano maghahanda ang buntis bago dumating ang bagyo, kaya hindi pa ito napupunan. Habang hinihintay ang opisyal na nilalaman, kumonsulta sa health center o barangay health worker tungkol sa pangangalaga sa buntis sa panahon ng sakuna, at sundin ang abiso ng barangay at lokal na pamahalaan kung kailangang lumikas. Huwag umasa sa talatang ito para sa payong medikal.",
+      "summary": "Placeholder: wala pang opisyal na gabay ng DOH para sa buntis; kumonsulta sa health center.",
+      "source_id": "doh-health-typhoon",
+      "locator": "(placeholder: no fetched official pregnancy guidance)",
+      "reviewed_by": "PLACEHOLDER: pending human reviewer",
+      "reviewed_at": "2026-10-09",
+      "version": 1
+    },
+    {
+      "id": "before-pets-01",
+      "lang": "tl",
+      "title": "Mga alagang hayop bago ang bagyo",
+      "topic": "pets",
+      "phase": [
+        "before"
+      ],
+      "warnings": {
+        "tcws": [],
+        "rainfall": [],
+        "surge": [],
+        "gale": false
+      },
+      "profile_tags": [
+        "pets"
+      ],
+      "hazards": [],
+      "critical": false,
+      "text": "Bago dumating ang bagyo, isama sa plano ng pamilya ang mga alagang hayop. Ayon sa gabay ng lungsod, ilikas ang mga alaga at hayop tulad ng livestock sa ligtas na lugar, o sa itinakdang evacuation site para sa mga hayop kung mayroon sa inyong lugar. Kung kailangang lumikas dahil sa baha, ilipat din ang mga alaga sa ligtas na lugar. Habang naghahanda, makinig sa balita at mga babala tungkol sa panahon, alamin ang plano ng komunidad sa pagbibigay-babala at paglikas, at ihanda ang Go Bag ng pamilya. Kapag inabisuhan ng barangay o lokal na pamahalaan, lumikas agad sa itinakdang evacuation center.",
+      "summary": "Ilikas ang mga alagang hayop sa ligtas na lugar o sa evacuation site para sa hayop bago ang bagyo.",
+      "source_id": "qc-guide-tropical-cyclone",
+      "locator": "BEFORE A TROPICAL CYCLONE / BAGO ANG BAGYO",
+      "reviewed_by": "PLACEHOLDER: pending human reviewer",
+      "reviewed_at": "2026-10-09",
+      "version": 1
+    },
+    {
+      "id": "during-water-food-01",
+      "lang": "tl",
+      "title": "Ligtas na inuming tubig at pagkain",
+      "topic": "water_food",
+      "phase": [
+        "during",
+        "after"
+      ],
+      "warnings": {
+        "tcws": [],
+        "rainfall": [],
+        "surge": [],
+        "gale": false
+      },
+      "profile_tags": [],
+      "hazards": [
+        "water"
+      ],
+      "critical": false,
+      "text": "Kapag may babala ng baha, mag-imbak ng inuming tubig sa mga lalagyan dahil maaaring maputol ang suplay ng tubig. Bago pa man ang bagyo, mag-ipon ng pagkaing kaunti o hindi na kailangang lutuin at hindi kailangang ilagay sa ref, sapat para sa hindi bababa sa tatlong araw. Pagkatapos ng baha, huwag munang kainin ang pagkain o inumin ang tubig hangga't hindi pa nasusuri kung kontaminado ang mga ito. Kumonsulta sa mga awtoridad pangkalusugan tungkol sa kailangang bakuna. Kung may sirang tubo ng tubig o linya ng kuryente, iulat ito sa tamang ahensya.",
+      "summary": "Mag-imbak ng inuming tubig at pagkain, at huwag kainin o inumin ang maaaring kontaminado ng baha.",
+      "source_id": "ndrrmc-senate-handbook-2011",
+      "locator": "Flood: When Warned of Flood; After the Flood; What to do in case of typhoons (pp. 36, 41-42)",
+      "reviewed_by": "PLACEHOLDER: pending human reviewer",
+      "reviewed_at": "2026-10-09",
+      "version": 1
+    },
+    {
+      "id": "during-electrical-01",
+      "lang": "tl",
+      "title": "Kuryente at saksakan habang may bagyo",
+      "topic": "electrical",
+      "phase": [
+        "during",
+        "after"
+      ],
+      "warnings": {
+        "tcws": [],
+        "rainfall": [],
+        "surge": [],
+        "gale": false
+      },
+      "profile_tags": [],
+      "hazards": [
+        "electrical"
+      ],
+      "critical": true,
+      "text": "Habang may bagyo, patayin ang main switch ng kuryente at ang valve ng tubig kung kinakailangan. Kapag brownout o madilim, gumamit ng flashlight o emergency lamp, at maging maingat sa paggamit ng kandila o gasera. Umiwas sa mga salamin at bintana. Pagkatapos ng bagyo, umiwas sa mga natumbang puno, nasirang gusali at linya ng kuryente. Bago buksan muli ang kuryente, siguruhing walang basa o nakababad na saksakan o kagamitan. Hintayin ang abiso ng kinauukulan bago bumalik sa bahay kung lumikas kayo, at maging maingat sa pag-aayos ng mga nasirang bahagi ng bahay.",
+      "summary": "Patayin ang main switch, gumamit ng flashlight, at suriin ang basang saksakan bago buksan ang kuryente.",
+      "source_id": "qc-guide-tropical-cyclone",
+      "locator": "DURING / AFTER A TROPICAL CYCLONE (HABANG BUMA-BAGYO / PAGTAPOS NG BAGYO)",
+      "reviewed_by": "PLACEHOLDER: pending human reviewer",
+      "reviewed_at": "2026-10-09",
+      "version": 1
+    },
+    {
+      "id": "after-generator-fire-01",
+      "lang": "tl",
+      "title": "Generator at carbon monoxide",
+      "topic": "generator_fire",
+      "phase": [
+        "after"
+      ],
+      "warnings": {
+        "tcws": [],
+        "rainfall": [],
+        "surge": [],
+        "gale": false
+      },
+      "profile_tags": [],
+      "hazards": [
+        "fire"
+      ],
+      "critical": true,
+      "text": "Kapag brownout at gagamit ng portable generator, tandaan na naglalabas ito ng carbon monoxide, isang nakalalasong gas na walang amoy at walang kulay at maaaring pumatay nang walang babala. Huwag kailanman gamitin ang generator sa loob ng bahay o garahe, kahit nakabukas ang mga pinto at bintana. Gamitin lamang ito sa labas, mahigit 20 talampakan ang layo sa bahay, mga pinto at bintana. Ilagay ang de-bateryang carbon monoxide detector malapit sa lahat ng tulugan at suriin ito nang regular upang matiyak na gumagana.",
+      "summary": "Huwag gamitin ang generator sa loob ng bahay o garahe; gamitin ito sa labas at maglagay ng carbon monoxide detector.",
+      "source_id": "cdc-generator-safety",
+      "locator": "CDC 'When the power goes out, keep your generator outside' (Portable Generators; CO Detectors)",
+      "reviewed_by": "PLACEHOLDER: pending human reviewer",
+      "reviewed_at": "2026-10-09",
+      "version": 2
+    },
+    {
+      "id": "after-cleanup-01",
+      "lang": "tl",
+      "title": "Paglilinis pagkatapos ng baha",
+      "topic": "cleanup",
+      "phase": [
+        "after"
+      ],
+      "warnings": {
+        "tcws": [],
+        "rainfall": [],
+        "surge": [],
+        "gale": false
+      },
+      "profile_tags": [],
+      "hazards": [
+        "flood"
+      ],
+      "critical": false,
+      "text": "Kung lumikas kayo, huwag bumalik sa bahay o sa mga lugar na binaha hanggang hindi pa idinedeklarang ligtas ng mga awtoridad. Huwag buksan ang main switch ng kuryente o gumamit ng appliances at iba pang kagamitan hanggang masuri ng isang electrician. Linisin ang anumang bagay na maaaring kontaminado ng tubig-baha. Siguraduhing hindi kontaminado ng baha ang inyong pagkain at inumin. Itapon ang naipong tubig sa mga lata, paso at gulong upang hindi pamahayan ng lamok. Sa paglilinis, unahin ang kaligtasan at sundin ang abiso ng barangay.",
+      "summary": "Bumalik lang kapag ligtas na, ipasuri ang kuryente, at linisin ang mga kontaminado ng baha.",
+      "source_id": "qc-guide-flood",
+      "locator": "AFTER / PAGTAPOS NG BAHA",
+      "reviewed_by": "PLACEHOLDER: pending human reviewer",
+      "reviewed_at": "2026-10-09",
+      "version": 2
+    },
+    {
+      "id": "after-leptospirosis-01",
+      "lang": "tl",
+      "title": "Leptospirosis pagkatapos ng baha",
+      "topic": "health_after_flood",
+      "phase": [
+        "after"
+      ],
+      "warnings": {
+        "tcws": [],
+        "rainfall": [],
+        "surge": [],
+        "gale": false
+      },
+      "profile_tags": [],
+      "hazards": [
+        "health"
+      ],
+      "critical": true,
+      "text": "Ang leptospirosis ay sakit na maaaring makuha sa baha o tubig na kontaminado. Para makaiwas, huwag lumangoy o lumubog sa baha o maruming tubig. Magsuot ng bota at guwantes kung kailangang lumusong. Uminom lamang ng malinis na tubig, itapon nang tama ang basura, at panatilihing malinis ang bahay at paligid. Hugasan ng malinis na tubig ang bahagi ng katawan na nabasa ng baha. Kung lumitaw ang mga sintomas ng leptospirosis, kumonsulta agad sa pinakamalapit na primary care provider.",
+      "summary": "Iwasan ang baha, maghugas kapag nabasa, at kumonsulta agad kapag lumitaw ang mga sintomas ng leptospirosis.",
+      "source_id": "doh-bicol-leptospirosis",
+      "locator": "Leptospirosis advisory: preventive measures",
+      "reviewed_by": "PLACEHOLDER: pending human reviewer",
+      "reviewed_at": "2026-10-09",
+      "version": 2
+    }
+  ]
+}

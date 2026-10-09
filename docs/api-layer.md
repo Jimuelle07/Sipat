@@ -53,6 +53,8 @@ export type CopyKey =
   | 'medical_dose'; // draft: "Hindi nagbibigay ng dosis ng gamot ang app. Magtanong sa Health Center o sa doktor."
 ```
 
+English translations exist for display under the Tagalog original and are pending review.
+
 ## 3. Frontend–backend handoff
 
 This section is the full contract between the two people who build the app. The frontend person needs only this section and the types it links to. The backend person implements it using sections 5 to 12.
@@ -64,23 +66,23 @@ In the MVP there is no server. Everything a server would normally do, such as se
 | | Frontend | Backend |
 | :-- | :-- | :-- |
 | Builds | Screens, navigation, components, theme (dark, large text), animations, accessibility, UI copy | The `Engine` facade and everything behind it: core logic, services, content files, the model, storage, packs, evaluation. Pilot: the cloud |
-| Folders | `app/`, `src/ui/` | `src/engine/`, `src/core/`, `src/services/`, `content/`, `scripts/`, `eval/`. Pilot: `cloud/` |
-| May import | `src/engine` (types, `createEngine`, `createMockEngine`), React, React Native UI primitives, navigation | Anything it needs |
-| Must not import | `src/core/*`, `src/services/*`, `llama.rn`, `react-native-mmkv`, `minisearch`, `expo-battery`, `expo-device`, `expo-file-system`, `expo-document-picker`, `expo-sharing`, `expo-print`, `expo-image-picker`, `expo-image-manipulator`, the ML Kit face-detection wrapper | `app/`, `src/ui/` |
+| Folders | `app/ui/` (screens, components, UI primitives) | `app/engine/`, `app/core/`, `app/services/` (the Engine facade, core logic, services, storage, content, evaluation, and cloud APIs) |
+| May import | `app/engine` (types, `createEngine`, `createMockEngine`), UI primitives, navigation | Anything it needs |
+| Must not import | `app/core/*`, `app/services/*`, native modules | `app/ui/` |
 | Writes the text for | Labels, buttons, status lines and error messages ([section 3.5](#35-codes-the-ui-must-handle)) | Safety copy and guide content, delivered inside events or through `engine.copy()` |
 | Pilot | The Bantay portal web UI | The portal REST API, the pack pipeline, the CDN and topic ingestion |
 
-An ESLint `no-restricted-imports` rule in `app/` and `src/ui/` enforces the import rows. The engine owns every native module, so the frontend never deals with the model, storage, battery, files, the camera, face detection, SMS or the dialer. The UI only shows the preview images and face boxes the engine hands it.
+An ESLint `no-restricted-imports` rule in `app/ui/` enforces the import rows. The engine owns every native/system module, so the frontend never deals with the model, storage, battery, files, the camera, face detection, SMS or the dialer. The UI only shows the preview images and face boxes the engine hands it.
 
 ```mermaid
 flowchart LR
-  subgraph FE["Frontend: app and src/ui"]
+  subgraph FE["Frontend: app/ui/"]
     SCR["Screens and components"]
   end
-  subgraph BE["Backend: src/engine and below"]
+  subgraph BE["Backend: app/engine and below"]
     ENG["Engine facade"]
-    CORE["src/core"]
-    SVC["src/services"]
+    CORE["app/core"]
+    SVC["app/services"]
     DATA["Content, packs, MMKV, model"]
   end
   SCR -->|calls that return values or Results| ENG
@@ -100,7 +102,7 @@ export interface Engine {
   init(): Promise<Result<EngineInfo, 'content_invalid' | 'storage_failed'>>; // once, behind the splash screen
   info(): EngineInfo;
   status(): EngineStatus;
-  copy(key: CopyKey): string; // fixed safety copy (section 2); the UI never retypes it
+  copy(key: CopyKey, lang?: UiLanguage): string; // 'tl' default; 'en' is a translation shown under the Tagalog
   onChange(listener: (change: EngineChange) => void): () => void; // returns unsubscribe
 
   profiles: ProfilesApi;
@@ -654,8 +656,10 @@ export interface Profile {
 }
 
 export type DeviceTier = 'full' | 'lite' | 'none';
+export type UiLanguage = 'tl' | 'en';
 
 export interface Settings {
+  language: UiLanguage;         // default 'tl'
   lowBatteryThreshold: number; // percent, default 15
   aiEnabled: boolean;          // default true
   staleWarningHours: number;   // default 3
@@ -792,7 +796,7 @@ export interface ChatMessage { role: 'system' | 'user' | 'assistant'; content: s
 
 export interface PromptInput {
   question: string;    // NormalizedQuery.raw
-  profile: Profile;
+  profile: Profile | null; // null before household setup: no tag boost, summary "hindi pa naka-setup"
   context: Context;
   passages: Passage[]; // the 1 or 2 selected, in rank order
 }
@@ -1185,7 +1189,7 @@ const messages: ChatMessage[] = [
 `SYSTEM_TL`, adapted from v1. This is the canonical text; [system-design.md](system-design.md) quotes the same lines.
 
 ```text
-Ikaw ay gabay sa paghahanda sa bagyo para sa isang sambahayan.
+Ikaw si Bagyo Buddy, gabay sa paghahanda sa bagyo para sa isang sambahayan.
 Sumagot LAMANG mula sa mga talatang ibinigay. Huwag gumamit ng sariling kaalaman.
 Sumagot sa 2 hanggang 4 na maiikling pangungusap sa simpleng Tagalog.
 Huwag magdagdag ng numero, oras, lugar o pangalan na wala sa mga talata.
@@ -1198,7 +1202,7 @@ Ilagay sa "used" ang ID ng talatang pinagkunan mo.
 
 ```text
 Sambahayan: {profile_summary}
-Babala ngayon: {warnings_summary}
+Yugto at babala: {phase_label}; {warnings_summary}
 
 Talata [{id_1}]: {text_1}
 Talata [{id_2}]: {text_2}
@@ -1207,6 +1211,7 @@ Tanong: {question}
 ```
 
 - `{profile_summary}` is built by code from the tags, about 20 tokens: "5 tao; may sanggol at senior na may maintenance na gamot; malapit sa ilog".
+- `{phase_label}` is the short phase label for `context.phase` (`before`, `during`, `after` map to "Bago", "Habang", "Pagkatapos"; see [README.md](README.md)).
 - `{warnings_summary}` lists the active warnings, for example "Signal No. 2; orange na babala sa ulan", or "wala".
 - The second `Talata` line is left out when only one passage is selected.
 - The closing line is never in the prompt. Code appends it.

@@ -12,7 +12,7 @@ It is built first as a 10-hour hackathon MVP, then piloted with one or two LGUs.
 
 ## Current stage
 
-Docs only (v2, 2026-10-09). There is no app code yet. Do not scaffold or write app code unless the user asks.
+Active development. All application code lives inside `app/`. The agent is free to generate, scaffold, and implement all code inside `app/`.
 
 ## Read before working
 
@@ -52,18 +52,10 @@ Docs only (v2, 2026-10-09). There is no app code yet. Do not scaffold or write a
 
 The docs describe intent. Check exact library APIs against the versions you install.
 
-## Planned layout (once coding starts)
+## Planned layout
 
 ```text
-app/            screens (frontend)
-src/ui/         components, hooks, UI copy (frontend)
-src/engine/     the Engine facade: the only API screens call, plus createMockEngine,
-                fixtures and contract tests (backend)
-src/core/       pure TypeScript: normalize, route, createIndex, search, gate, buildPrompt,
-                verify, buildChecklist, verifyPack, plus the ask() orchestrator built
-                with createAsk(deps). No React Native imports; runs in Node.
-src/services/   ModelManager, PowerPolicy, Store, PackManager, ShareService,
-                UpdateClient (Pilot), TopicReporter (Pilot)
+app/            all application code (screens, UI components, engine facade, core logic, services, storage)
 content/        guide.tl.json, checklist.json, warnings.json, synonyms.json,
                 intents.json, sources.json, hotlines.json
 scripts/        content validation, pack build and signing, evaluation
@@ -75,7 +67,7 @@ eval/           question sets and results
 - Use the shared names in `docs/README.md` exactly: phases, warning kinds and levels, profile tags, topic groups, module names, answer events, verifier codes, device tiers and MMKV keys.
 - UI copy is Tagalog or Taglish and lives in one place, keyed by name. Code, comments and docs are in English.
 - Times are ISO 8601 with `+08:00` (Asia/Manila). Places use PSGC codes.
-- Keep `src/core` pure and deterministic so unit tests and the 120-question evaluation run in Node.
-- Screens (`app/`, `src/ui/`) import only `src/engine`, never `src/core`, `src/services` or native modules. Change the `Engine` contract only as `docs/api-layer.md` section 3.7 describes.
+- Keep core logic pure and deterministic so unit tests and the 120-question evaluation run in Node.
+- Screens and UI components in `app/` import only the `Engine` facade, never lower-level core logic, internal services, or raw native modules directly. Change the `Engine` contract only as `docs/api-layer.md` section 3.7 describes.
 - Do not add a dependency that needs the network at runtime.
 - In docs: link sources inline, mark our own analysis *Reasoning:*, mark secondary figures **Unverified**, treat targets as proposals to measure, and tag scope as MVP, MVP stretch, Pilot or Later.

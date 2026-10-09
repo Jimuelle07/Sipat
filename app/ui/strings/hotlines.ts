@@ -1,0 +1,83 @@
+import type { TopicGroup } from '../../engine';
+import { defineStrings } from '../i18n';
+
+/** Copy used only by the Hotlines screen. Fixed safety copy comes from engine.copy(). */
+export const hotlineStrings = defineStrings({
+  tl: {
+    title: 'Hotline',
+    hotlines: 'Mga hotline',
+    noHotlines: 'Walang nakatalang hotline.',
+    call: 'Tumawag',
+    noDialer: 'Hindi mabuksan ang dialer sa phone na ito.',
+    centers: 'Mga evacuation center',
+    noCentersTitle: 'Walang nakatalang evacuation center',
+    noCenters: 'Wala pang nakatalang evacuation center para sa lugar mo.',
+    landmark: 'Palatandaan',
+    capacity: 'Kapasidad',
+    accessible: 'May akses para sa may kapansanan',
+    pets: 'Tumatanggap ng alagang hayop',
+    yes: 'Oo',
+    no: 'Hindi',
+    sms: 'Magpadala ng text',
+    safe: 'Ligtas ako',
+    needHelp: 'Kailangan ng tulong',
+    where: 'Kinaroroonan (opsyonal)',
+    preview: 'Silipin ang mensahe',
+    recipients: 'Mga numero, paghiwalayin ng kuwit',
+    recipientsPlaceholder: '0917 123 4567, 0928 123 4567',
+    compose: 'Buksan ang SMS app',
+    openingSms: 'Binubuksan ang SMS app…',
+    actionFailed: 'Hindi natuloy ang aksyon. Subukan muli.',
+  },
+  en: {
+    title: 'Hotlines',
+    hotlines: 'Hotlines',
+    noHotlines: 'No hotline is listed.',
+    call: 'Call',
+    noDialer: 'The dialer cannot open on this phone.',
+    centers: 'Evacuation centers',
+    noCentersTitle: 'No evacuation center listed',
+    noCenters: 'No evacuation center is listed for your area yet.',
+    landmark: 'Landmark',
+    capacity: 'Capacity',
+    accessible: 'Accessible for persons with disabilities',
+    pets: 'Accepts pets',
+    yes: 'Yes',
+    no: 'No',
+    sms: 'Send a text',
+    safe: 'I am safe',
+    needHelp: 'I need help',
+    where: 'Location (optional)',
+    preview: 'Message preview',
+    recipients: 'Numbers, separated by commas',
+    recipientsPlaceholder: '0917 123 4567, 0928 123 4567',
+    compose: 'Open SMS app',
+    openingSms: 'Opening SMS app…',
+    actionFailed: 'The action did not go through. Try again.',
+  },
+});
+
+const TOPIC_LABELS: Record<TopicGroup, string> = {
+  signals: 'Mga signal',
+  go_bag: 'Go bag',
+  home_prep: 'Paghahanda sa bahay',
+  evacuation: 'Paglikas',
+  flood: 'Baha',
+  surge: 'Storm surge',
+  landslide: 'Pagguho ng lupa',
+  infant: 'Sanggol',
+  senior: 'Nakatatanda',
+  pregnancy: 'Pagbubuntis',
+  disability: 'May kapansanan',
+  pets: 'Alagang hayop',
+  water_food: 'Tubig at pagkain',
+  electrical: 'Kuryente',
+  generator_fire: 'Generator at sunog',
+  cleanup: 'Paglilinis',
+  health_after_flood: 'Kalusugan pagkatapos ng baha',
+  out_of_guide: 'Wala sa gabay',
+};
+
+export function topicLabel(topic: TopicGroup): string {
+  return TOPIC_LABELS[topic];
+}

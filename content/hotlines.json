@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "content_version": 1,
+  "generated_at": "2026-10-09T00:00:00+08:00",
+  "items": [
+    { "id": "hotline-911", "name": "National Emergency Hotline 911", "number": "911", "scope": "national", "source_id": "pna-911", "verified_at": "2026-10-09" },
+    { "id": "hotline-prc", "name": "Philippine Red Cross", "number": "143", "scope": "national", "source_id": "prc-hotline", "verified_at": "2026-10-09" },
+    { "id": "hotline-ndrrmc", "name": "NDRRMC Operations Center", "number": "0289115061", "scope": "national", "hours": "24/7", "source_id": "ndrrmc-opcen", "verified_at": "2026-10-09" },
+    { "id": "hotline-pnp", "name": "PNP (sa pamamagitan ng 911)", "number": "911", "scope": "national", "source_id": "pna-911", "verified_at": "2026-10-09" }
+  ]
+}

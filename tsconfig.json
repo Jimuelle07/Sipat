@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
+    "jsx": "react-jsx",
+    "types": [
+      "node"
+    ],
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "noUncheckedIndexedAccess": true,
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": [
+    "index.ts",
+    "app",
+    "scripts",
+    "vitest.config.ts"
+  ],
+  "extends": "expo/tsconfig.base"
+}

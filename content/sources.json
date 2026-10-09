@@ -1,0 +1,196 @@
+{
+  "schema_version": 1,
+  "content_version": 1,
+  "generated_at": "2026-10-09T00:00:00+08:00",
+  "items": [
+    {
+      "id": "pagasa-tcws",
+      "agency": "PAGASA",
+      "title": "Tropical Cyclone Wind Signal",
+      "date": "undated",
+      "url": "https://bagong.pagasa.dost.gov.ph/learning-tools/tropical-cyclone-wind-signal",
+      "retrieved_at": "2026-10-09",
+      "notes": "Page states the current five-level TCWS system has been in use since 23 March 2022."
+    },
+    {
+      "id": "pagasa-rainfall",
+      "agency": "PAGASA",
+      "title": "PAGASA Rainfall Warning System (publication leaflet)",
+      "date": "undated",
+      "url": "https://pagasa.dost.gov.ph/learnings/publication",
+      "retrieved_at": "2026-10-09",
+      "notes": "Publications page lists the 'PAGASA Rainfall Warning System' leaflet (image download); located via search, leaflet text not machine-readable. Hourly bands 7.5-15, 15-30, 30+ mm also appear in the PAGASA Pasig-Marikina-Tullahan FFWS rainfall map legend (https://pasig-marikina-tullahanffws.pagasa.dost.gov.ph/rainfall/map.do)."
+    },
+    {
+      "id": "pagasa-storm-surge",
+      "agency": "PAGASA",
+      "title": "Storm Surge",
+      "date": "undated",
+      "url": "https://www.pagasa.dost.gov.ph/information/storm-surge",
+      "retrieved_at": "2026-10-09",
+      "notes": "Warning levels are shown only as an image (warning-levels.png); page text covers what storm surge is and what to do in storm-surge prone areas."
+    },
+    {
+      "id": "ndrrmc-preparedness",
+      "agency": "NDRRMC / OCD (via Philippine News Agency)",
+      "title": "NDRRMC ramps up disaster preparedness amid Covid-19 pandemic",
+      "date": "undated",
+      "url": "https://www.pna.gov.ph/articles/1105816",
+      "retrieved_at": "2026-10-09",
+      "notes": "No go-bag/preparedness page found on ndrrmc.gov.ph. Article content seen via search index only (direct fetch returned HTTP 404); it urges preparing a go bag with food packs, clothes, whistle, flashlight and other emergency items."
+    },
+    {
+      "id": "ocd-go-bag",
+      "agency": "OCD (via Philippine Information Agency)",
+      "title": "Civil Defense promotes 'GO Bag' for emergencies",
+      "date": "2024-08-20",
+      "url": "https://pia.gov.ph/disaster-information-service/civil-defense-promotes-go-bag-for-emergencies",
+      "retrieved_at": "2026-10-09",
+      "notes": "OCD-NCR go bag advisory reported by PIA. Direct fetch returned HTTP 403; content seen via search index only."
+    },
+    {
+      "id": "doh-health-typhoon",
+      "agency": "DOH (Cordillera Center for Health Development)",
+      "title": "Leptospirosis",
+      "date": "undated",
+      "url": "https://caro.doh.gov.ph/leptospirosis-6",
+      "retrieved_at": "2026-10-09",
+      "notes": "Official DOH regional page. Direct fetch returned HTTP 403; content seen via search index only. Related DOH Bicol advisory: https://bicol.doh.gov.ph/advisories/leptospirosis (avoid flood water, boots and gloves)."
+    },
+    {
+      "id": "phivolcs-hazardhunter",
+      "agency": "DOST-PHIVOLCS (GeoRiskPH)",
+      "title": "About HazardHunterPH",
+      "date": "undated",
+      "url": "https://hazardhunter.georisk.gov.ph/about-hazardhunterph",
+      "retrieved_at": "2026-10-09",
+      "notes": "Indicative hazard assessment by location; flood and rain-induced landslide data from DENR-MGB, storm surge and severe wind from DOST-PAGASA."
+    },
+    {
+      "id": "bfp-fire-safety",
+      "agency": "BFP (Region III)",
+      "title": "Oplan Ligtas na Pamayanan Guidebook",
+      "date": "undated",
+      "url": "https://region3.bfp.gov.ph/wp-content/uploads/2023/01/OLP-Guidebook.pdf",
+      "retrieved_at": "2026-10-09",
+      "notes": "Covers fire safety in homes, common household fire hazards, home exit drill, cooking fire safety. Located via search; no national bfp.gov.ph fire-safety tips page found."
+    },
+    {
+      "id": "prc-hotline",
+      "agency": "Philippine Red Cross",
+      "title": "Contact Us",
+      "date": "undated",
+      "url": "https://redcross.org.ph/contact-us/",
+      "retrieved_at": "2026-10-09",
+      "notes": "Page states 'Emergency Hotline: 143' and trunkline +63 2 8790 2300."
+    },
+    {
+      "id": "pna-911",
+      "agency": "Philippine News Agency",
+      "title": "Public urged to use Unified 911 hotline for disaster emergencies",
+      "date": "2026-08-07",
+      "url": "https://www.pna.gov.ph/articles/1281331",
+      "retrieved_at": "2026-10-09",
+      "notes": "Direct fetch returned HTTP 404; title/date seen via search index. Related PNA 2026-07-21 (articles/1279911): Unified 911 connects the public to police, fire, medical and rescue services through a single nationwide number."
+    },
+    {
+      "id": "ndrrmc-opcen",
+      "agency": "NDRRMC",
+      "title": "PUBLIC ADVISORY: Temporary NDRRM Operations Center Hotline Numbers (official Facebook page)",
+      "date": "2025-10-24",
+      "url": "https://www.facebook.com/NDRRMC/posts/public-advisorytemporary-ndrrm-operations-center-hotline-numbersplease-be-inform/1131235035846062/",
+      "retrieved_at": "2026-10-09",
+      "notes": "States main lines (02) 8911-5061 to 64, available 24/7, but this advisory says they were temporarily unavailable due to line migration; temporary numbers are in the post image (not readable). Re-verify before release."
+    },
+    {
+      "id": "qc-guide-tropical-cyclone",
+      "agency": "Quezon City Government",
+      "title": "What to Do In Case of Tropical Cyclone (QCitizen Guide)",
+      "date": "2026-09-18",
+      "url": "https://quezoncity.gov.ph/qcitizen-guides/what-to-do-during-tropical-cyclone/",
+      "retrieved_at": "2026-10-09"
+    },
+    {
+      "id": "qc-guide-go-bag",
+      "agency": "Quezon City Government",
+      "title": "Preparing an Emergency Go Bag (QCitizen Guide)",
+      "date": "2025-12-10",
+      "url": "https://quezoncity.gov.ph/qcitizen-guides/how-to-prepare-a-go-bag/",
+      "retrieved_at": "2026-10-09"
+    },
+    {
+      "id": "qc-guide-flood",
+      "agency": "Quezon City Government",
+      "title": "What to Do In Case of Flood (QCitizen Guide)",
+      "date": "2026-09-24",
+      "url": "https://quezoncity.gov.ph/qcitizen-guides/what-to-do-in-case-of-flood/",
+      "retrieved_at": "2026-10-09"
+    },
+    {
+      "id": "qc-guide-landslide",
+      "agency": "Quezon City Government",
+      "title": "What to Do In Case of Landslide (QCitizen Guide)",
+      "date": "2025-11-24",
+      "url": "https://quezoncity.gov.ph/qcitizen-guides/what-to-do-in-case-of-landslide/",
+      "retrieved_at": "2026-10-09"
+    },
+    {
+      "id": "unicef-ph-typhoon",
+      "agency": "UNICEF Philippines",
+      "title": "Emergency preparedness tips: typhoons",
+      "date": "undated",
+      "url": "https://www.unicef.org/philippines/emergency-preparedness-tips-typhoons",
+      "retrieved_at": "2026-10-09"
+    },
+    {
+      "id": "unicef-ph-go-bag",
+      "agency": "UNICEF Philippines",
+      "title": "What to pack in your emergency go-bag",
+      "date": "undated",
+      "url": "https://www.unicef.org/philippines/emergency-go-bag-checklist",
+      "retrieved_at": "2026-10-09"
+    },
+    {
+      "id": "doh-unicef-who-breastfeeding-2014",
+      "agency": "DOH / UNICEF / WHO (via ReliefWeb)",
+      "title": "UNICEF and WHO support DOH ban on donation of milk formula and encourage all to protect, promote and support breastfeeding during Typhoon Hagupit (Ruby) Response",
+      "date": "2014-12-10",
+      "url": "https://reliefweb.int/report/philippines/unicef-and-who-support-doh-ban-donation-milk-formula-and-encourage-all-protect",
+      "retrieved_at": "2026-10-09",
+      "notes": "Original: http://www.unicef.org/philippines/media_23332.html"
+    },
+    {
+      "id": "qc-guide-fire-safety",
+      "agency": "Quezon City Government",
+      "title": "Fire Safety Tips (QCitizen Guide)",
+      "date": "2026-05-13",
+      "url": "https://quezoncity.gov.ph/qcitizen-guides/fire-safety-tips/",
+      "retrieved_at": "2026-10-09"
+    },
+    {
+      "id": "ndrrmc-senate-handbook-2011",
+      "agency": "Senate Committee on Climate Change with NDRRMC, PHIVOLCS, PAGASA, DOH, BFP et al.",
+      "title": "Disaster Preparedness & First Aid Handbook",
+      "date": "2011",
+      "url": "https://climate.gov.ph/files/Disaster_Preparedness_First_Aid_Handbook.pdf",
+      "retrieved_at": "2026-10-09"
+    },
+    {
+      "id": "cdc-generator-safety",
+      "agency": "U.S. CDC (National Center for Environmental Health)",
+      "title": "When the Power Goes Out, Keep Your Generator Outside",
+      "date": "2024-04-11",
+      "url": "https://www.cdc.gov/carbon-monoxide/media/pdfs/Generators_1.pdf",
+      "retrieved_at": "2026-10-09",
+      "notes": "No fetchable Philippine official generator page; DOH PNA article 1121850 blocked."
+    },
+    {
+      "id": "doh-bicol-leptospirosis",
+      "agency": "DOH Bicol Center for Health Development",
+      "title": "Leptospirosis (advisory)",
+      "date": "undated",
+      "url": "https://bicol.doh.gov.ph/advisories/leptospirosis",
+      "retrieved_at": "2026-10-09"
+    }
+  ]
+}

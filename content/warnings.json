@@ -1,0 +1,129 @@
+{
+  "schema_version": 1,
+  "content_version": 1,
+  "generated_at": "2026-10-09T00:00:00+08:00",
+  "items": [
+    {
+      "id": "tcws-1", "kind": "tcws", "level": 1, "label": "Signal No. 1",
+      "thresholds": { "wind_kmh": [39, 61] }, "lead_time_h": 36,
+      "meaning": "Malakas na hangin (39–61 km/h) sa loob ng 36 oras. Minimal hanggang kaunting banta sa buhay at ari-arian: ang mga bahay na gawa sa magaang materyales o luma at sira-sira ay maaaring magkaroon ng minimal hanggang kaunting pinsala.",
+      "actions": [
+        "Asahan na ang bahay na gawa sa kahoy, kawayan, o magaang materyales ay maaaring bahagyang masira.",
+        "Maaaring may kaunting abala sa pampublikong sasakyan."
+      ],
+      "source_id": "pagasa-tcws", "confirmed": true
+    },
+    {
+      "id": "tcws-2", "kind": "tcws", "level": 2, "label": "Signal No. 2",
+      "thresholds": { "wind_kmh": [62, 88] }, "lead_time_h": 24,
+      "meaning": "Gale-force na hangin (62–88 km/h) sa loob ng 24 oras. Kaunti hanggang katamtamang banta sa buhay at ari-arian: maaaring masira ang mga bahay na gawa sa magaang materyales at bahagyang masira ang bubong ng mga bahay na mahina o karaniwang pagkakagawa.",
+      "actions": [
+        "Ang mga magaang gamit na nakalantad sa labas at hindi nakatali ay maaaring liparin at makapinsala.",
+        "Maaaring maputol ang ilang kawad ng kuryente at magkaroon ng lokal na brownout.",
+        "Asahan ang kaunti hanggang katamtamang abala sa pampublikong sasakyan."
+      ],
+      "source_id": "pagasa-tcws", "confirmed": true
+    },
+    {
+      "id": "tcws-3", "kind": "tcws", "level": 3, "label": "Signal No. 3",
+      "thresholds": { "wind_kmh": [89, 117] }, "lead_time_h": 18,
+      "meaning": "Storm-force na hangin (89–117 km/h) sa loob ng 18 oras. Katamtaman hanggang malaking banta sa buhay at ari-arian: malaking pinsala sa mga bahay na gawa sa magaang materyales; ang mga bahay na mahina o karaniwang pagkakagawa ay maaaring masiraan ng bubong, bintana, at bahagi ng pader.",
+      "actions": [
+        "Ang mga gamit sa labas na magaan hanggang katamtamang bigat ay maaaring liparin at makasakit o makapinsala.",
+        "Asahan ang brownout sa maraming lugar dahil sa mga natumbang poste at kawad ng kuryente.",
+        "Maaaring magkaroon ng kaunting abala sa komunikasyon at suplay ng inuming tubig."
+      ],
+      "source_id": "pagasa-tcws", "confirmed": true
+    },
+    {
+      "id": "tcws-4", "kind": "tcws", "level": 4, "label": "Signal No. 4",
+      "thresholds": { "wind_kmh": [118, 184] }, "lead_time_h": 12,
+      "meaning": "Typhoon-force na hangin (118–184 km/h) sa loob ng 12 oras. Malaki hanggang matinding banta sa buhay at ari-arian: matinding pinsala sa mga bahay na gawa sa magaang materyales; ang mga bahay na mahina o karaniwang pagkakagawa ay maaaring tuluyang mawalan ng bubong at gumuho ang pader.",
+      "actions": [
+        "Maraming lumilipad na debris ang maaaring makapinsala, makasakit, at makamatay.",
+        "Asahan ang halos tuluyang pagkawala ng kuryente at komunikasyon.",
+        "Maaaring kumonti ang suplay ng inuming tubig."
+      ],
+      "source_id": "pagasa-tcws", "confirmed": true
+    },
+    {
+      "id": "tcws-5", "kind": "tcws", "level": 5, "label": "Signal No. 5",
+      "thresholds": { "wind_kmh": [185, null] }, "lead_time_h": 12,
+      "meaning": "Typhoon-force na hangin (185 km/h o higit pa) sa loob ng 12 oras. Matinding banta sa buhay at ari-arian: matindi hanggang mapaminsalang pinsala sa mga bahay na mahina o karaniwang pagkakagawa at gawa sa magaang materyales; kahit matitibay na bahay ay maaaring masiraan ng bubong at pader.",
+      "actions": [
+        "Ang mga tao, alagang hayop, at hayop na nakalantad sa hangin ay nasa malaking panganib na masaktan o mamatay.",
+        "Asahan na mawawala nang matagal ang kuryente, inuming tubig, at komunikasyon.",
+        "Malawak na pinsala ang idudulot ng lumilipad na debris."
+      ],
+      "source_id": "pagasa-tcws", "confirmed": true
+    },
+    {
+      "id": "rainfall-yellow", "kind": "rainfall", "level": "yellow", "label": "Yellow na babala sa ulan",
+      "thresholds": { "rain_mm_per_hour": [7.5, 15] },
+      "meaning": "Advisory — kamalayan ng komunidad. Posible ang pagbaha sa mababang lugar at malapit sa ilog.",
+      "actions": [
+        "Maging alerto sa posibleng baha kung nasa mababang lugar o malapit sa ilog.",
+        "Mag-ingat at sumubaybay sa mga abiso ng PAGASA."
+      ],
+      "source_id": "pagasa-rainfall", "confirmed": false
+    },
+    {
+      "id": "rainfall-orange", "kind": "rainfall", "level": "orange", "label": "Orange na babala sa ulan",
+      "thresholds": { "rain_mm_per_hour": [15, 30] },
+      "meaning": "Alert — paghahanda ng komunidad. Banta na ang pagbaha sa mababang lugar at malapit sa ilog.",
+      "actions": [
+        "Maghanda ang komunidad sa nagbabantang baha sa mababang lugar at malapit sa ilog.",
+        "Maging alerto sa posibleng baha, flash flood, at landslide."
+      ],
+      "source_id": "pagasa-rainfall", "confirmed": false
+    },
+    {
+      "id": "rainfall-red", "kind": "rainfall", "level": "red", "label": "Red na babala sa ulan",
+      "thresholds": { "rain_mm_per_hour": [30, null] },
+      "meaning": "Emergency — pagtugon ng komunidad. Inaasahan ang matinding pagbaha.",
+      "actions": [
+        "Gawin ang mga kinakailangang pag-iingat.",
+        "Tumugon ang komunidad sa emergency; sundin ang abiso ng lokal na pamahalaan."
+      ],
+      "source_id": "pagasa-rainfall", "confirmed": false
+    },
+    {
+      "id": "surge-yellow", "kind": "surge", "level": "yellow", "label": "Yellow na babala sa storm surge",
+      "thresholds": { "surge_m": [1, 2] },
+      "meaning": "May banta ng storm surge (daluyong ng bagyo): abnormal na pagtaas ng dagat dahil sa bagyo na maaaring bumaha sa mabababang lugar sa baybayin.",
+      "actions": [
+        "Laging sumubaybay sa mga abiso ng PAGASA sa TV at radyo.",
+        "Alamin ang pinakaligtas at pinakamabilis na daan papunta sa mataas at ligtas na lugar.",
+        "Alamin kung saan ang mga matibay na gusaling may ilang palapag na itinalaga ng lokal na pamahalaan para sa paglikas."
+      ],
+      "source_id": "pagasa-storm-surge", "confirmed": false
+    },
+    {
+      "id": "surge-orange", "kind": "surge", "level": "orange", "label": "Orange na babala sa storm surge",
+      "thresholds": { "surge_m": [2.1, 3] },
+      "meaning": "May banta ng storm surge (daluyong ng bagyo): abnormal na pagtaas ng dagat dahil sa bagyo. Mas mapanganib kapag sumabay sa high tide, kasama ang malalaking alon.",
+      "actions": [
+        "Makipag-ayos sa pamilya o kaibigan sa mataas na lugar na maaari ninyong tuluyan pansamantala.",
+        "Maghandang lumikas sa sandaling ipayo ng MDRRMC o ng mga opisyal ng barangay."
+      ],
+      "source_id": "pagasa-storm-surge", "confirmed": false
+    },
+    {
+      "id": "surge-red", "kind": "surge", "level": "red", "label": "Red na babala sa storm surge",
+      "thresholds": { "surge_m": [3, null] },
+      "meaning": "May banta ng storm surge (daluyong ng bagyo): abnormal na pagtaas ng dagat dahil sa bagyo na maaaring bumaha kahit sa mga lugar na karaniwang tuyo at ligtas.",
+      "actions": [
+        "Lumikas sa mataas na lugar kapag ipinag-utos ang sapilitang paglikas.",
+        "Dalhin ang emergency kit.",
+        "Patayin ang kuryente at ang tangke ng gas bago umalis."
+      ],
+      "source_id": "pagasa-storm-surge", "confirmed": false
+    },
+    {
+      "id": "gale", "kind": "gale", "level": "on", "label": "Gale warning",
+      "meaning": "(placeholder: walang nakuhang paliwanag ng gale warning mula sa PAGASA; ang pahina ng Gale Warning ay nagpapakita lang ng kasalukuyang babala)",
+      "actions": ["(placeholder: walang nakuhang aksyon mula sa PAGASA gale warning page)"],
+      "source_id": "pagasa-tcws", "confirmed": false
+    }
+  ]
+}

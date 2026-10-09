@@ -1,0 +1,41 @@
+import { defineStrings } from '../i18n';
+
+/** Ask screen chrome. Safety copy stays in engine.copy() and is rendered through SafetyText. */
+export const askStrings = defineStrings({
+  tl: {
+    title: 'Magtanong', assistantName: 'Bagyo Buddy',
+    welcome: 'Magtanong tungkol sa paghahanda. Ang mga sagot ay mula sa opisyal na mga gabay.',
+    suggestionTitle: 'Maaari mong itanong', inputLabel: 'Tanong', placeholder: 'Magtanong tungkol sa bagyo…', ask: 'Ipadala', cancel: 'Ihinto',
+    failed: 'Hindi natuloy ang tanong. Subukan muli.', retry: 'Subukan muli', clearChat: 'Burahin ang usapan',
+    example_go_bag: 'Ano ang ilalagay sa go bag?', example_flood: 'Ano ang gawin kapag may baha?', example_evacuation: 'Kailan dapat lumikas?',
+    askAbout: 'Ano ang dapat malaman tungkol sa', suggestions: 'Maaari mo ring itanong:',
+    pinned: 'Mahalagang gabay', hideSource: 'Itago ang pinagmulan', sourceUnavailable: 'Hindi makita ang detalye ng pinagmulan.',
+    reviewedBy: 'Sinuri ni', reviewedAt: 'Sinuri noong', hotlines: 'Mga hotline', planEmpty: 'Walang nakatalang impormasyon. Buksan ang tab na Pamilya at punan ang plano ng pamilya.',
+    aiLabel: 'AI paliwanag', aiLoading: 'Inihahanda ang AI…', aiThinking: 'Sumusulat ng sagot…', aiSkipped: 'Buod mula sa gabay ang ipinapakita.',
+    aiRejected: 'Hindi ipinakita ang sagot ng AI dahil hindi ito tugma sa gabay.',
+    aiReason_low_battery: 'Naka-off ang AI para makatipid sa baterya.', aiReason_battery_saver: 'Naka-on ang battery saver, kaya buod lang ang ipinapakita.',
+    aiReason_ai_off: 'Naka-off ang AI sa Settings.', aiReason_tier: 'Hindi kaya ng phone na ito ang AI. Buod mula sa gabay ang ipinapakita.', aiReason_no_model: 'Wala pang AI model sa phone na ito.',
+    filipinoNote: 'Official guide text is in Filipino.',
+    historyTitle: 'Mga naunang tanong', historyEmpty: 'Wala pang tanong.', clearHistory: 'Burahin ang kasaysayan',
+    outcome_answered_ai: 'Sagot na may AI', outcome_answered_summary: 'Buod mula sa gabay', outcome_refused: 'Wala sa gabay', outcome_fixed_reply: 'Paalala', outcome_plan_answer: 'Plano ng pamilya', outcome_cancelled: 'Kinansela',
+    topic_signals: 'Mga signal', topic_go_bag: 'Go bag', topic_home_prep: 'Paghahanda sa bahay', topic_evacuation: 'Paglikas', topic_flood: 'Baha', topic_surge: 'Storm surge', topic_landslide: 'Pagguho ng lupa', topic_infant: 'Sanggol', topic_senior: 'Nakatatanda', topic_pregnancy: 'Pagbubuntis', topic_disability: 'May kapansanan', topic_pets: 'Alagang hayop', topic_water_food: 'Tubig at pagkain', topic_electrical: 'Kuryente', topic_generator_fire: 'Generator at sunog', topic_cleanup: 'Paglilinis', topic_health_after_flood: 'Kalusugan pagkatapos ng baha', topic_out_of_guide: 'Wala sa gabay',
+  },
+  en: {
+    title: 'Ask', assistantName: 'Bagyo Buddy',
+    welcome: 'Ask about preparedness. Answers come from official guides.',
+    suggestionTitle: 'Try asking', inputLabel: 'Question', placeholder: 'Ask about typhoons…', ask: 'Send', cancel: 'Stop',
+    failed: 'The question did not go through. Try again.', retry: 'Retry', clearChat: 'Clear chat',
+    example_go_bag: 'What goes in a go bag?', example_flood: 'What should we do during a flood?', example_evacuation: 'When should we evacuate?',
+    askAbout: 'What should I know about', suggestions: 'You can also ask:',
+    pinned: 'Critical guide', hideSource: 'Hide source', sourceUnavailable: 'Source details are unavailable.',
+    reviewedBy: 'Reviewed by', reviewedAt: 'Reviewed on', hotlines: 'Hotlines', planEmpty: 'No information is listed. Open the Family tab to fill in the family plan.',
+    aiLabel: 'AI explanation', aiLoading: 'Preparing the AI…', aiThinking: 'Writing an answer…', aiSkipped: 'The summary from the guide is shown.',
+    aiRejected: 'The AI answer was not shown because it did not match the guide.',
+    aiReason_low_battery: 'AI is off to save battery.', aiReason_battery_saver: 'Battery saver is on, so only the summary is shown.',
+    aiReason_ai_off: 'AI is off in Settings.', aiReason_tier: 'This phone cannot run the AI. The summary from the guide is shown.', aiReason_no_model: 'There is no AI model on this phone yet.',
+    filipinoNote: 'Official guide text is in Filipino.',
+    historyTitle: 'Past questions', historyEmpty: 'No questions yet.', clearHistory: 'Clear history',
+    outcome_answered_ai: 'Answer with AI', outcome_answered_summary: 'Summary from the guide', outcome_refused: 'Not in the guide', outcome_fixed_reply: 'Reminder', outcome_plan_answer: 'Family plan', outcome_cancelled: 'Cancelled',
+    topic_signals: 'Signals', topic_go_bag: 'Go bag', topic_home_prep: 'Home preparation', topic_evacuation: 'Evacuation', topic_flood: 'Flood', topic_surge: 'Storm surge', topic_landslide: 'Landslide', topic_infant: 'Infant', topic_senior: 'Older adult', topic_pregnancy: 'Pregnancy', topic_disability: 'Disability', topic_pets: 'Pets', topic_water_food: 'Water and food', topic_electrical: 'Electricity', topic_generator_fire: 'Generator and fire', topic_cleanup: 'Cleanup', topic_health_after_flood: 'Health after a flood', topic_out_of_guide: 'Not in the guide',
+  },
+});

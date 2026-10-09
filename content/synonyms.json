@@ -1,0 +1,558 @@
+{
+  "schema_version": 1,
+  "content_version": 1,
+  "generated_at": "2026-10-09T00:00:00+08:00",
+  "items": [
+    {
+      "canonical": "lumikas",
+      "forms": [
+        "lumikas",
+        "lilikas",
+        "lumilikas",
+        "paglikas",
+        "inilikas",
+        "likas",
+        "evacuate",
+        "evacuation",
+        "evacuating",
+        "evacuated",
+        "mag-evacuate",
+        "nag-evacuate",
+        "bakwit"
+      ],
+      "lang": "tl",
+      "topic": "evacuation"
+    },
+    {
+      "canonical": "baha",
+      "forms": [
+        "baha",
+        "bumaha",
+        "bumabaha",
+        "binaha",
+        "tubig-baha",
+        "lumubog",
+        "flood",
+        "flooding",
+        "flood water",
+        "floodwaters"
+      ],
+      "lang": "tl",
+      "topic": "flood"
+    },
+    {
+      "canonical": "gamot",
+      "forms": [
+        "gamot",
+        "medicine",
+        "medicines",
+        "meds",
+        "maintenance",
+        "tableta",
+        "prescription",
+        "reseta"
+      ],
+      "lang": "tl",
+      "topic": "senior"
+    },
+    {
+      "canonical": "posporo",
+      "forms": [
+        "posporo",
+        "lighter",
+        "matches"
+      ],
+      "lang": "tl",
+      "topic": "go_bag"
+    },
+    {
+      "canonical": "kuryente",
+      "forms": [
+        "brownout",
+        "blackout",
+        "walang kuryente",
+        "power outage",
+        "electricity",
+        "power",
+        "no power",
+        "power cut"
+      ],
+      "lang": "tl",
+      "topic": "electrical"
+    },
+    {
+      "canonical": "sanggol",
+      "forms": [
+        "baby",
+        "beybi",
+        "infant",
+        "newborn",
+        "bata pa",
+        "breastfeeding",
+        "pagpapasuso",
+        "infant care"
+      ],
+      "lang": "tl",
+      "topic": "infant"
+    },
+    {
+      "canonical": "bagyo",
+      "forms": [
+        "typhoon",
+        "storm",
+        "bagyo",
+        "cyclone",
+        "tropical cyclone"
+      ],
+      "lang": "tl",
+      "topic": "signals"
+    },
+    {
+      "canonical": "landslide",
+      "forms": [
+        "guho",
+        "pagguho",
+        "landslide",
+        "gumuho",
+        "mudslide",
+        "rockfall"
+      ],
+      "lang": "tl",
+      "topic": "landslide"
+    },
+    {
+      "canonical": "daluyong",
+      "forms": [
+        "storm surge",
+        "daluyong",
+        "surge",
+        "alon",
+        "storm-surge",
+        "tidal surge"
+      ],
+      "lang": "tl",
+      "topic": "surge"
+    },
+    {
+      "canonical": "gobag",
+      "forms": [
+        "go bag",
+        "go-bag",
+        "gobag",
+        "emergency bag",
+        "survival kit",
+        "emergency kit",
+        "first aid kit",
+        "72-hour kit",
+        "bug-out bag"
+      ],
+      "lang": "tl",
+      "topic": "go_bag"
+    },
+    {
+      "canonical": "generator",
+      "forms": [
+        "generator",
+        "genset",
+        "generator set"
+      ],
+      "lang": "tl",
+      "topic": "generator_fire"
+    },
+    {
+      "canonical": "kandila",
+      "forms": [
+        "kandila",
+        "candle",
+        "candles"
+      ],
+      "lang": "tl",
+      "topic": "generator_fire"
+    },
+    {
+      "canonical": "leptospirosis",
+      "forms": [
+        "lepto",
+        "leptospirosis",
+        "wound",
+        "wounds",
+        "injury",
+        "sugat",
+        "wound care",
+        "infection",
+        "fever",
+        "lagnat",
+        "symptoms",
+        "sintomas"
+      ],
+      "lang": "tl",
+      "topic": "health_after_flood"
+    },
+    {
+      "canonical": "evacuation center",
+      "forms": [
+        "evacuation center",
+        "evac center",
+        "evacuation site"
+      ],
+      "lang": "tl",
+      "topic": "evacuation"
+    },
+    {
+      "canonical": "signal",
+      "forms": [
+        "signal",
+        "signal no",
+        "wind signal",
+        "tcws"
+      ],
+      "lang": "tl",
+      "topic": "signals"
+    },
+    {
+      "canonical": "hangin",
+      "forms": [
+        "hangin",
+        "wind",
+        "malakas na hangin"
+      ],
+      "lang": "tl",
+      "topic": "signals"
+    },
+    {
+      "canonical": "buntis",
+      "forms": [
+        "buntis",
+        "pregnant",
+        "nagdadalang-tao",
+        "pregnancy",
+        "expecting",
+        "pregnancy care"
+      ],
+      "lang": "tl",
+      "topic": "pregnancy"
+    },
+    {
+      "canonical": "pwd",
+      "forms": [
+        "pwd",
+        "may kapansanan",
+        "disability",
+        "disabled",
+        "wheelchair",
+        "special needs",
+        "assistive device"
+      ],
+      "lang": "tl",
+      "topic": "disability"
+    },
+    {
+      "canonical": "senior",
+      "forms": [
+        "senior",
+        "lolo",
+        "lola",
+        "matanda",
+        "elderly",
+        "senior citizen",
+        "grandparent",
+        "old person"
+      ],
+      "lang": "tl",
+      "topic": "senior"
+    },
+    {
+      "canonical": "alaga",
+      "forms": [
+        "alaga",
+        "alagang hayop",
+        "pet",
+        "pets",
+        "aso",
+        "pusa",
+        "livestock",
+        "hayop",
+        "animal"
+      ],
+      "lang": "tl",
+      "topic": "pets"
+    },
+    {
+      "canonical": "inuming tubig",
+      "forms": [
+        "inuming tubig",
+        "drinking water",
+        "drinking-water",
+        "tubig na maiinom",
+        "malinis na tubig",
+        "malinis tubig",
+        "water",
+        "water supply",
+        "safe water",
+        "store water",
+        "storing water",
+        "tubig",
+        "imbak",
+        "mag-imbak",
+        "iimbak",
+        "mag-ipon"
+      ],
+      "lang": "tl",
+      "topic": "water_food"
+    },
+    {
+      "canonical": "pagkain",
+      "forms": [
+        "pagkain",
+        "food",
+        "de lata",
+        "canned goods",
+        "canned",
+        "delata",
+        "food supply",
+        "food storage",
+        "biskwit"
+      ],
+      "lang": "tl",
+      "topic": "water_food"
+    },
+    {
+      "canonical": "saksakan",
+      "forms": [
+        "saksakan",
+        "outlet",
+        "socket",
+        "extension cord"
+      ],
+      "lang": "tl",
+      "topic": "electrical"
+    },
+    {
+      "canonical": "sunog",
+      "forms": [
+        "sunog",
+        "nasunog",
+        "fire",
+        "apoy",
+        "burning"
+      ],
+      "lang": "tl",
+      "topic": "generator_fire"
+    },
+    {
+      "canonical": "linis",
+      "forms": [
+        "linis",
+        "linisin",
+        "maglinis",
+        "paglilinis",
+        "clean up",
+        "cleanup",
+        "clean",
+        "cleaning",
+        "disinfect",
+        "disinfecting",
+        "washing",
+        "wash"
+      ],
+      "lang": "tl",
+      "topic": "cleanup"
+    },
+    {
+      "canonical": "putik",
+      "forms": [
+        "putik",
+        "maputik",
+        "mud",
+        "naputikan",
+        "muddy",
+        "silt"
+      ],
+      "lang": "tl",
+      "topic": "cleanup"
+    },
+    {
+      "canonical": "lagnat",
+      "forms": [
+        "lagnat",
+        "nilalagnat",
+        "fever",
+        "sinat",
+        "sick",
+        "sickness",
+        "illness"
+      ],
+      "lang": "tl",
+      "topic": "health_after_flood"
+    },
+    {
+      "canonical": "flashlight",
+      "forms": [
+        "flashlight",
+        "torch",
+        "emergency lamp",
+        "ilaw",
+        "headlamp",
+        "lampara"
+      ],
+      "lang": "tl",
+      "topic": "go_bag"
+    },
+    {
+      "canonical": "bubong",
+      "forms": [
+        "bubong",
+        "roof",
+        "yero",
+        "roofing",
+        "roof repair"
+      ],
+      "lang": "tl",
+      "topic": "home_prep"
+    },
+    {
+      "canonical": "ilog",
+      "forms": [
+        "ilog",
+        "sapa",
+        "river",
+        "creek",
+        "riverbank",
+        "riverside"
+      ],
+      "lang": "tl",
+      "topic": "evacuation"
+    },
+    {
+      "canonical": "dagat",
+      "forms": [
+        "dagat",
+        "baybayin",
+        "sea",
+        "coast",
+        "tabing-dagat",
+        "seaside",
+        "coastline",
+        "shore"
+      ],
+      "lang": "tl",
+      "topic": "surge"
+    },
+    {
+      "canonical": "malapit sa ilog",
+      "forms": [
+        "evacuate",
+        "evacuation",
+        "evacuation plan",
+        "evacuation route",
+        "when to evacuate",
+        "when should we evacuate",
+        "should we evacuate",
+        "need to evacuate",
+        "forced evacuation",
+        "near river",
+        "near the river",
+        "lumikas",
+        "lilikas",
+        "paglikas",
+        "bakwit"
+      ],
+      "lang": "tl",
+      "topic": "evacuation"
+    },
+    {
+      "canonical": "wind signal",
+      "forms": [
+        "signal",
+        "signal no",
+        "signal number",
+        "wind signal",
+        "tcws",
+        "storm signal",
+        "babala ng hangin"
+      ],
+      "lang": "tl",
+      "topic": "signals"
+    },
+    {
+      "canonical": "tubig-baha",
+      "forms": [
+        "flood",
+        "flooding",
+        "flood water",
+        "floodwaters",
+        "flooded",
+        "baha sa bahay"
+      ],
+      "lang": "tl",
+      "topic": "flood"
+    },
+    {
+      "canonical": "powerbank",
+      "forms": [
+        "powerbank",
+        "power bank",
+        "battery",
+        "baterya",
+        "spare battery",
+        "ekstrang baterya",
+        "charger",
+        "emergency charger"
+      ],
+      "lang": "tl",
+      "topic": "go_bag"
+    },
+    {
+      "canonical": "unang lunas",
+      "forms": [
+        "first aid",
+        "first-aid",
+        "bandage",
+        "gauze",
+        "first aid kit"
+      ],
+      "lang": "tl",
+      "topic": "go_bag"
+    },
+    {
+      "canonical": "pagguho",
+      "forms": [
+        "landslide",
+        "pagguho",
+        "guho",
+        "gumuho",
+        "mudslide",
+        "pagguho ng lupa"
+      ],
+      "lang": "tl",
+      "topic": "landslide"
+    },
+    {
+      "canonical": "brownout",
+      "forms": [
+        "brownout",
+        "blackout",
+        "power",
+        "power outage",
+        "power failure",
+        "power goes out",
+        "no electricity",
+        "walang kuryente"
+      ],
+      "lang": "tl",
+      "topic": "electrical"
+    },
+    {
+      "canonical": "carbon monoxide",
+      "forms": [
+        "generator",
+        "genset",
+        "carbon monoxide",
+        "carbon monoxide poisoning",
+        "co poisoning"
+      ],
+      "lang": "tl",
+      "topic": "generator_fire"
+    }
+  ]
+}

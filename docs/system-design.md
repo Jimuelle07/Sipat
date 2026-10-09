@@ -37,12 +37,12 @@ Three facts shape every choice below.
 
 ```mermaid
 flowchart TB
-  subgraph Phone["On the phone - works offline"]
-    UI["UI screens"]
-    ENG["Engine facade - src/engine"]
+  subgraph Phone["Client & Backend - works offline"]
+    UI["UI screens - app/ui"]
+    ENG["Engine facade - app/engine"]
     ASK["ask orchestrator"]
     CL["buildChecklist"]
-    subgraph Core["src/core - pure TypeScript"]
+    subgraph Core["app/core - pure TypeScript"]
       NORM["normalize"]
       ROUTE["route"]
       SEARCH["search"]
@@ -51,7 +51,7 @@ flowchart TB
       VERIFY["verify"]
       VPACK["verifyPack"]
     end
-    subgraph Services["src/services"]
+    subgraph Services["app/services"]
       MODEL["ModelManager - llama.rn"]
       POWER["PowerPolicy"]
       STORE["Store - MMKV"]
@@ -409,7 +409,7 @@ The model writes in a shape the grammar fixes, from passages search chose.
 System message, the fixed instructions (the canonical text is `SYSTEM_TL` in [api-layer.md](api-layer.md#8-llm-contract-mvp)):
 
 ```text
-Ikaw ay gabay sa paghahanda sa bagyo para sa isang sambahayan.
+Ikaw si Bagyo Buddy, gabay sa paghahanda sa bagyo para sa isang sambahayan.
 Sumagot LAMANG mula sa mga talatang ibinigay. Huwag gumamit ng sariling kaalaman.
 Sumagot sa 2 hanggang 4 na maiikling pangungusap sa simpleng Tagalog.
 Huwag magdagdag ng numero, oras, lugar o pangalan na wala sa mga talata.
@@ -424,7 +424,7 @@ User message, built per question:
 
 ```text
 Sambahayan: {profile_summary}
-Babala ngayon: {warnings_summary}
+Yugto at babala: {phase_label}; {warnings_summary}
 
 Talata [{id_1}]: {text_1}
 Talata [{id_2}]: {text_2}
@@ -432,7 +432,7 @@ Talata [{id_2}]: {text_2}
 Tanong: {question}
 ```
 
-Code writes `profile_summary` from tags, for example "5 tao; may sanggol at senior na may maintenance na gamot; malapit sa ilog". It writes `warnings_summary` from the context, for example "Signal No. 3; orange na babala sa ulan". The prompt never contains names, member notes, photos, contact numbers, addresses or the evacuation center. The model cannot repeat what it never sees; the `plan` route answers those questions from data. Use llama.rn `messages` so the chat template stored in the GGUF formats the turns (check current library docs).
+Code writes `profile_summary` from tags, for example "5 tao; may sanggol at senior na may maintenance na gamot; malapit sa ilog". It writes `phase_label` from the context's phase ("Bago", "Habang" or "Pagkatapos") and `warnings_summary` from the context, for example "Signal No. 3; orange na babala sa ulan". The prompt never contains names, member notes, photos, contact numbers, addresses or the evacuation center. The model cannot repeat what it never sees; the `plan` route answers those questions from data. Use llama.rn `messages` so the chat template stored in the GGUF formats the turns (check current library docs).
 
 | Part | Tokens |
 | :-- | :-- |
@@ -537,7 +537,7 @@ Every rule is enforced by code, never by the prompt alone.
 | 11 | AI not allowed (tier, battery, battery saver, setting, no model) | Summary only; `ai_status` gives the reason | `PowerPolicy` |
 | 12 | An active warning set more than 3 hours ago | The stale-warning banner; the checklist still shows | `buildChecklist`, UI |
 | 13 | Any outcome | The closing line, appended by code | `ask()` |
-| 14 | Any prompt | Contains only passages, the tag-based profile summary, the warnings line and the question | `buildPrompt` |
+| 14 | Any prompt | Contains only passages, the tag-based profile summary, the phase and warnings line and the question | `buildPrompt` |
 | 15 | Guide older than 30 days while online (Pilot) | Suggest an update on the Home and About screens | `UpdateClient`, UI |
 
 The emergency card, fixed replies and refusal text are reviewed static content. None of them is generated.

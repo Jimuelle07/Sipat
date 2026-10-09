@@ -3,3 +3,6 @@
 .codex/
 .cursor/
 .impeccable/
+node_modules/
+.expo/
+dist/

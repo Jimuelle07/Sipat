@@ -1,0 +1,370 @@
+import type { JSX, ReactNode } from 'react';
+import { useEffect, useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import type { AgeGroup, Contact, HomeTag, Member, MemberInput, NeedTag, Profile, ProfileInput, Relation, Settings } from '../../engine';
+import type { EngineContextValue } from '../context/useEngine';
+import { useEngine, useEngineChange } from '../context/useEngine';
+import { Button, Card, Chip, Field, InlineError, Screen, SectionHeader } from '../components';
+import { useLang, useT } from '../i18n';
+import { strings } from '../strings';
+import { profileStrings } from '../strings/profile';
+import { colors, font, minTouch, space } from '../theme';
+
+const HOME_TAGS = ['near_river', 'near_sea', 'slope', 'low_lying', 'light_materials', 'concrete', 'upper_floor'] as const satisfies readonly HomeTag[];
+const RELATIONS = ['self', 'spouse', 'child', 'parent', 'grandparent', 'grandchild', 'sibling', 'relative', 'other'] as const satisfies readonly Relation[];
+const AGE_GROUPS = ['infant', 'child', 'teen', 'adult', 'senior'] as const satisfies readonly AgeGroup[];
+const NEED_TAGS = ['pregnant', 'pwd', 'maintenance_meds'] as const satisfies readonly NeedTag[];
+const MAX_CONTACTS = 5;
+const MAX_PETS = 20;
+const MIN_PETS = 0;
+
+export interface MemberDraft { id?: string; name: string; relation: Relation; ageGroup: AgeGroup; needs: NeedTag[]; note: string; phone: string }
+export interface HouseholdDraft { name: string; petsCount: number; home: HomeTag[]; evacuationCenter: string; meetingPlace: string; contacts: Contact[] }
+
+interface Copy extends Record<string, string> {
+  screenTitle: string; household: string; setupTitle: string; setupIntro: string; householdStep: string; ownerStep: string;
+  continue: string; back: string; ownerSection: string; householdSummary: string; headcount: string; editHousehold: string;
+  doneEditing: string; plan: string; evacuationCenter: string; meetingPlace: string; contacts: string; contactName: string;
+  contactPhone: string; contactRelation: string; addContact: string; noContacts: string; save: string; saving: string;
+  saved: string; members: string; memberNote: string; memberPhone: string; edit: string; saveMember: string;
+  cancelEdit: string; noMembers: string; addMember: string; settings: string; aiEnabled: string; on: string; off: string;
+  lowBatteryThreshold: string; staleWarningHours: string; settingsHint: string; clearHistory: string; historyCleared: string;
+  language: string; fieldName: string; fieldPhone: string; fieldRelation: string; fieldNote: string;
+  error_owner_required: string; error_not_found: string; error_out_of_range: string; error_unknown: string;
+}
+interface BaseCopy extends Record<string, string> {
+  householdName: string; personName: string; ageGroup: string; needs: string; createHousehold: string;
+  error_name_required: string; error_too_long: string; error_pets_range: string; error_too_many_contacts: string;
+  error_contact_phone_invalid: string; error_phone_invalid: string; error_too_many_members: string; error_owner_relation: string;
+  petsCount: string; homeTags: string;
+  remove: string; memberName: string; relation: string; emptyPlan: string; decrease: string; increase: string;
+  doneMark: string; todoMark: string;
+}
+
+export function blankMemberDraft(): MemberDraft { return { name: '', relation: 'other', ageGroup: 'adult', needs: [], note: '', phone: '' }; }
+export function memberDraftFrom(member: Member): MemberDraft {
+  return { id: member.id, name: member.name, relation: member.relation, ageGroup: member.ageGroup, needs: [...member.needs], note: member.note ?? '', phone: member.phone ?? '' };
+}
+export function memberInputFrom(draft: MemberDraft): MemberInput {
+  const input: MemberInput = { name: draft.name.trim(), relation: draft.relation, ageGroup: draft.ageGroup, needs: [...draft.needs] };
+  if (draft.id !== undefined) input.id = draft.id;
+  const note = draft.note.trim();
+  if (note.length > 0) input.note = note;
+  const phone = draft.phone.trim();
+  if (phone.length > 0) input.phone = phone;
+  return input;
+}
+export function toggleInList<T>(list: readonly T[], value: T): T[] { return list.includes(value) ? list.filter((item) => item !== value) : [...list, value]; }
+export function clampNumber(value: number, min: number, max: number): number {
+  if (Number.isNaN(value)) return min;
+  return Math.min(max, Math.max(min, Math.round(value)));
+}
+export function parseSettingNumber(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) return null;
+  const value = Number(trimmed);
+  return Number.isFinite(value) ? value : null;
+}
+export function householdDraftFrom(profile: Profile): HouseholdDraft {
+  return { name: profile.name, petsCount: profile.petsCount, home: [...profile.home], evacuationCenter: profile.plan.evacuationCenter ?? '', meetingPlace: profile.plan.meetingPlace ?? '', contacts: profile.plan.contacts.map((contact) => ({ ...contact })) };
+}
+export function buildProfileInput(profile: Profile, draft: HouseholdDraft): ProfileInput {
+  const contacts: Contact[] = [];
+  for (const contact of draft.contacts) {
+    const name = contact.name.trim();
+    if (name.length === 0) continue;
+    const next: Contact = { name, phone: contact.phone.trim() };
+    const relation = contact.relation?.trim();
+    if (relation !== undefined && relation.length > 0) next.relation = relation;
+    contacts.push(next);
+  }
+  const plan: Profile['plan'] = { ...profile.plan, contacts };
+  const evacuationCenter = draft.evacuationCenter.trim();
+  if (evacuationCenter.length > 0) plan.evacuationCenter = evacuationCenter;
+  else delete plan.evacuationCenter;
+  const meetingPlace = draft.meetingPlace.trim();
+  if (meetingPlace.length > 0) plan.meetingPlace = meetingPlace;
+  else delete plan.meetingPlace;
+  return { id: profile.id, name: draft.name.trim(), petsCount: clampNumber(draft.petsCount, MIN_PETS, MAX_PETS), home: [...draft.home], plan };
+}
+
+function errorCopy(code: string, t: Copy, base: BaseCopy): string {
+  const messages: Record<string, string> = {
+    name_required: base.error_name_required, too_long: base.error_too_long, pets_range: base.error_pets_range,
+    too_many_contacts: base.error_too_many_contacts, contact_phone_invalid: base.error_contact_phone_invalid,
+    phone_invalid: base.error_phone_invalid, too_many_members: base.error_too_many_members,
+    owner_relation: base.error_owner_relation, owner_required: t.error_owner_required,
+    not_found: t.error_not_found, out_of_range: t.error_out_of_range,
+  };
+  return messages[code] ?? t.error_unknown;
+}
+export function errorMessage(code: string, t: Copy = profileStrings.tl, base: BaseCopy = strings.tl): string { return errorCopy(code, t, base); }
+function fieldLabel(field: string, t: Copy, base: BaseCopy): string {
+  switch (field.split('.').pop() ?? field) {
+    case 'name': return t.fieldName;
+    case 'phone': return t.fieldPhone;
+    case 'relation': return t.fieldRelation;
+    case 'note': return t.fieldNote;
+    case 'petsCount': return base.petsCount;
+    case 'contacts': return t.contacts;
+    case 'evacuationCenter': return t.evacuationCenter;
+    case 'meetingPlace': return t.meetingPlace;
+    default: return field;
+  }
+}
+export function fieldErrorLines(errors: readonly { code: string; field: string }[], t: Copy = profileStrings.tl, base: BaseCopy = strings.tl): string[] {
+  return errors.map((error) => `${fieldLabel(error.field, t, base)}: ${errorCopy(error.code, t, base)}`);
+}
+
+function firstFieldError(errors: readonly { code: string; field: string }[], field: string, t: Copy, base: BaseCopy): string | undefined {
+  const found = errors.find((error) => error.field.split('.').pop() === field);
+  return found ? errorCopy(found.code, t, base) : undefined;
+}
+function dynamicCopy(copy: Record<string, string>, key: string): string { return copy[key] ?? key; }
+
+export function ProfileScreen(): JSX.Element {
+  const engine = useEngine();
+  const t = useT(profileStrings);
+  const base = useT(strings);
+  useEngineChange(['profiles', 'family', 'settings', 'history']);
+  const profile = engine.profiles.active();
+  return <Screen title={t.screenTitle}>
+    {profile ? <>
+      <HouseholdCard engine={engine} profile={profile} t={t} base={base} />
+      <MembersSection engine={engine} profile={profile} t={t} base={base} />
+      <SettingsSection engine={engine} t={t} />
+    </> : <SetupForm engine={engine} t={t} base={base} />}
+  </Screen>;
+}
+
+function SetupForm({ engine, t, base }: { engine: EngineContextValue; t: Copy; base: BaseCopy }): JSX.Element {
+  const [step, setStep] = useState<1 | 2>(1);
+  const [householdName, setHouseholdName] = useState('');
+  const [ownerName, setOwnerName] = useState('');
+  const [ownerAge, setOwnerAge] = useState<AgeGroup>('adult');
+  const [ownerNeeds, setOwnerNeeds] = useState<NeedTag[]>([]);
+  const [ownerPhone, setOwnerPhone] = useState('');
+  const [errors, setErrors] = useState<readonly { code: string; field: string }[]>([]);
+  const [busy, setBusy] = useState(false);
+
+  const next = (): void => {
+    if (householdName.trim().length === 0) { setErrors([{ code: 'name_required', field: 'name' }]); return; }
+    setErrors([]);
+    setStep(2);
+  };
+  const create = async (): Promise<void> => {
+    setBusy(true);
+    await Promise.resolve();
+    try {
+      const owner: MemberInput = { name: ownerName, relation: 'self', ageGroup: ownerAge, needs: ownerNeeds };
+      const phone = ownerPhone.trim();
+      if (phone.length > 0) owner.phone = phone;
+      const result = engine.profiles.create({ name: householdName, owner });
+      setErrors(result.ok ? [] : result.errors);
+      if (!result.ok && result.errors.some((error) => error.field === 'name')) setStep(1);
+    } finally { setBusy(false); }
+  };
+  const label = step === 1 ? t.householdStep : t.ownerStep;
+  return <Card title={t.setupTitle} subtitle={t.setupIntro}>
+    <Text style={styles.eyebrow}>{label}</Text>
+    {step === 1 ? <>
+      <Field label={base.householdName} value={householdName} onChangeText={setHouseholdName} error={firstFieldError(errors, 'name', t, base)} />
+      <Button label={t.continue} onPress={next} icon="arrow-forward" />
+    </> : <>
+      <Field label={base.personName} value={ownerName} onChangeText={setOwnerName} error={firstFieldError(errors, 'name', t, base)} />
+      <Text style={styles.label}>{base.ageGroup}</Text>
+      <Selector>{AGE_GROUPS.map((item) => <Chip key={item} label={dynamicCopy(base, `age_${item}`)} selected={ownerAge === item} onPress={() => setOwnerAge(item)} />)}</Selector>
+      <Text style={styles.label}>{base.needs}</Text>
+      <Selector>{NEED_TAGS.map((item) => <Chip key={item} label={dynamicCopy(base, `need_${item}`)} selected={ownerNeeds.includes(item)} onPress={() => setOwnerNeeds((current) => toggleInList(current, item))} />)}</Selector>
+      <Field label={t.memberPhone} value={ownerPhone} onChangeText={setOwnerPhone} keyboardType="phone-pad" error={firstFieldError(errors, 'phone', t, base)} />
+      {errors.length > 0 && !errors.some((error) => ['name', 'phone'].includes(error.field.split('.').pop() ?? '')) ? <InlineError message={fieldErrorLines(errors, t, base).join('\n')} /> : null}
+      <View style={styles.actions}>
+        <Button label={t.back} variant="secondary" onPress={() => { setErrors([]); setStep(1); }} />
+        <Button label={busy ? t.saving : base.createHousehold} onPress={() => { void create(); }} disabled={busy} icon="checkmark" />
+      </View>
+    </>}
+  </Card>;
+}
+
+function HouseholdCard({ engine, profile, t, base }: { engine: EngineContextValue; profile: Profile; t: Copy; base: BaseCopy }): JSX.Element {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<HouseholdDraft>(() => householdDraftFrom(profile));
+  const [errors, setErrors] = useState<readonly { code: string; field: string }[]>([]);
+  const [saved, setSaved] = useState(false);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { setDraft(householdDraftFrom(profile)); setSaved(false); }, [profile.id]);
+  const patch = (next: Partial<HouseholdDraft>): void => { setDraft((current) => ({ ...current, ...next })); setSaved(false); };
+  const save = async (): Promise<void> => {
+    setBusy(true);
+    await Promise.resolve();
+    try {
+      const result = engine.profiles.save(buildProfileInput(profile, draft));
+      if (result.ok) { setDraft(householdDraftFrom(result.value)); setErrors([]); setSaved(true); setEditing(false); }
+      else { setErrors(result.errors); setSaved(false); }
+    } finally { setBusy(false); }
+  };
+  const updateContact = (index: number, next: Partial<Contact>): void => patch({ contacts: draft.contacts.map((contact, i) => i === index ? { ...contact, ...next } : contact) });
+  const summaryTags = [
+    ...profile.home.map((tag) => dynamicCopy(base, `home_${tag}`)),
+    ...profile.members.filter((tag) => tag !== 'pets').map((tag) => tag === 'pregnant' || tag === 'pwd' || tag === 'maintenance_meds' ? dynamicCopy(base, `need_${tag}`) : dynamicCopy(base, `age_${tag}`)),
+    ...(profile.petsCount > 0 ? [`${profile.petsCount} ${base.petsCount}`] : []),
+  ];
+  return <Card>
+    <SectionHeader title={t.householdSummary} action={{ label: editing ? t.doneEditing : t.editHousehold, onPress: () => { setEditing((value) => !value); setErrors([]); } }} />
+    {!editing ? <>
+      <Text style={styles.householdName}>{profile.name}</Text>
+      <Text style={styles.muted}>{profile.headcount} {t.headcount}</Text>
+      <Selector>{summaryTags.length > 0 ? summaryTags.map((tag, index) => <Chip key={`${tag}-${index}`} label={tag} />) : <Text style={styles.muted}>{base.emptyPlan}</Text>}</Selector>
+    </> : <>
+      <Field label={base.householdName} value={draft.name} onChangeText={(value) => patch({ name: value })} error={firstFieldError(errors, 'name', t, base)} />
+      <View style={styles.stepper}>
+        <Text style={styles.label}>{base.petsCount}: {draft.petsCount}</Text>
+        <Button label="−" variant="secondary" onPress={() => patch({ petsCount: clampNumber(draft.petsCount - 1, MIN_PETS, MAX_PETS) })} accessibilityLabel={`${base.decrease} ${base.petsCount}`} />
+        <Button label="+" variant="secondary" onPress={() => patch({ petsCount: clampNumber(draft.petsCount + 1, MIN_PETS, MAX_PETS) })} accessibilityLabel={`${base.increase} ${base.petsCount}`} />
+      </View>
+      <Text style={styles.label}>{base.homeTags}</Text>
+      <Selector>{HOME_TAGS.map((tag) => <Chip key={tag} label={dynamicCopy(base, `home_${tag}`)} selected={draft.home.includes(tag)} onPress={() => patch({ home: toggleInList(draft.home, tag) })} />)}</Selector>
+      <Text style={styles.subheading}>{t.plan}</Text>
+      <Field label={t.evacuationCenter} value={draft.evacuationCenter} onChangeText={(value) => patch({ evacuationCenter: value })} error={firstFieldError(errors, 'evacuationCenter', t, base)} />
+      <Field label={t.meetingPlace} value={draft.meetingPlace} onChangeText={(value) => patch({ meetingPlace: value })} error={firstFieldError(errors, 'meetingPlace', t, base)} />
+      <Text style={styles.label}>{t.contacts}</Text>
+      {draft.contacts.length === 0 ? <Text style={styles.muted}>{t.noContacts}</Text> : null}
+      {draft.contacts.map((contact, index) => <View key={`contact-${index}`} style={styles.nestedCard}>
+        <Field label={t.contactName} value={contact.name} onChangeText={(value) => updateContact(index, { name: value })} error={firstFieldError(errors, 'contacts', t, base)} />
+        <Field label={t.contactPhone} value={contact.phone} onChangeText={(value) => updateContact(index, { phone: value })} keyboardType="phone-pad" error={firstFieldError(errors, 'phone', t, base)} />
+        <Field label={t.contactRelation} value={contact.relation ?? ''} onChangeText={(value) => updateContact(index, { relation: value })} />
+        <IconButton label={base.remove} icon="trash-outline" onPress={() => patch({ contacts: draft.contacts.filter((_, i) => i !== index) })} danger />
+      </View>)}
+      {draft.contacts.length < MAX_CONTACTS ? <Button label={t.addContact} variant="secondary" icon="add" onPress={() => patch({ contacts: [...draft.contacts, { name: '', phone: '' }] })} /> : null}
+      {errors.length > 0 && errors.some((error) => !['name', 'evacuationCenter', 'meetingPlace', 'contacts', 'phone'].includes(error.field.split('.').pop() ?? '')) ? <InlineError message={fieldErrorLines(errors, t, base).join('\n')} /> : null}
+      {saved ? <Text style={styles.muted}>{t.saved}</Text> : null}
+      <Button label={busy ? t.saving : t.save} onPress={() => { void save(); }} disabled={busy} icon="checkmark" />
+    </>}
+  </Card>;
+}
+
+function MembersSection({ engine, profile, t, base }: { engine: EngineContextValue; profile: Profile; t: Copy; base: BaseCopy }): JSX.Element {
+  const members = engine.family.members();
+  const [draft, setDraft] = useState<MemberDraft | null>(null);
+  const [errors, setErrors] = useState<readonly { code: string; field: string }[]>([]);
+  const [generalError, setGeneralError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const editing = draft?.id !== undefined;
+  const submit = async (): Promise<void> => {
+    if (!draft) return;
+    setBusy(true);
+    await Promise.resolve();
+    try {
+      const result = engine.family.saveMember(memberInputFrom(draft));
+      if (result.ok) { setDraft(null); setErrors([]); setGeneralError(''); }
+      else { setErrors(result.errors); setGeneralError(''); }
+    } finally { setBusy(false); }
+  };
+  const remove = (memberId: string): void => {
+    const result = engine.family.removeMember(memberId);
+    if (result.ok) { setErrors([]); setGeneralError(''); }
+    else { setGeneralError(errorCopy(result.error.code, t, base)); setErrors([]); }
+  };
+  const translatedRelation = (value: Relation): string => dynamicCopy(base, `relation_${value}`);
+  return <Card>
+    <SectionHeader title={t.members} />
+    {members.length === 0 ? <Text style={styles.muted}>{t.noMembers}</Text> : null}
+    {members.map((member) => <View key={member.id} style={styles.memberRow}>
+      <View style={styles.memberInfo}>
+        <Text style={styles.memberName}>{member.name}</Text>
+        <Text style={styles.muted}>{translatedRelation(member.relation)} · {dynamicCopy(base, `age_${member.ageGroup}`)}</Text>
+        {member.note ? <Text style={styles.muted}>{member.note}</Text> : null}
+        {member.needs.length > 0 ? <Selector>{member.needs.map((need) => <Chip key={need} label={dynamicCopy(base, `need_${need}`)} />)}</Selector> : null}
+      </View>
+      <View style={styles.iconActions}>
+        <IconButton label={t.edit} icon="create-outline" onPress={() => { setDraft(memberDraftFrom(member)); setErrors([]); setGeneralError(''); }} />
+        <IconButton label={base.remove} icon="trash-outline" onPress={() => remove(member.id)} danger />
+      </View>
+    </View>)}
+    {generalError ? <InlineError message={generalError} /> : null}
+    {!draft ? <Button label={t.addMember} onPress={() => { setDraft(blankMemberDraft()); setErrors([]); }} icon="add" /> : <Card title={editing ? t.edit : t.addMember}>
+      <Field label={base.memberName} value={draft.name} onChangeText={(value) => setDraft((current) => current ? { ...current, name: value } : current)} error={firstFieldError(errors, 'name', t, base)} />
+      <Text style={styles.label}>{base.relation}</Text>
+      <Selector>{RELATIONS.filter((item) => item !== 'self').map((item) => <Chip key={item} label={dynamicCopy(base, `relation_${item}`)} selected={draft.relation === item} onPress={() => setDraft((current) => current ? { ...current, relation: item } : current)} />)}</Selector>
+      <Text style={styles.label}>{base.ageGroup}</Text>
+      <Selector>{AGE_GROUPS.map((item) => <Chip key={item} label={dynamicCopy(base, `age_${item}`)} selected={draft.ageGroup === item} onPress={() => setDraft((current) => current ? { ...current, ageGroup: item } : current)} />)}</Selector>
+      <Text style={styles.label}>{base.needs}</Text>
+      <Selector>{NEED_TAGS.map((item) => <Chip key={item} label={dynamicCopy(base, `need_${item}`)} selected={draft.needs.includes(item)} onPress={() => setDraft((current) => current ? { ...current, needs: toggleInList(current.needs, item) } : current)} />)}</Selector>
+      <Field label={t.memberNote} value={draft.note} onChangeText={(value) => setDraft((current) => current ? { ...current, note: value } : current)} error={firstFieldError(errors, 'note', t, base)} />
+      <Field label={t.memberPhone} value={draft.phone} onChangeText={(value) => setDraft((current) => current ? { ...current, phone: value } : current)} keyboardType="phone-pad" error={firstFieldError(errors, 'phone', t, base)} />
+      {errors.length > 0 && errors.some((error) => !['name', 'note', 'phone'].includes(error.field.split('.').pop() ?? '')) ? <InlineError message={fieldErrorLines(errors, t, base).join('\n')} /> : null}
+      <View style={styles.actions}>
+        <Button label={t.cancelEdit} variant="secondary" onPress={() => { setDraft(null); setErrors([]); }} />
+        <Button label={busy ? t.saving : t.saveMember} onPress={() => { void submit(); }} disabled={busy} icon="checkmark" />
+      </View>
+    </Card>}
+  </Card>;
+}
+
+function SettingsSection({ engine, t }: { engine: EngineContextValue; t: Copy }): JSX.Element {
+  const settings = engine.settings.get();
+  const { lang, setLang } = useLang();
+  const [error, setError] = useState('');
+  const [historyCleared, setHistoryCleared] = useState(false);
+  const updateSetting = (patch: Partial<Settings>): void => {
+    const result = engine.settings.update(patch);
+    setError(result.ok ? '' : t.error_out_of_range);
+  };
+  const step = (key: 'lowBatteryThreshold' | 'staleWarningHours', amount: number): void => {
+    const bounds = key === 'lowBatteryThreshold' ? { min: 5, max: 50 } : { min: 1, max: 12 };
+    const result = engine.settings.update({ [key]: settings[key] + amount });
+    if (!result.ok) setError(t.error_out_of_range);
+    else setError('');
+    if (settings[key] < bounds.min || settings[key] > bounds.max) setError(t.error_out_of_range);
+  };
+  const clearHistory = (): void => { engine.history.clear(); setHistoryCleared(true); };
+  return <Card title={t.settings}>
+    <View style={styles.settingRow}><Text style={styles.settingTitle}>{t.language}</Text><View style={styles.languageChoices}>{(['tl', 'en'] as const).map((item) => <Chip key={item} label={item.toUpperCase()} selected={lang === item} onPress={() => setLang(item)} />)}</View></View>
+    <View style={styles.settingRow}><View style={styles.settingCopy}><Text style={styles.settingTitle}>{t.aiEnabled}</Text><Text style={styles.muted}>{settings.aiEnabled ? t.on : t.off}</Text></View><Switch value={settings.aiEnabled} onValueChange={(value) => updateSetting({ aiEnabled: value })} trackColor={{ false: colors.border, true: colors.accent }} thumbColor={colors.text} accessibilityLabel={t.aiEnabled} /></View>
+    <SettingStepper label={t.lowBatteryThreshold} value={settings.lowBatteryThreshold} suffix="%" onStep={(amount) => step('lowBatteryThreshold', amount)} />
+    <SettingStepper label={t.staleWarningHours} value={settings.staleWarningHours} suffix="h" onStep={(amount) => step('staleWarningHours', amount)} />
+    <Text style={styles.muted}>{t.settingsHint}</Text>
+    {error ? <InlineError message={error} /> : null}
+    <Button label={t.clearHistory} variant="secondary" icon="trash-outline" onPress={clearHistory} />
+    {historyCleared ? <Text style={styles.muted}>{t.historyCleared}</Text> : null}
+  </Card>;
+}
+
+function SettingStepper({ label, value, suffix, onStep }: { label: string; value: number; suffix: string; onStep: (amount: number) => void }): JSX.Element {
+  return <View style={styles.stepper}>
+    <Text style={[styles.settingTitle, styles.stepperLabel]}>{label}</Text>
+    <Button label="−" variant="secondary" onPress={() => onStep(-1)} accessibilityLabel={`${label} −`} />
+    <Text accessibilityLiveRegion="polite" style={styles.stepValue}>{value}{suffix}</Text>
+    <Button label="+" variant="secondary" onPress={() => onStep(1)} accessibilityLabel={`${label} +`} />
+  </View>;
+}
+
+function Selector({ children }: { children: ReactNode }): JSX.Element { return <View style={styles.selector}>{children}</View>; }
+function IconButton({ label, icon, onPress, danger = false, disabled = false }: { label: string; icon: 'create-outline' | 'trash-outline'; onPress: () => void; danger?: boolean; disabled?: boolean }): JSX.Element {
+  return <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled }} disabled={disabled} onPress={onPress} style={[styles.iconButton, disabled && styles.disabled]}><Ionicons name={icon} size={22} color={danger ? colors.danger : colors.accent} /></Pressable>;
+}
+
+const styles = StyleSheet.create({
+  eyebrow: { color: colors.accent, fontSize: font.sm, fontWeight: '700' },
+  label: { color: colors.text, fontSize: font.sm, fontWeight: '600' },
+  subheading: { color: colors.text, fontSize: font.md, fontWeight: '700', marginTop: space.sm },
+  muted: { color: colors.muted, fontSize: font.sm },
+  householdName: { color: colors.text, fontSize: font.xl, fontWeight: '700' },
+  selector: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: space.sm },
+  stepper: { minHeight: minTouch, flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  stepperLabel: { flex: 1 },
+  stepValue: { color: colors.text, minWidth: 56, textAlign: 'center', fontSize: font.md, fontWeight: '700' },
+  nestedCard: { gap: space.sm, padding: space.md, borderRadius: 12, backgroundColor: colors.surfaceRaised },
+  memberRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: space.md, borderTopWidth: 1, borderTopColor: colors.border },
+  memberInfo: { flex: 1, gap: space.xs },
+  memberName: { color: colors.text, fontSize: font.md, fontWeight: '700' },
+  iconActions: { flexDirection: 'row', alignItems: 'center' },
+  iconButton: { minWidth: minTouch, minHeight: minTouch, justifyContent: 'center', alignItems: 'center', borderRadius: 12, backgroundColor: colors.surfaceRaised },
+  disabled: { opacity: 0.45 },
+  settingRow: { minHeight: minTouch, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.md },
+  settingCopy: { flex: 1 },
+  settingTitle: { color: colors.text, fontSize: font.sm, fontWeight: '600' },
+  languageChoices: { flexDirection: 'row', gap: space.xs },
+});

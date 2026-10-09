@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "content_version": 1,
+  "generated_at": "2026-10-09T00:00:00+08:00",
+  "rules": {
+    "emergency": {
+      "phrases": [
+        "lumulubog",
+        "may naipit",
+        "hindi makahinga",
+        "nalulunod",
+        "tulong tulong",
+        "may sugatan",
+        "nasusunog"
+      ],
+      "card_id": "emergency-default"
+    },
+    "live_data": {
+      "phrases": [
+        "nasaan na ang bagyo",
+        "saan na ang bagyo",
+        "may pasok ba",
+        "kailan babalik ang kuryente",
+        "kailan darating ang bagyo",
+        "track ng bagyo",
+        "signal ngayon",
+        "may pasok"
+      ],
+      "reply_key": "no_live_data"
+    },
+    "medical_dose": {
+      "phrases": [
+        "ilang tableta",
+        "dosis",
+        "ilang mg",
+        "ilang ml",
+        "gaano karami ang gamot",
+        "dose"
+      ],
+      "reply_key": "medical_dose"
+    },
+    "plan": {
+      "evacuation_center": [
+        "evacuation center namin",
+        "saan kami lilikas"
+      ],
+      "meeting_place": [
+        "saan kami magkikita"
+      ],
+      "contacts": [
+        "numero ni",
+        "contact namin",
+        "sino ang tatawagan"
+      ],
+      "hotlines": [
+        "hotline",
+        "numero ng barangay"
+      ]
+    },
+    "emergency_cards": [
+      {
+        "id": "emergency-default",
+        "title": "Emergency: Humingi agad ng tulong",
+        "steps": [
+          "Manatiling mahinahon at lumayo agad sa panganib.",
+          "Tumawag agad sa emergency hotline na nasa ibaba para sa tulong.",
+          "Kung hindi makalabas, manatili sa ligtas na bahagi at humingi ng tulong gamit ang matingkad na tela sa bintana o gumawa ng ingay para marinig ng rescuers.",
+          "Kung may makapal na usok, gumapang papunta sa ligtas na lugar at takpan ang bibig at ilong ng basang tela.",
+          "Huwag bumalik sa loob hanggang sabihin ng kinauukulan na ligtas na, at magpasuri kung may nasugatan."
+        ],
+        "hotline_ids": [
+          "hotline-911",
+          "hotline-prc",
+          "hotline-ndrrmc"
+        ],
+        "source_id": "qc-guide-fire-safety"
+      }
+    ]
+  }
+}
