@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useThemedStyles } from '../theme';
 import type { Theme } from '../theme';
 import { Button } from './Button';
+import { MascotSlot } from './MascotSlot';
 import { Txt } from './Txt';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
@@ -26,7 +27,10 @@ export function EmptyState({ icon, title, body, action }: EmptyStateProps): JSX.
 
   return (
     <View style={styles.box}>
-      <Ionicons name={icon} size={t.type.roles.headline.fontSize} color={t.colors.accentText} />
+      <View style={styles.blob}>
+        <MascotSlot size={150} accessibilityLabel={title} />
+        <Ionicons name={icon} size={t.type.roles.title.fontSize} color={t.colors.stickers.carbon} style={styles.glyph} />
+      </View>
       <Txt role="title" align="center">{title}</Txt>
       {body !== undefined ? <Txt role="body" tone="muted" align="center">{body}</Txt> : null}
       {action !== undefined ? (
@@ -42,5 +46,26 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     justifyContent: 'center',
     gap: t.space.md,
     padding: t.space.xxl,
+  },
+  blob: {
+    width: 176,
+    height: 176,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: t.radius.pill,
+    borderWidth: t.border.control,
+    borderColor: t.colors.stickers.carbon,
+    backgroundColor: t.colors.wash,
+  },
+  glyph: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    padding: t.space.sm,
+    overflow: 'hidden',
+    borderRadius: t.radius.pill,
+    borderWidth: t.border.control,
+    borderColor: t.colors.stickers.carbon,
+    backgroundColor: t.colors.stickers.sunburst,
   },
 })

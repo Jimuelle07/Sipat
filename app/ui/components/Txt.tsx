@@ -54,7 +54,9 @@ export function Txt({
         {
           fontSize: token.fontSize,
           lineHeight: token.lineHeight,
-          fontWeight: token.fontWeight,
+          // Bundled faces carry their own weight; a fontWeight on top would be faked on Android.
+          fontFamily: token.fontWeight === '800' ? t.type.families.display : token.fontWeight === '700' ? t.type.families.bold : t.type.families.medium,
+          fontWeight: 'normal',
           letterSpacing: token.letterSpacing,
         },
         { color: ink },

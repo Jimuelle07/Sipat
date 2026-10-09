@@ -12,8 +12,9 @@ import type { Theme } from '../theme';
  * word by word and sweeps a highlighter under the emphasis word. It re-runs when `revealKey`
  * changes (the caller passes the switch timestamp).
  */
-export function SwitchBanner({ text, emphasis, undoLabel, onUndo, dismissLabel, onDismiss, revealKey }: {
+export function SwitchBanner({ text, reason, emphasis, undoLabel, onUndo, dismissLabel, onDismiss, revealKey }: {
   text: string;
+  reason?: string;
   emphasis?: string;
   undoLabel?: string;
   onUndo?: () => void;
@@ -80,7 +81,6 @@ export function SwitchBanner({ text, emphasis, undoLabel, onUndo, dismissLabel, 
     return () => anim.stop();
   }, [revealKey, wordCount, minimal, t, values, highlight, banner]);
 
-  const highlightHeight = Math.round(t.type.roles.lead.lineHeight * 0.4);
   const highlightTranslate = highlight.interpolate({
     inputRange: [0, 1],
     outputRange: [-emphasisWidth / 2, 0],
@@ -117,18 +117,18 @@ export function SwitchBanner({ text, emphasis, undoLabel, onUndo, dismissLabel, 
                   style={[
                     styles.highlightBar,
                     {
-                      height: highlightHeight,
                       backgroundColor: t.colors.highlight.fill,
                       transform: [{ translateX: highlightTranslate }, { scaleX: highlight }],
                     },
                   ]}
                 />
               ) : null}
-              <Txt role="lead" color={t.colors.capsule.ink}>{word}</Txt>
+              <Txt role="lead" color={isEmphasis ? t.colors.highlight.ink : t.colors.capsule.ink}>{word}</Txt>
             </Animated.View>
           );
         })}
       </View>
+      {reason ? <Txt role="bodySmall" color={t.colors.capsule.ink}>{reason}</Txt> : null}
       <View style={styles.actions}>
         {undoLabel !== undefined && onUndo !== undefined ? (
           <Button label={undoLabel} onPress={onUndo} variant="text" />
@@ -167,8 +167,9 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   },
   highlightBar: {
     position: 'absolute',
-    left: 0,
-    right: 0,
+    left: -t.space.xs,
+    right: -t.space.xs,
+    top: 0,
     bottom: 0,
     borderRadius: t.radius.pill,
   },

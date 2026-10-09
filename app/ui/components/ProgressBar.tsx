@@ -37,14 +37,16 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     gap: t.space.xs,
   },
   track: {
-    height: t.space.gutter,
+    height: t.space.xl,
     borderRadius: t.radius.pill,
     backgroundColor: t.colors.surfaceSunken,
+    borderWidth: t.border.control,
+    borderColor: t.colors.stickers.carbon,
     overflow: 'hidden',
   },
   fill: {
     height: '100%',
     borderRadius: t.radius.pill,
-    backgroundColor: t.colors.accentText,
+    backgroundColor: t.colors.wash,
   },
 })

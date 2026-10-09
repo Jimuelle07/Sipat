@@ -1,9 +1,10 @@
 import type { JSX } from 'react';
 import type { ComponentProps } from 'react';
-import { Pressable, View, StyleSheet } from 'react-native';
+import { Animated, Pressable, View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useThemedStyles } from '../theme';
 import type { Theme, Tone } from '../theme';
+import { usePressSpring } from '../motion/spring';
 import { Txt } from './Txt';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
@@ -23,6 +24,7 @@ export interface ChipProps {
 export function Chip({ label, selected = false, onPress, tone, icon }: ChipProps): JSX.Element {
   const t = useTheme();
   const styles = useThemedStyles(makeStyles);
+  const press = usePressSpring(0.93);
 
   const ink = tone?.ink ?? (selected ? t.colors.selected.ink : t.colors.text);
   const glyph: IconName | undefined = selected ? 'checkmark' : icon;
@@ -49,19 +51,26 @@ export function Chip({ label, selected = false, onPress, tone, icon }: ChipProps
   }
 
   return (
+    <Animated.View style={[press.style, styles.wrap]}>
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ selected }}
       onPress={onPress}
-      style={({ pressed }) => [...surface, pressed && styles.pressed]}
+      onPressIn={press.onPressIn}
+      onPressOut={press.onPressOut}
+      style={surface}
     >
       {content}
     </Pressable>
+    </Animated.View>
   );
 }
 
 const makeStyles = (t: Theme) => StyleSheet.create({
+  wrap: {
+    alignSelf: 'flex-start',
+  },
   chip: {
     alignSelf: 'flex-start',
     flexDirection: 'row',
@@ -71,6 +80,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     paddingHorizontal: t.space.lg,
     borderRadius: t.radius.pill,
     borderWidth: t.border.control,
+    boxShadow: t.shadow.sticker,
   },
   emphasis: {
     borderWidth: t.border.emphasis,
@@ -79,6 +89,6 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     flexShrink: 1,
   },
   pressed: {
-    opacity: 0.86,
+    transform: [{ translateY: 2 }, { scale: 0.985 }],
   },
 })

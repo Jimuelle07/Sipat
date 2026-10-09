@@ -1,42 +1,22 @@
-import type { AnswerEvent, SourceRef } from '../../../engine';
+import { fill } from '../../strings/format';
 
-export type ChatMessage =
-  | { id: string; kind: 'question'; text: string }
-  | { id: string; kind: 'answer'; question: string; events: AnswerEvent[]; error?: boolean };
+/**
+ * Pure helpers for the Ask screen. No React or React Native imports, so the rules run in Node.
+ * One `AnswerPlan` per question lives in the screen; these cover input guardrails and copy.
+ */
 
-const AI_REPLACED: ReadonlySet<AnswerEvent['type']> = new Set(['ai_partial', 'ai_final', 'ai_rejected']);
-
-export function canSubmitQuestion(question: string): boolean {
-  return question.trim().length > 0;
+/** A question is sendable when it is 1..maxLength characters once trimmed. */
+export function canSend(question: string, maxLength: number): boolean {
+  const text = question.trim();
+  return text.length > 0 && text.length <= maxLength;
 }
 
-export function sourceLine(source: SourceRef): string {
-  return [source.agency, source.title, source.date, source.locator]
-    .filter((part): part is string => typeof part === 'string' && part.length > 0)
-    .join(' — ');
+/** The `{count}/{max}` counter copy filled with the live length and the engine's max. */
+export function counterText(template: string, count: number, max: number): string {
+  return fill(template, { count, max });
 }
 
-/** Append an event in arrival order while keeping streaming AI output in one replaceable slot. */
-export function reduceEvents(current: AnswerEvent[], event: AnswerEvent): AnswerEvent[] {
-  if (event.type === 'ai_status') {
-    return [...current.filter((item) => item.type !== 'ai_status'), event];
-  }
-  if (event.type === 'ai_partial') {
-    return [...current.filter((item) => item.type !== 'ai_status' && item.type !== 'ai_partial' && item.type !== 'ai_final' && item.type !== 'ai_rejected'), event];
-  }
-  if (AI_REPLACED.has(event.type)) {
-    return [...current.filter((item) => !AI_REPLACED.has(item.type)), event];
-  }
-  return [...current, event];
-}
-
-/** Remove transient model progress after the user stops generation. */
-export function cancelEvents(current: AnswerEvent[]): AnswerEvent[] {
-  return current.filter((event) => event.type !== 'ai_status' && event.type !== 'ai_partial');
-}
-
-export function chatReducer(messages: ChatMessage[], event: AnswerEvent): ChatMessage[] {
-  const last = messages.at(-1);
-  if (!last || last.kind !== 'answer') return messages;
-  return [...messages.slice(0, -1), { ...last, events: reduceEvents(last.events, event) }];
+/** The source ids from a final answer, de-duplicated and order-preserving. */
+export function usedIds(used: readonly string[]): string[] {
+  return [...new Set(used)];
 }

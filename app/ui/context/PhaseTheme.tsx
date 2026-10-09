@@ -1,12 +1,21 @@
 import type { JSX, ReactNode } from 'react';
+import { useDevOverrides } from './AppChrome';
 import { ThemeProvider } from '../theme';
 import { useEngine, useEngineChange } from './useEngine';
 
 export function PhaseTheme({ children }: { children: ReactNode }): JSX.Element {
   const engine = useEngine();
-  // The v2 contract adds 'phase'; add it to this list when that change kind is available.
-  useEngineChange(['context']);
+  useEngineChange(['phase', 'context']);
   const phase = engine.context.get().phase;
+  const overrides = useDevOverrides();
 
-  return <ThemeProvider phase={phase}>{children}</ThemeProvider>;
+  return (
+    <ThemeProvider
+      phase={phase}
+      scheme={overrides.scheme === 'system' ? undefined : overrides.scheme}
+      largeText={overrides.largeText === 'system' ? undefined : overrides.largeText === 'on'}
+    >
+      {children}
+    </ThemeProvider>
+  );
 }

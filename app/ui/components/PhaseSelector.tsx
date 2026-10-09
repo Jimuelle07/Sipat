@@ -39,15 +39,12 @@ export function PhaseSelector({ value, recommended, reasonText, labels, recommen
               onPress={() => onSelect(phase)}
               style={styles.segment}
             >
-              {showRecommended ? (
-                <Tag label={recommendedLabel} tone={t.colors.highlight} icon="sparkles" />
-              ) : null}
               <View style={[styles.segmentFill, active && styles.segmentSelected]}>
                 {active ? (
                   <Ionicons name="checkmark" size={t.type.roles.label.fontSize} color={t.colors.selected.ink} />
                 ) : null}
                 <Txt
-                  role="label"
+                  role="caption"
                   numberOfLines={1}
                   color={active ? t.colors.selected.ink : t.colors.text}
                 >
@@ -58,6 +55,12 @@ export function PhaseSelector({ value, recommended, reasonText, labels, recommen
           );
         })}
       </View>
+      {recommended !== undefined && recommended !== value ? (
+        <View style={styles.recommendation}>
+          <Tag label={recommendedLabel} tone={t.colors.highlight} icon="sparkles" />
+          <Txt role="bodySmall" tone="muted">{labels[recommended]}</Txt>
+        </View>
+      ) : null}
       {reasonText !== undefined && reasonText.length > 0 ? (
         <Txt role="bodySmall" tone="muted" style={styles.reason}>{reasonText}</Txt>
       ) : null}
@@ -74,10 +77,13 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     gap: t.space.xs,
     padding: t.space.xs,
     borderRadius: t.radius.pill,
-    backgroundColor: t.colors.surfaceSunken,
+    backgroundColor: t.colors.surface,
+    borderWidth: t.border.control,
+    borderColor: t.colors.stickers.carbon,
   },
   segment: {
     flex: 1,
+    minWidth: 0,
     minHeight: t.minTouch,
     alignItems: 'center',
     justifyContent: 'center',
@@ -90,11 +96,20 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     justifyContent: 'center',
     gap: t.space.xs,
     minHeight: t.minTouch - t.space.xs * 2,
-    paddingHorizontal: t.space.md,
+    paddingHorizontal: t.space.xs,
     borderRadius: t.radius.pill,
   },
   segmentSelected: {
     backgroundColor: t.colors.selected.fill,
+    borderWidth: t.border.control,
+    borderColor: t.colors.stickers.carbon,
+  },
+  recommendation: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: t.space.sm,
+    paddingHorizontal: t.space.xs,
   },
   reason: {
     paddingHorizontal: t.space.xs,

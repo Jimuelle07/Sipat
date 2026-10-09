@@ -1,21 +1,15 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-import warnings from '../../../content/warnings.json';
 import { accountStrings } from './account';
 import { askStrings } from './ask';
 import { commonStrings } from './common';
-import { componentStrings } from './components';
 import type { ErrorSource } from './errors';
-import { errorMessage, errorStrings, SILENT } from './errors';
+import { errorMessage, errorStrings, genericMessage, SILENT } from './errors';
 import { fill } from './format';
 import { guideStrings, guideTopicLabels } from './guide';
 import { homeStrings } from './home';
 import { hotlineStrings } from './hotlines';
 import { profileStrings } from './profile';
-import { warningLabels } from './warnings';
 
 interface StringTable {
   tl: Record<string, string>;
@@ -30,8 +24,6 @@ const table = (name: string, value: unknown): readonly [string, StringTable] => 
 const TABLES: ReadonlyArray<readonly [string, StringTable]> = [
   table('commonStrings', commonStrings),
   table('errorStrings', errorStrings),
-  table('warningLabels', warningLabels),
-  table('componentStrings', componentStrings),
   table('accountStrings', accountStrings),
   table('askStrings', askStrings),
   table('guideStrings', guideStrings),
@@ -109,6 +101,11 @@ const SILENT_KEYS: string[] = [
 ];
 
 describe('errorMessage', () => {
+  it('exposes the generic message in both languages', () => {
+    expect(genericMessage('tl')).toBe(errorStrings.tl.generic);
+    expect(genericMessage('en')).toBe(errorStrings.en.generic);
+  });
+
   it.each(REQUIRED_ENTRIES)('%s.%s has a non-generic tl and en message', (source, code) => {
     expect(errorMessage('tl', source, code)).not.toBeNull();
     expect(errorMessage('tl', source, code)).not.toBe(errorStrings.tl.generic);
@@ -143,20 +140,6 @@ describe('errorMessage', () => {
   });
 });
 
-describe('warningLabels', () => {
-  const warningIds: string[] = (warnings as { items: Array<{ id: string }> }).items.map((item) => item.id);
-
-  it.each(warningIds)('covers warning id %s', (id) => {
-    expect((warningLabels.tl as Record<string, string>)[id]).toBeTruthy();
-    expect((warningLabels.en as Record<string, string>)[id]).toBeTruthy();
-  });
-
-  it('covers barangay-order', () => {
-    expect(warningLabels.tl['barangay-order']).toBeTruthy();
-    expect(warningLabels.en['barangay-order']).toBeTruthy();
-  });
-});
-
 const TOPIC_GROUPS = [
   'signals', 'go_bag', 'home_prep', 'evacuation', 'flood', 'surge', 'landslide',
   'infant', 'senior', 'pregnancy', 'disability', 'pets', 'water_food', 'electrical',
@@ -181,13 +164,3 @@ describe('fill', () => {
   });
 });
 
-describe('legacy strings file', () => {
-  // app/engine/exportText.ts (backend, removed in B3) still imports app/ui/strings.ts; until then it may only re-export.
-  it('app/ui/strings.ts holds no copy of its own', () => {
-    const here = path.dirname(fileURLToPath(import.meta.url));
-    const legacy = path.resolve(here, '../strings.ts');
-    if (!fs.existsSync(legacy)) return;
-    const code = fs.readFileSync(legacy, 'utf8').split('\n').filter((line) => line.trim() !== '' && !line.trim().startsWith('//'));
-    expect(code).toEqual(["export { homeStrings as strings } from './strings/home';"]);
-  });
-});

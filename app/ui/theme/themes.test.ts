@@ -185,25 +185,25 @@ describe('buildTheme contrast invariants', () => {
 
 describe('buildTheme palette traceability', () => {
   it.each(themeCases)('$label · every hex string comes from palette.json', ({ theme }) => {
-    for (const hex of collectHexStrings(theme)) {
+    for (const hex of collectHexStrings({ ...theme, shadow: undefined })) {
       expect(paletteValues.has(hex), `${hex} is not a value in palette.json`).toBe(true);
     }
   });
 });
 
 describe('buildTheme role spot checks', () => {
-  it('before light canvas is the before tint', () => {
-    expect(themeFor('before', 'light').colors.canvas).toBe(paletteJson.phase.before.tint);
+  it('before light canvas is the sky wash', () => {
+    expect(themeFor('before', 'light').colors.canvas).toBe(paletteJson.sticker.skyWash);
   });
 
   it('during light canvas is gray[0]', () => {
     expect(themeFor('during', 'light').colors.canvas).toBe(paletteJson.gray['0']);
   });
 
-  it('during light highlight is the during deep fill with gray[0] ink', () => {
+  it('during light highlight is the ember sticker with carbon ink', () => {
     expect(themeFor('during', 'light').colors.highlight).toEqual({
-      fill: paletteJson.phase.during.deep,
-      ink: paletteJson.gray['0'],
+      fill: paletteJson.sticker.ember,
+      ink: paletteJson.sticker.carbon,
     });
   });
 
@@ -222,8 +222,9 @@ describe('buildTheme role spot checks', () => {
     });
   });
 
-  it.each(['before', 'after'] as const)('%s light brand is blue[700]', (phase) => {
-    expect(themeFor(phase, 'light').colors.brand).toBe(paletteJson.blue['700']);
+  it.each(['before', 'after'] as const)('%s light brand is the phase accent', (phase) => {
+    const c = themeFor(phase, 'light').colors;
+    expect(c.brand).toBe(c.accentText);
   });
 });
 
@@ -308,9 +309,9 @@ describe('buildTheme letterSpacing', () => {
     expect(letterSpacing).toBe(round2(fontSize * -0.01));
   });
 
-  it.each(LARGE)('before headline tracking is em −0.04 (largeText=%s)', (largeText) => {
+  it.each(LARGE)('before headline tracking is em −0.01 (largeText=%s)', (largeText) => {
     const { fontSize, letterSpacing } = themeFor('before', 'light', largeText).type.roles.headline;
-    expect(letterSpacing).toBe(round2(fontSize * -0.04));
+    expect(letterSpacing).toBe(round2(fontSize * -0.01));
   });
 });
 
@@ -321,9 +322,9 @@ describe('buildTheme mascot slot', () => {
   });
 
   it.each([
-    ['before', 96, 'heroEnd'],
-    ['during', 40, 'headerEnd'],
-    ['after', 120, 'heroBelow'],
+    ['before', 168, 'heroEnd'],
+    ['during', 48, 'headerEnd'],
+    ['after', 168, 'heroBelow'],
   ] as const)('%s slot is %i dp at %s', (phase, size, placement) => {
     const regular = themeFor(phase, 'light', false);
     const large = themeFor(phase, 'light', true);

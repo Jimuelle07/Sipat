@@ -21,7 +21,7 @@ export function HotlineRow({ name, number, callLabel, onCall }: {
   return (
     <View style={styles.row}>
       <View style={styles.info}>
-        <Txt role="lead" tone="text" numberOfLines={1}>{name}</Txt>
+        <Txt role="lead" tone="text">{name}</Txt>
         <Txt role="title" tone="accent" style={styles.number}>{number}</Txt>
       </View>
       <Button label={callLabel} icon="call" variant="primary" onPress={onCall} />

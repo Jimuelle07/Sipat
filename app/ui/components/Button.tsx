@@ -1,10 +1,11 @@
 import type { JSX } from 'react';
 import type { ComponentProps } from 'react';
-import { Pressable, StyleSheet } from 'react-native';
+import { Animated, Pressable, StyleSheet } from 'react-native';
 import type { AccessibilityState } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useThemedStyles } from '../theme';
 import type { Theme } from '../theme';
+import { usePressSpring } from '../motion/spring';
 import { Txt } from './Txt';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
@@ -58,9 +59,11 @@ export function Button({
 }: ButtonProps): JSX.Element {
   const t = useTheme();
   const styles = useThemedStyles(makeStyles);
-  const ink = inkFor(t, variant);
+  const ink = disabled ? t.colors.textMuted : inkFor(t, variant);
+  const press = usePressSpring(0.95);
 
   return (
+    <Animated.View style={[press.style, fullWidth && styles.fullWidth]}>
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
@@ -68,17 +71,22 @@ export function Button({
       accessibilityState={{ disabled, ...accessibilityState }}
       disabled={disabled}
       onPress={onPress}
-      style={({ pressed }) => [
+      onPressIn={press.onPressIn}
+      onPressOut={press.onPressOut}
+      style={[
         styles.base,
         styles[variant],
         fullWidth && styles.fullWidth,
         disabled && styles.disabled,
-        pressed && !disabled && styles.pressed,
+        disabled && variant === 'outline' && styles.disabledOutline,
+        disabled && variant === 'text' && styles.disabledText,
+        !disabled && variant !== 'text' && variant !== 'outline' && styles.lift,
       ]}
     >
       {icon !== undefined ? <Ionicons name={icon} size={t.type.roles.label.fontSize} color={ink} /> : null}
       <Txt role="label" color={ink} style={styles.label}>{label}</Txt>
     </Pressable>
+    </Animated.View>
   );
 }
 
@@ -118,14 +126,26 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     backgroundColor: t.colors.danger.fill,
     borderColor: t.colors.danger.fill,
   },
+  lift: {
+    boxShadow: t.shadow.sticker,
+  },
   fullWidth: {
     alignSelf: 'stretch',
   },
   disabled: {
-    opacity: 0.45,
+    backgroundColor: t.colors.surfaceSunken,
+    borderColor: t.colors.controlBorder,
+  },
+  disabledOutline: {
+    backgroundColor: 'transparent',
+    borderColor: t.colors.controlBorder,
+  },
+  disabledText: {
+    backgroundColor: 'transparent',
+    borderWidth: 0,
   },
   pressed: {
-    opacity: 0.86,
+    transform: [{ translateY: 2 }, { scale: 0.985 }],
   },
   label: {
     flexShrink: 1,

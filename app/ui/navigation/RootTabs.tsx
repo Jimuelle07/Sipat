@@ -1,6 +1,7 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import type { JSX } from 'react';
-import { StyleSheet } from 'react-native';
+import type { ComponentProps } from 'react';
+import { StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Txt } from '../components';
@@ -13,10 +14,27 @@ import { HomeScreen } from '../screens/HomeScreen';
 import { HotlinesScreen } from '../screens/HotlinesScreen';
 import { GuideScreen } from '../screens/GuideScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
-import { AccountScreen } from '../screens/AccountScreen';
 import type { RootTabParamList } from './types';
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
+
+function TabGlyph({ name, color, focused }: { name: ComponentProps<typeof Ionicons>['name']; color: string; focused: boolean }): JSX.Element {
+  const theme = useTheme();
+  return (
+    <View style={{
+      width: 52,
+      height: 30,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: theme.radius.pill,
+      borderWidth: focused ? theme.border.control : 0,
+      borderColor: theme.colors.stickers.carbon,
+      backgroundColor: focused ? theme.colors.wash : 'transparent',
+    }}>
+      <Ionicons name={name} color={color} size={22} />
+    </View>
+  );
+}
 
 export function RootTabs(): JSX.Element {
   const t = useT(commonStrings);
@@ -27,34 +45,39 @@ export function RootTabs(): JSX.Element {
   return (
     <Tab.Navigator screenOptions={{
       headerShown: false,
-      tabBarActiveTintColor: theme.colors.accentText,
+      tabBarActiveTintColor: theme.colors.stickers.carbon,
       tabBarInactiveTintColor: theme.colors.textMuted,
-      // Icon row + one caption line + breathing room, plus the gesture-bar inset.
+      tabBarItemStyle: { marginVertical: theme.space.xs },
       tabBarStyle: [styles.tabBar, {
-        height: theme.minTouch + theme.type.roles.caption.lineHeight + theme.space.md + insets.bottom,
-        paddingBottom: insets.bottom + theme.space.xs,
+        height: theme.minTouch + theme.type.roles.caption.lineHeight + theme.space.xxl,
+        paddingBottom: theme.space.xs,
+        paddingTop: theme.space.xs,
+        marginBottom: insets.bottom + theme.space.md,
       }],
-      // Six destinations share a phone width: shrink a long label instead of truncating it.
       tabBarLabel: ({ color, children }) => (
-        <Txt role="caption" color={color} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{children}</Txt>
+        <Txt role="caption" color={color} numberOfLines={1} style={styles.tabLabel}>{children}</Txt>
       ),
     }}>
-      <Tab.Screen name="Home" component={HomeScreen} options={{ title: t.tabHome, tabBarIcon: ({ color, size }) => <Ionicons name="home-outline" color={color} size={size} /> }} />
-      <Tab.Screen name="Ask" component={AskScreen} options={{ title: t.tabAsk, tabBarIcon: ({ color, size }) => <Ionicons name="chatbubble-ellipses-outline" color={color} size={size} /> }} />
-      <Tab.Screen name="Guide" component={GuideScreen} options={{ title: t.tabGuide, tabBarIcon: ({ color, size }) => <Ionicons name="book-outline" color={color} size={size} /> }} />
-      <Tab.Screen name="Hotlines" component={HotlinesScreen} options={{ title: t.tabHotlines, tabBarIcon: ({ color, size }) => <Ionicons name="call-outline" color={color} size={size} /> }} />
-      <Tab.Screen name="Family" component={ProfileScreen} options={{ title: t.tabProfile, tabBarIcon: ({ color, size }) => <Ionicons name="people-outline" color={color} size={size} /> }} />
-      <Tab.Screen name="Account" component={AccountScreen} options={{ title: t.tabAccount, tabBarIcon: ({ color, size }) => <Ionicons name="person-circle-outline" color={color} size={size} /> }} />
+      <Tab.Screen name="Home" component={HomeScreen} options={{ title: t.tabHome, tabBarIcon: ({ color, focused }) => <TabGlyph name="home-outline" color={color} focused={focused} /> }} />
+      <Tab.Screen name="Ask" component={AskScreen} options={{ title: t.tabAsk, tabBarIcon: ({ color, focused }) => <TabGlyph name="chatbubble-ellipses-outline" color={color} focused={focused} /> }} />
+      <Tab.Screen name="Guide" component={GuideScreen} options={{ title: t.tabGuide, tabBarIcon: ({ color, focused }) => <TabGlyph name="book-outline" color={color} focused={focused} /> }} />
+      <Tab.Screen name="Hotlines" component={HotlinesScreen} options={{ title: t.tabHotlines, tabBarIcon: ({ color, focused }) => <TabGlyph name="call-outline" color={color} focused={focused} /> }} />
+      <Tab.Screen name="Family" component={ProfileScreen} options={{ title: t.tabProfile, tabBarIcon: ({ color, focused }) => <TabGlyph name="people-outline" color={color} focused={focused} /> }} />
     </Tab.Navigator>
   );
 }
 
 const makeStyles = (theme: Theme) => StyleSheet.create({
+  tabLabel: { fontSize: 11, lineHeight: 20, paddingBottom: 2 },
   tabBar: {
     backgroundColor: theme.colors.surface,
-    borderTopLeftRadius: theme.radius.panel,
-    borderTopRightRadius: theme.radius.panel,
-    borderTopColor: theme.colors.hairline,
-    borderTopWidth: theme.border.hairline,
+    marginHorizontal: theme.space.gutter,
+    marginBottom: theme.space.md,
+    borderRadius: theme.radius.pill,
+    borderColor: theme.colors.stickers.carbon,
+    borderWidth: theme.border.emphasis,
+    borderTopWidth: theme.border.emphasis,
+    elevation: 0,
+    boxShadow: theme.shadow.float,
   },
 });

@@ -1,31 +1,17 @@
-import { describe, expect, it, vi } from 'vitest';
-
-vi.mock('react-native', () => ({
-  Pressable: 'Pressable',
-  ScrollView: 'ScrollView',
-  StyleSheet: { create: (value: unknown) => value },
-  Text: 'Text',
-  TextInput: 'TextInput',
-  View: 'View',
-}));
-vi.mock('@expo/vector-icons', () => ({ Ionicons: 'Ionicons' }));
-vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' }));
+import { describe, expect, it } from 'vitest';
 
 import type { Member, Profile } from '../../engine';
-import { commonStrings } from '../strings/common';
-import { profileStrings } from '../strings/profile';
+import { errorMessage } from '../strings/errors';
 import {
   blankMemberDraft,
   buildProfileInput,
   clampNumber,
-  errorMessage,
-  fieldErrorLines,
   householdDraftFrom,
+  initialsOf,
   memberDraftFrom,
   memberInputFrom,
-  parseSettingNumber,
   toggleInList,
-} from './ProfileScreen';
+} from './family/profileModel';
 
 const profile: Profile = {
   id: 'household-1',
@@ -182,32 +168,17 @@ describe('household draft and profile input', () => {
 });
 
 describe('error copy', () => {
-  it('maps known codes and falls back for unknown ones', () => {
-    expect(errorMessage('owner_required')).toBe(profileStrings.tl.error_owner_required);
-    expect(errorMessage('out_of_range')).toBe(profileStrings.tl.error_out_of_range);
-    expect(errorMessage('mystery')).toBe(profileStrings.tl.error_unknown);
-  });
-
-  it('labels each field path and keeps every error', () => {
-    const lines = fieldErrorLines([
-      { code: 'name_required', field: 'owner.name' },
-      { code: 'pets_range', field: 'petsCount' },
-    ]);
-    expect(lines).toHaveLength(2);
-    expect(lines[0]).toBe(`${profileStrings.tl.fieldName}: ${commonStrings.tl.error_name_required}`);
-    expect(lines[1]).toBe(`${commonStrings.tl.petsCount}: ${commonStrings.tl.error_pets_range}`);
+  it('maps known validation codes and falls back for unknown ones', () => {
+    expect(errorMessage('tl', 'validation', 'name_required')).toBe('Lagyan ng pangalan.');
+    expect(errorMessage('tl', 'family', 'owner_required')).toBe('Hindi puwedeng burahin ang pangunahing tao.');
+    expect(errorMessage('tl', 'validation', 'mystery')).toBe(errorMessage('tl', 'validation', 'unknown'));
   });
 });
 
-describe('parseSettingNumber', () => {
-  it('accepts numbers and trims whitespace', () => {
-    expect(parseSettingNumber('15')).toBe(15);
-    expect(parseSettingNumber(' 3 ')).toBe(3);
-  });
-
-  it('rejects empty or non-numeric text', () => {
-    expect(parseSettingNumber('')).toBeNull();
-    expect(parseSettingNumber('   ')).toBeNull();
-    expect(parseSettingNumber('abc')).toBeNull();
+describe('initialsOf', () => {
+  it('takes the first and last initials, best effort', () => {
+    expect(initialsOf('Ana Reyes')).toBe('AR');
+    expect(initialsOf('Ana')).toBe('A');
+    expect(initialsOf('  ')).toBe('');
   });
 });

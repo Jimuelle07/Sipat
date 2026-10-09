@@ -8,6 +8,7 @@ import { defineStrings } from '../i18n';
 export const accountStrings = defineStrings({
   tl: {
     title: 'Account',
+    back: 'Bumalik',
     signInTitle: 'Mag-sign in',
     signUpTitle: 'Gumawa ng account',
     forgotTitle: 'Nakalimutan ang password',
@@ -16,7 +17,7 @@ export const accountStrings = defineStrings({
     confirmPassword: 'Ulitin ang password',
     signIn: 'Mag-sign in',
     signUp: 'Gumawa ng account',
-    sendReset: 'Ipadala ang link',
+    sendReset: 'Suriin ang email',
     noAccount: 'Wala pang account? Gumawa.',
     haveAccount: 'May account na? Mag-sign in.',
     forgotLink: 'Nakalimutan ang password?',
@@ -26,10 +27,10 @@ export const accountStrings = defineStrings({
     emailInvalid: 'Hindi wastong email.',
     passwordShort: 'Kailangan ng mas mahabang password.',
     passwordMismatch: 'Hindi magkatugma ang mga password.',
-    resetSent: 'Kung may account ang email na ito, may matatanggap na link.',
   },
   en: {
     title: 'Account',
+    back: 'Back',
     signInTitle: 'Sign in',
     signUpTitle: 'Create an account',
     forgotTitle: 'Forgot password',
@@ -38,7 +39,7 @@ export const accountStrings = defineStrings({
     confirmPassword: 'Repeat password',
     signIn: 'Sign in',
     signUp: 'Create account',
-    sendReset: 'Send link',
+    sendReset: 'Check email',
     noAccount: 'No account yet? Create one.',
     haveAccount: 'Have an account? Sign in.',
     forgotLink: 'Forgot password?',
@@ -48,6 +49,5 @@ export const accountStrings = defineStrings({
     emailInvalid: 'Invalid email.',
     passwordShort: 'Use a longer password.',
     passwordMismatch: 'Passwords do not match.',
-    resetSent: 'If this email has an account, a link will be sent.',
   },
 });

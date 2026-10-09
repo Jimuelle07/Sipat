@@ -9,23 +9,28 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('@expo/vector-icons', () => ({ Ionicons: 'Ionicons' }));
 vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' }));
+vi.mock('@react-navigation/native', () => ({
+  useNavigation: () => ({ navigate: () => undefined, goBack: () => undefined }),
+  useRoute: () => ({ params: undefined }),
+}));
+vi.mock('../context/AppChrome', () => ({
+  AppBanners: () => null,
+  StatusBadges: () => null,
+}));
 
 import type { TopicGroup } from '../../engine';
 import { goBack } from './GuideScreen';
 import type { GuideView } from './GuideScreen';
 import { guideStrings, guideTopicLabels } from '../strings/guide';
+import { fill } from '../strings/format';
 
 const TOPICS: TopicGroup[] = [
   'signals', 'go_bag', 'home_prep', 'evacuation', 'flood', 'surge', 'landslide', 'infant', 'senior',
-  'pregnancy', 'disability', 'pets', 'water_food', 'electrical', 'generator_fire', 'cleanup',
-  'health_after_flood', 'out_of_guide',
+  'pregnancy', 'disability', 'pets', 'water_food', 'electrical', 'generator_fire', 'gas_safety',
+  'cleanup', 'health_after_flood', 'first_aid', 'psychosocial', 'damage_report', 'assistance', 'out_of_guide',
 ];
 
 describe('goBack', () => {
-  it('steps from a passage detail back to its topic list', () => {
-    expect(goBack({ kind: 'passage', topic: 'flood', id: 'p1' })).toEqual({ kind: 'topic', topic: 'flood' });
-  });
-
   it('steps from a topic list back to the topic grid', () => {
     expect(goBack({ kind: 'topic', topic: 'flood' })).toEqual({ kind: 'topics' });
   });
@@ -34,9 +39,9 @@ describe('goBack', () => {
     expect(goBack({ kind: 'topics' })).toEqual({ kind: 'topics' });
   });
 
-  it('never loses the topic while returning to the grid', () => {
-    const view: GuideView = { kind: 'passage', topic: 'senior', id: 'p9' };
-    expect(goBack(goBack(view))).toEqual({ kind: 'topics' });
+  it('loses the topic while returning to the grid', () => {
+    const view: GuideView = { kind: 'topic', topic: 'senior' };
+    expect(goBack(view)).toEqual({ kind: 'topics' });
   });
 });
 
@@ -59,5 +64,10 @@ describe('guide strings', () => {
   it('shows the English note about Filipino guide text in both modes', () => {
     expect(guideStrings.tl.englishNote).toBe('Official guide text is in Filipino.');
     expect(guideStrings.en.englishNote).toBe('Official guide text is in Filipino.');
+  });
+
+  it('fills the reviewer line from the passaged reviewer and date', () => {
+    expect(fill(guideStrings.tl.reviewedLine, { name: 'SAMPLE Reviewer A', date: '2026-10-09' }))
+      .toBe('Sinuri ni SAMPLE Reviewer A noong 2026-10-09');
   });
 });
