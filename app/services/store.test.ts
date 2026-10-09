@@ -11,6 +11,7 @@ const settings: Settings = {
   autoCheckUpdates: true,
   wifiOnly: true,
   topicReportsOptIn: false,
+  damageReportsOptIn: false,
 };
 
 const profile: Profile = {

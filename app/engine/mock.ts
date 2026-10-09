@@ -94,6 +94,7 @@ const DEFAULT_SETTINGS: Settings = {
   autoCheckUpdates: true,
   wifiOnly: true,
   topicReportsOptIn: false,
+  damageReportsOptIn: false,
 };
 
 const ALL_CHANGES: EngineChange[] = [

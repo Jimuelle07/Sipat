@@ -2,11 +2,11 @@
 
 Households use Bagyo Buddy free forever; LGUs pay an annual Bantay license for a localized pack, out of the disaster fund the law already requires them to keep.
 
-Related: [README](README.md) · [Problem](problem.md) · [Solution](solution.md)
+Related: [README](README.md) · [Features](features.md) · [Problem](problem.md) · [Solution](solution.md)
 
 ## 1. Summary
 
-- **Who uses it.** Households in typhoon-prone areas ([problem.md](problem.md) has the persona and evidence). They never pay, never make an account and never see an ad.
+- **Who uses it.** Households in typhoon-prone areas ([problem.md](problem.md) has the persona and evidence). They never pay, never need an account and never see an ad.
 - **Who pays.** Municipal and city LGUs, through their DRRM offices, buy the **Bantay** license. NGOs, schools and CSR sponsors can buy or sponsor licenses too.
 - **The logic.** LGUs already have a legal duty and a budget line to prepare households (RA 10121). Bagyo Buddy turns part of that budget into guidance that stays on each household's phone when power and signal fail.
 - **What we never do.** No ads, no data sales, no household payments. The household app has no payment or license check, so it works fully offline.
@@ -16,14 +16,14 @@ Related: [README](README.md) · [Problem](problem.md) · [Solution](solution.md)
 | Block | Bagyo Buddy |
 | :-- | :-- |
 | Customer segments | Households (users, free); municipal and city DRRMOs (payers); barangays (pilot partners); NGOs, schools, CSR sponsors (co-payers) |
-| Value propositions | Households: what to do for your own household, offline, with sources. LGUs: their guidance on every phone even when towers are down; anonymous insight; preparedness evidence for the SGLG |
-| Channels | LGU rollout via barangay assemblies, BHWs, school drills; radio; offline pack sharing; Play Store. To LGUs: OCD regional offices, DRRMO networks, leagues, DILG |
-| Customer relationships | Households: self-serve, no account. LGUs: pilot success plan, training, pre-season check, post-season review |
+| Value propositions | Households: what to do for your own household, offline, with sources; the phase-themed app that switches with the bagyo; the latest PAGASA bulletin kept for when signal drops. LGUs: their centers, hotlines and advisories on every phone even when towers are down; anonymous insight; preparedness evidence for the SGLG |
+| Channels | LGU rollout via barangay assemblies, BHW house visits, school drills; radio; Play Store. To LGUs: OCD regional offices, DRRMO networks, leagues, DILG |
+| Customer relationships | Households: self-serve, account optional. LGUs: pilot success plan, training, pre-season check, post-season review |
 | Revenue streams | Bantay annual license; optional onboarding fee; CSR-sponsored licenses; grants; NGO and school licenses at 20% off |
-| Key resources | Reviewed, source-traceable Tagalog guide; evaluation set; offline stack; signing keys and pack pipeline; LGU relationships |
-| Key activities | Writing and reviewing content; building LGU packs; testing on budget phones; pilots and training; procurement compliance |
-| Key partners | PAGASA, NDRRMC/OCD, DOH, PHIVOLCS, BFP; LGU DRRMOs; Liga ng mga Barangay; NGOs; sponsors; Meta (Llama), Google Play, AWS |
-| Cost structure | Team; content review; legal and approvals; registration and compliance; training travel; tiny infrastructure |
+| Key resources | Reviewed, source-traceable Tagalog guide; evaluation set; offline stack; bulletin scraper and signed feed; signing keys (pack and feed) and pack pipeline; LGU relationships |
+| Key activities | Writing and reviewing content; operating the scraper; reviewing scraped hotlines and evacuation centers; building LGU packs; testing on budget phones; pilots and training; procurement compliance |
+| Key partners | PAGASA (content and bulletin data permission), NDRRMC/OCD, DOH, PHIVOLCS, BFP; LGU DRRMOs; Liga ng mga Barangay; NGOs; sponsors; Meta (Llama), Google Play, AWS |
+| Cost structure | Team; content and data review; legal and approvals; registration and compliance; training travel; a scheduled scraper job and KB-size hosting |
 
 ## 3. The nine blocks
 
@@ -34,7 +34,7 @@ Related: [README](README.md) · [Problem](problem.md) · [Solution](solution.md)
 | Segment | Main hazard | What comes first |
 | :-- | :-- | :-- |
 | Riverside (`near_river`) | River floods | Rainfall warnings, readiness to evacuate |
-| Coastal (`near_sea`) | Storm surge, gale | Surge and gale warnings; fisherfolk guidance (Later) |
+| Coastal (`near_sea`) | Storm surge, gale | Surge and gale warnings |
 | Upland (`slope`) | Landslides | Warning signs, when to leave the slope |
 | Urban flood-prone (`low_lying`) | Flash floods, long outages | Floodwater and electrical safety |
 
@@ -46,8 +46,8 @@ Related: [README](README.md) · [Problem](problem.md) · [Solution](solution.md)
 
 | Segment | What they get |
 | :-- | :-- |
-| Households | A checklist for their household and the warning they heard; Taglish answers from official guides, with sources; works with no signal and on low battery; free and private |
-| LGU DRRMO | Their evacuation centers, hotlines and advisories on every household's phone, even when networks fail; rollout with no servers or accounts; opt-in anonymous topic counts; training |
+| Households | A checklist for their household, its phase and the warning they heard; Taglish answers from official guides, with sources; an app whose theme and Home switch with the bagyo phase, with undo; the latest PAGASA bulletin, recommended evacuation centers and the bagyo's distance, kept on the phone for when signal drops (MVP stretch); works with no signal and on low battery; free and private |
+| LGU DRRMO | Their verified evacuation centers, hotlines and advisories on every household's phone, even when networks fail; no mandatory accounts for households; opt-in anonymous topic counts; damage reports from the households that choose to send them (Pilot); training |
 | Mayor and council | A visible, low-cost preparedness program measured in households prepared; evidence for the SGLG's Disaster Preparedness area |
 | NGOs and sponsors | A measurable outcome; credit on the About screen; no ads and no access to user data |
 
@@ -55,16 +55,15 @@ Related: [README](README.md) · [Problem](problem.md) · [Solution](solution.md)
 
 **To households**
 
-1. **LGU rollout:** barangay assemblies, BHW house visits and school drills, where officers help families set up on a calm day.
+1. **LGU rollout:** barangay assemblies, BHW house visits and school drills, where officers help families install the app, set up each member and take the face photos on a calm day.
 2. **Radio:** stations that announce the signals can remind listeners to tap the warning in the app. *Reasoning:* radio is what families still hear when power and signal are out.
-3. **Offline pack sharing:** signed packs pass phone to phone (Bluetooth, Quick Share, Messenger, a barangay laptop).
-4. **Google Play**, with the model as an AI pack ([Play for On-device AI](https://developer.android.com/google/play/on-device-ai)).
+3. **Google Play**, with the model as an AI pack ([Play for On-device AI](https://developer.android.com/google/play/on-device-ai)).
 
 **To LGUs:** OCD regional offices and DRRMO networks; the leagues of municipalities and cities and the Liga ng mga Barangay; DILG, which administers the SGLG; DRRM events, with a live demo in airplane mode. Each pilot becomes the case study that sells the next.
 
 ### Customer relationships
 
-**Households** are self-serve: no account, no login, no help desk. The About screen shows the guide date, sources and reviewers. Local questions go to the barangay.
+**Households** are self-serve: the app works fully with no login or help desk. The MVP ships static sign-up, login and forgot-password screens with no backend; the optional real family account (profile backup after sign-in) is Later. The About screen shows the guide date, sources and reviewers. Local questions go to the barangay.
 
 **LGUs** get a managed relationship that follows the typhoon season:
 
@@ -72,7 +71,7 @@ Related: [README](README.md) · [Problem](problem.md) · [Solution](solution.md)
 | :-- | :-- |
 | Pilot | A written success plan: barangays, household count, survey method, dates |
 | Onboarding | We build the LGU pack with the DRRMO; an LGU approver signs off before publishing |
-| Training | Officers and BHWs learn to set up households and share packs offline |
+| Training | Officers and BHWs learn to help households set up, members and photos included |
 | Pre-season check | Refresh the pack, confirm hotlines and centers |
 | Post-season review | Survey results, content gaps, renewal proposal |
 
@@ -83,7 +82,7 @@ Related: [README](README.md) · [Problem](problem.md) · [Solution](solution.md)
 | Bantay annual license | Municipal and city LGUs | Core revenue, through government procurement |
 | Onboarding and training fee | LGUs, optional | One-time; can be folded into the license |
 | CSR-sponsored licenses | Telcos, electric cooperatives, banks, insurers | The sponsor pays for an LGU's license and is credited on the About screen |
-| Humanitarian grants | Foundations, development programs | Fund content (such as the Cebuano guide) and pilots |
+| Humanitarian grants | Foundations, development programs | Fund content and pilots |
 | NGO and school licenses | NGOs, humanitarian groups, schools | 20% off Bantay, as in v1 |
 
 Households pay nothing, ever.
@@ -91,35 +90,36 @@ Households pay nothing, ever.
 ### Key resources
 
 - **The guide:** about 300 short Tagalog passages from official sources, each with its source, reviewer and review date. The real asset.
+- **The bulletin feed and scraper:** a scheduled server-side job that turns PAGASA's public bulletins into a small signed feed, verbatim with source and issued time, plus a review queue for scraped hotlines and evacuation centers ([features.md, section 10](features.md#10-updates-scraper-and-lgu-packs)).
 - **The evaluation set:** 120 labeled Taglish questions ([solution.md](solution.md)).
-- **The offline stack, signing keys and pack pipeline**, so content works and stays trustworthy without a network.
+- **The offline stack, signing keys (pack key kept offline, separate feed key held by the job) and pack pipeline**, so content works and stays trustworthy.
 - **LGU relationships and case studies.**
 
 ### Key activities
 
-Writing, sourcing and reviewing passages; building and refreshing LGU packs; testing the app on budget phones; running pilots, training and post-season reviews; staying compliant (registration, PhilGEPS, invoices, agency approvals, data privacy); guarding the signing keys.
+Writing, sourcing and reviewing passages; operating the scraper (watching parse failures and stale feeds); reviewing scraped hotlines and evacuation centers before they reach phones; building and refreshing LGU packs; testing the app on budget phones; running pilots, training and post-season reviews; staying compliant (registration, PhilGEPS, invoices, agency approvals, data privacy); guarding the signing keys.
 
 ### Key partners
 
 | Partner | Role |
 | :-- | :-- |
-| PAGASA, NDRRMC/OCD, DOH, PHIVOLCS, BFP | Content sources; approval for paid use (RA 8293, Sec. 176) |
+| PAGASA, NDRRMC/OCD, DOH, PHIVOLCS, BFP | Content sources; approval for paid use (RA 8293, Sec. 176). PAGASA also: permission to scrape and redistribute its bulletins, ideally a data feed |
 | LGU DRRMOs | Buyers; co-authors and reviewers of local packs |
 | Liga ng mga Barangay; leagues of municipalities and cities | Reach to LGUs |
 | NGOs and humanitarian groups | Co-delivery, grants, discounted licenses |
 | Telcos, electric cooperatives, banks, insurers | CSR sponsors. They never touch content or data |
-| Meta (Llama), Google Play, AWS | The model and its license; distribution and the model's AI pack; hosting for KB-size packs |
+| Meta (Llama), Google Play, AWS | The model and its license; distribution and the model's AI pack; hosting for KB-size packs and the feed |
 
 ### Cost structure
 
 | Cost | Driver |
 | :-- | :-- |
 | Team | Engineers, a content writer, LGU onboarding. The largest cost |
-| Content review | DRRM professionals; grows with packs and languages |
+| Content and data review | DRRM professionals; grows with packs; plus review of scraped hotlines and centers |
 | Legal and approvals | Agency approval for paid use; privacy review. Mostly one-time |
 | Registration and compliance | Business registration, BIR invoices, PhilGEPS |
 | Travel and training | Per LGU |
-| Infrastructure | S3 and CloudFront for KB-size packs; a small LGU portal. Near zero |
+| Infrastructure | A scheduled scraper job (e.g. GitHub Actions cron); S3 and CloudFront for KB-size packs and the feed; a small LGU portal. Near zero |
 | Distribution | Google Play developer account, a one-time fee |
 
 The 0.81 GB model comes from Google Play as an AI pack or from a pinned public mirror such as [Hugging Face](https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF), checked by SHA-256. Our CDN never serves model bytes.
@@ -128,20 +128,20 @@ The 0.81 GB model comes from Google Play as an AI pack or from a pinned public m
 
 ### Ambon: households, free forever
 
-The list below is the full household product. Some items ship after the hackathon; [solution.md](solution.md#5-features-by-release) has the release for each.
+The list below is the full household product. Online items are MVP stretch and some ship after the hackathon; [features.md](features.md) has the release for each.
 
-- All safety features: the warning picker (wind signal, rainfall, storm surge, gale), household checklists, Taglish questions with sources, the emergency card, the "Ligtas kami" text composer, low-battery mode.
-- Family setup by the main person, member by member, with optional photos kept only on the phone; a "Bilangan" roll call and a "Hinahanap" card for each member in case someone gets separated.
-- More than one household profile (for example the grandparents' house in the province); a printable family plan and go-bag list.
-- Fully offline with no account. Smart Update is free whenever the family chooses to go online, and a signed pack can also come from a neighbor's phone.
+- All safety features: the warning picker (wind signal, rainfall, storm surge, gale), phase-recommended household checklists with "Gawin ngayon", Taglish questions with sources, the emergency card, low-battery mode.
+- Bagyo phases as the app's mode, with a theme per phase and automatic switching toward caution, always with undo.
+- Family setup by the main person, member by member, with a required face photo for everyone kept only on the phone, and a "Hinahanap" card for each member in case someone gets separated.
+- One hotlines screen: national hotlines, family contacts, meeting place and evacuation center.
+- Household location from the barangay list, or one optional coarse GPS reading.
+- Fully offline with no account. When online: the latest PAGASA bulletin, the bagyo's distance and track view, recommended evacuation centers, reviewed hotline updates and Smart Update guide packs, all free and logged on screen.
 
 ### Bantay: the LGU annual license
 
-- **A localized pack:** the LGU's evacuation centers, hotlines, hazard notes per barangay and advisories, signed and delivered inside the update families approve.
-- **An offline rollout kit:** an install guide for BHWs, a shareable signed pack, printed setup cards.
+- **A localized pack:** the LGU's verified evacuation centers (replacing scraped ones), LGU hotlines, hazard notes per barangay and advisories, signed and delivered inside the update families approve.
 - **Training**, the pre-season check and the post-season review.
 - **An opt-in topic dashboard** under the README's privacy rules ([F3](README.md)).
-- **Extra packs** for local needs (coastal, upland, fishing, farming) as they become available.
 
 ### Bantay pilot
 
@@ -190,11 +190,11 @@ The alternatives are complements, not rivals ([problem.md](problem.md) has the f
 | Alternative | Its job | How Bagyo Buddy fits |
 | :-- | :-- | :-- |
 | Free cell-broadcast alerts ([ECBS](https://en.wikipedia.org/wiki/Emergency_Cell_Broadcast_System), RA 10639) | Say a hazard is coming | We say what the household should do, offline |
-| PAGASA bulletins | Official forecasts and warnings | The family taps the warning PAGASA announced |
+| PAGASA bulletins | Official forecasts and warnings | The family taps the warning PAGASA announced; the app keeps the latest bulletin, verbatim, for when signal drops |
 | Project NOAH, HazardHunterPH | Online hazard maps | Planning tools; we cover the storm hours |
 | NDRRMC and OCD guides | Authoritative advice | Our source material, credited and searchable in Taglish |
 
-**The moat:** the reviewed, source-traceable Tagalog guide (later Cebuano), the evaluation set, LGU relationships and local packs, and offline trust. *Reasoning:* a big tech company could build a chatbot, but is unlikely to maintain reviewed local packs with each DRRMO.
+**The moat:** the reviewed, source-traceable Tagalog guide, the evaluation set, LGU relationships and local packs, and offline trust. *Reasoning:* a big tech company could build a chatbot, but is unlikely to maintain reviewed local packs with each DRRMO.
 
 ## 8. Key metrics
 
@@ -215,7 +215,7 @@ The alternatives are complements, not rivals ([problem.md](problem.md) has the f
 | Nov to Dec 2026 | Interview 5 DRRMOs; test the pricing hypothesis; ask PAGASA, NDRRMC/OCD and DOH for approval for paid use |
 | Jan to Feb 2027 | Register the business and PhilGEPS account; sign one pilot agreement |
 | Mar to Apr 2027 | Build and review the LGU pack with the DRRMO; "before" survey |
-| May to Jun 2027 | Rollout and training; BHWs set up households and share packs offline |
+| May to Jun 2027 | Rollout and training; BHWs help households set up, photos included |
 | Mid-2027 | Ask the pilot LGU to put the license in next year's DRRM fund plan; quote two or three more LGUs |
 | Jul to Nov 2027 | Typhoon season: support the DRRMO, keep packs fresh |
 | Dec 2027 | "After" survey, case study, renewal proposal |

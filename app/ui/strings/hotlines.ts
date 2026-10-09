@@ -73,8 +73,13 @@ const TOPIC_LABELS: Record<TopicGroup, string> = {
   water_food: 'Tubig at pagkain',
   electrical: 'Kuryente',
   generator_fire: 'Generator at sunog',
+  gas_safety: 'LPG at gas',
   cleanup: 'Paglilinis',
   health_after_flood: 'Kalusugan pagkatapos ng baha',
+  first_aid: 'Pangunang lunas',
+  psychosocial: 'Kalusugang pangkaisipan',
+  damage_report: 'Pag-uulat ng pinsala',
+  assistance: 'Tulong at ayuda',
   out_of_guide: 'Wala sa gabay',
 };
 

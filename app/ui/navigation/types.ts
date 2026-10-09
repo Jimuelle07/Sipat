@@ -1,1 +1,1 @@
-export type RootTabParamList = { Home: undefined; Ask: undefined; Guide: undefined; Hotlines: undefined; Family: undefined };
+export type RootTabParamList = { Home: undefined; Ask: undefined; Guide: undefined; Hotlines: undefined; Family: undefined; Account: undefined };

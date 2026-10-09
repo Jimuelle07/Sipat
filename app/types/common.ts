@@ -33,12 +33,13 @@ export type HomeTag =
   | 'near_river' | 'near_sea' | 'slope' | 'low_lying' | 'light_materials' | 'concrete' | 'upper_floor';
 export type LivelihoodTag = 'fisherfolk' | 'farmer'; // Later
 export type ProfileTag = MemberTag | HomeTag | LivelihoodTag;
-export type HazardTag = 'wind' | 'flood' | 'surge' | 'landslide' | 'electrical' | 'water' | 'health' | 'fire';
+export type HazardTag = 'wind' | 'flood' | 'surge' | 'landslide' | 'electrical' | 'water' | 'health' | 'fire' | 'gas';
 
 export type TopicGroup =
   | 'signals' | 'go_bag' | 'home_prep' | 'evacuation' | 'flood' | 'surge' | 'landslide'
   | 'infant' | 'senior' | 'pregnancy' | 'disability' | 'pets' | 'water_food' | 'electrical'
-  | 'generator_fire' | 'cleanup' | 'health_after_flood' | 'out_of_guide';
+  | 'generator_fire' | 'gas_safety' | 'cleanup' | 'health_after_flood' | 'first_aid'
+  | 'psychosocial' | 'damage_report' | 'assistance' | 'out_of_guide';
 
 export interface Contact {
   name: string;      // ≤ 60 chars
@@ -105,4 +106,5 @@ export interface Settings {
   autoCheckUpdates: boolean;   // Pilot, default true
   wifiOnly: boolean;           // Pilot, default true
   topicReportsOptIn: boolean;  // Pilot, default false
+  damageReportsOptIn: boolean; // Pilot, default false
 }

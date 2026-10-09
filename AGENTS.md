@@ -6,7 +6,7 @@ NEVER co-author yourself.
 
 ## Project: Bagyo Buddy
 
-Bagyo Buddy is an offline typhoon companion for Filipino households on budget Android phones. The family sets up a household profile once. During a storm they tap the warning they heard on the radio (PAGASA wind signal 1 to 5, rainfall, storm surge or gale) and get a checklist fitted to their household. They can ask questions in Taglish; answers come only from official preparedness guides that ship inside the app (PAGASA, NDRRMC and OCD, DOH, PHIVOLCS, BFP), with the source one tap away. Llama 3.2 1B runs on the phone to put the matched passage in plain words, but the app works fully without it: the vetted summary shows first, the AI answer second. Households never pay; LGUs pay for a localized pack (their evacuation centers, hotlines and advisories).
+Bagyo Buddy is an offline-first typhoon companion for Filipino households on budget Android phones. The family sets up a household profile once, with a face photo of every member. The app runs in one of three bagyo phases (before, during, after); the phase changes the whole UI theme, the checklist and the answers, and it can switch automatically from the warnings the user taps, what they tell the assistant, and how close the latest PAGASA bulletin puts the bagyo. During a storm they tap the warning they heard on the radio (PAGASA wind signal 1 to 5, rainfall, storm surge or gale) and get a checklist fitted to their household. They can ask questions in Taglish; answers come only from official preparedness guides that ship inside the app (PAGASA, NDRRMC and OCD, DOH, PHIVOLCS, BFP), with the source one tap away. Llama 3.2 1B runs on the phone to put the matched passage in plain words, but the app works fully without it: the vetted summary shows first, the AI answer second. When the phone has signal, it also fetches a signed feed from our own server (scraped PAGASA bulletins, recommended evacuation centers, hotline and guide updates) and caches it for offline use. Households never pay; LGUs pay for a localized pack (their evacuation centers, hotlines and advisories).
 
 It is built first as a 10-hour hackathon MVP, then piloted with one or two LGUs.
 
@@ -18,7 +18,8 @@ Active development. All application code lives inside `app/`. The agent is free 
 
 | Need | Doc |
 | :-- | :-- |
-| The idea, v2 decisions, shared names, glossary | [docs/README.md](docs/README.md) |
+| The idea, v2 and v3 decisions, shared names, glossary | [docs/README.md](docs/README.md) |
+| Every feature by release (feature source of truth) | [docs/features.md](docs/features.md) |
 | Users, evidence, alternatives, assumptions | [docs/problem.md](docs/problem.md) |
 | Journey, features by release, content guide, demo, 10-hour plan, evaluation | [docs/solution.md](docs/solution.md) |
 | Architecture, retrieval, generation, safety, power, updates, security | [docs/system-design.md](docs/system-design.md) |
@@ -26,29 +27,30 @@ Active development. All application code lives inside `app/`. The agent is free 
 | Splitting work between a frontend and a backend person | [docs/api-layer.md, section 3](docs/api-layer.md#3-frontendbackend-handoff) |
 | Business model, pricing, how LGUs buy | [docs/BMC.md](docs/BMC.md) |
 
-`docs/idea-bagyo-buddy.md` and `docs/Bagyo-Buddy-Product-Overview.md` are the v1 inputs, kept for history. Where they disagree with the docs above, the v2 docs win.
+`docs/idea-bagyo-buddy.md` and `docs/Bagyo-Buddy-Product-Overview.md` are the v1 inputs, kept for history. Where they disagree with the docs above, the docs above win. Where those docs disagree on a feature, `docs/features.md` wins.
 
 ## Product rules (non-negotiable; enforce them in code and in review)
 
-1. **Offline first.** Every core feature works in airplane mode. The MVP release build has no INTERNET permission. In the Pilot build, only `UpdateClient` and the opt-in `TopicReporter` may touch the network, only to one pinned host, and every request appears in the on-screen network log.
+1. **Offline first, hybrid second.** Every main feature (household setup, phases, warnings, checklists, Ask in Taglish, hotlines, the bundled guide) works in airplane mode and never waits on the network. Until the online features land (MVP stretch), the release build has no INTERNET permission. After that, only `UpdateClient` (feed and packs), the opt-in `TopicReporter` (Pilot), the opt-in `DamageReporter` (Pilot) and, from Later, the optional `AccountSync` (profile backup after sign-in) may touch the network, only to one pinned host (our own server), never in the background, and every request appears in the on-screen network log. The phone never contacts PAGASA or any other site directly; the server-side scraper does that.
 2. **Grounded answers only.** The model sees only retrieved guide passages and never answers from its own knowledge. The search gate runs before the model; when nothing matches, the model is never called and the app says "Wala ito sa gabay."
-3. **Safety lives in code, not in prompts.** The intent router (emergency, live data, family plan, medicine doses), the verifier (citations, numbers, phone-like strings), critical-passage pinning and the closing line "Sundin ang utos ng barangay at ng mga awtoridad." are all enforced by code.
-4. **Structured facts never come from the model.** Hotlines, evacuation centers, contacts and addresses are rendered from data.
+3. **Safety lives in code, not in prompts.** The intent router (emergency, live data, family plan, medicine doses, phase cues), the verifier (citations, numbers, phone-like strings), critical-passage pinning, phase switching (`decidePhase`; the model's `phase_hint` is only a suggestion) and the closing line "Sundin ang utos ng barangay at ng mga awtoridad." are all enforced by code.
+4. **Structured and live facts never come from the model.** Hotlines, evacuation centers, contacts, addresses and PAGASA bulletin data are rendered from data. Bulletin text and numbers never enter the model prompt.
 5. **Useful without AI.** Low battery (below 15% or the phone's battery saver on), the `none` device tier, AI switched off or a missing model all fall back to vetted summaries. Never block a feature on the model.
-6. **Private by design.** The household profile never leaves the phone. No analytics SDKs, no location permission, no background services, no household accounts.
-7. **Traceable content.** Every passage has a source (agency, title, date, URL), a reviewer and a review date. The content build fails without them.
-8. **Family data and photos stay on the phone.** The main person sets up the household; there is no online account. Member names, notes and photos never go into the model prompt, packs, topic reports, logs or SMS text. Photos are optional, re-encoded without EXIF, kept in app-private storage, excluded from cloud backup, and leave the phone only when the user shares a member card. Camera permission is asked only when the user taps "Kunan ng litrato".
+6. **Private by design.** The household profile works with no account: the MVP ships static sign-up, login and forgot-password screens with no backend, so nothing leaves the phone and nothing is blocked. The real optional family account is Later: the profile is cache-first, syncs to our server only after sign-in while online, and can be turned off in Settings. Photos and location never sync, and never leave the phone except when the user shares a member card or a damage report (Pilot). The bulletin feed is the same file for everyone and evacuation centers come in province bundles, so a request reveals at most the province; distances are computed on the phone. Location is optional: one coarse GPS reading, asked only when the user taps "Gamitin ang lokasyon ng telepono", never in the background; the PSGC area list is the alternative. No analytics SDKs, no background services, no mandatory accounts.
+7. **Traceable content.** Every passage has a source (agency, title, date, URL), a reviewer and a review date. Hotlines and evacuation centers also need a reviewer before they reach phones, scraped or not. Scraped bulletins carry the agency, source URL, issued time and fetched time, and are shown verbatim. The content and feed builds fail without them.
+8. **Family data and photos stay on the phone.** The main person sets up the household; it works with no account, and the optional account (Later) only backs up the profile after sign-in. Every member needs a face photo: the photo step has no skip button, and "Mamaya na" saves the member as pending until a photo is added. Member names, notes, photos and location never go into the model prompt, packs, topic reports, logs or network requests. Photos are re-encoded without EXIF, kept in app-private storage, excluded from cloud backup, and leave the phone only when the user shares a member card or attaches them to a damage report (Pilot). Damage-report photos are separate from member photos. Camera permission is asked only when the user taps "Kunan ng litrato".
 9. **Face detection, never face recognition.** The bundled ML Kit detector only returns boxes to crop a photo, and the boxes are discarded. No identification, no embeddings, no face comparison. Llama 3.2 1B is text-only and never sees images.
-10. **Never invent official facts.** Do not make up signal thresholds, hotlines, medicine doses, laws or statistics in code, content, tests or docs. Cite a source or leave a clearly marked placeholder.
+10. **Never invent official facts.** Do not make up signal thresholds, phase distance bands, hotlines, evacuation centers, medicine doses, laws or statistics in code, content, tests or docs. Cite a source or leave a clearly marked placeholder. Phase thresholds live in `content/phase_rules.json`, never as numbers in code.
 
 ## Planned stack (MVP)
 
 - Expo development build, React Native New Architecture, TypeScript (strict), Hermes. Android first.
 - llama.rn running `Llama-3.2-1B-Instruct-Q4_K_M.gguf` (0.81 GB) with JSON-schema output and token streaming.
 - MiniSearch (BM25+) indexed at startup from `content/guide.tl.json`, with Taglish synonyms and tag boosts.
-- react-native-mmkv for households and members, the active context, checklist state and settings.
-- MVP stretch: expo-image-picker and expo-image-manipulator for member photos, and Google ML Kit face detection (bundled model, works offline) through a React Native wrapper, used only to find and crop faces.
-- Node scripts for content validation, pack building and the evaluation harness.
+- react-native-mmkv for households and members, the active context (phase and warnings), checklist state, the cached feed and settings.
+- expo-image-picker and expo-image-manipulator for the required member photos, and Google ML Kit face detection (bundled model, works offline) through a React Native wrapper, used only to find and crop faces.
+- MVP stretch: expo-location for the optional one-shot coarse location, and `fetch` to the one pinned host for the signed feed and packs.
+- Node scripts for content validation, pack building, the evaluation harness, and the scheduled scraper that builds and signs the feed.
 
 The docs describe intent. Check exact library APIs against the versions you install.
 
@@ -57,8 +59,8 @@ The docs describe intent. Check exact library APIs against the versions you inst
 ```text
 app/            all application code (screens, UI components, engine facade, core logic, services, storage)
 content/        guide.tl.json, checklist.json, warnings.json, synonyms.json,
-                intents.json, sources.json, hotlines.json
-scripts/        content validation, pack build and signing, evaluation
+                intents.json, sources.json, hotlines.json, phase_rules.json, places.json
+scripts/        content validation, pack and feed build and signing, scraper, evaluation
 eval/           question sets and results
 ```
 

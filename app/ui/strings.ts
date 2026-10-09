@@ -3,7 +3,7 @@ import { defineStrings } from './i18n';
 export const strings = defineStrings({
   tl: {
     loading: 'Inihahanda ang Bagyo Buddy…', failed: 'Hindi mabuksan ang app',
-    tabHome: 'Tahanan', tabAsk: 'Magtanong', tabGuide: 'Gabay', tabHotlines: 'Hotline', tabProfile: 'Pamilya',
+    tabHome: 'Tahanan', tabAsk: 'Magtanong', tabGuide: 'Gabay', tabHotlines: 'Hotline', tabProfile: 'Pamilya', tabAccount: 'Account',
     phases: 'Yugto', before: 'Bago', during: 'Habang may bagyo', after: 'Pagkatapos',
     warnings: 'Mga babala', activeWarnings: 'Mga kasalukuyang babala', clear: 'Alisin',
     checklist: 'Mga dapat gawin', progress: 'Tapos na', askPrompt: 'Ano ang gusto mong itanong?',
@@ -31,7 +31,7 @@ export const strings = defineStrings({
   },
   en: {
     loading: 'Preparing Bagyo Buddy…', failed: 'The app could not open',
-    tabHome: 'Home', tabAsk: 'Ask', tabGuide: 'Guide', tabHotlines: 'Hotlines', tabProfile: 'Family',
+    tabHome: 'Home', tabAsk: 'Ask', tabGuide: 'Guide', tabHotlines: 'Hotlines', tabProfile: 'Family', tabAccount: 'Account',
     phases: 'Phase', before: 'Before', during: 'During the storm', after: 'After',
     warnings: 'Warnings', activeWarnings: 'Current warnings', clear: 'Clear',
     checklist: 'Checklist', progress: 'Done', askPrompt: 'What would you like to ask?',
