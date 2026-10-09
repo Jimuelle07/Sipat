@@ -1,21 +1,26 @@
 import type {
-  AccountState, AiDecision, AnswerEvent, AskOptions, ChecklistTick, ChecklistView, Context, Engine,
+  AccountState, AiDecision, AnswerEvent, AskOptions, Bulletin, ChecklistTick, ChecklistView, Context, Engine,
   EngineChange, EngineOverrides, EngineInfo, EngineStatus, EvalSummary, FaceBox, Member, MemberPhoto,
-  FaceDetection, PhotoDraft, PhotoError, Phase, PhaseInputKey, PickedPhoto, Profile, Result,
-  SaveMemberResult, SaveProfileResult, Settings, Store, StoreSchema,
+  FaceDetection, HomePoint, PhotoDraft, PhotoError, Phase, PickedPhoto, Profile, Result,
+  SaveMemberResult, SaveProfileResult, Settings, Store, StoreSchema, StormMeasure,
   WarningInput, WarningKind, TopicGroup,
 } from '../types/index.ts';
-import type { Place } from '../types/content.ts';
+import type { PhaseRules, Place } from '../types/content.ts';
 import { ENGINE_API_VERSION } from '../types/engine.ts';
 import { bundledContent, rawContent } from '../content/index.ts';
 import { buildChecklist } from '../core/checklist.ts';
 import { deriveHousehold } from '../core/deriveHousehold.ts';
 import { decidePhase } from '../core/decidePhase.ts';
+import { measureStorm } from '../core/measureStorm.ts';
 import { createIndex } from '../core/search.ts';
 import { toManilaIso } from '../core/time.ts';
 import { validateContent } from '../core/validateContent.ts';
 import { createPowerPolicy, type PowerPolicyService } from '../services/power.ts';
-import { createModelManager, defaultLlamaBackend } from '../services/model.ts';
+import { createModelManager, defaultLlamaBackend, defaultModelFiles } from '../services/model.ts';
+import { BUNDLED_MODEL } from '../services/modelEntry.ts';
+import { createPhotoService } from '../services/photos.ts';
+import { createShareService } from '../services/share.ts';
+import { createFilePicker } from '../services/files.ts';
 import { createPackManager } from '../services/packs.ts';
 import { createStore } from '../services/store.ts';
 import { runAskPipeline } from './askPipeline.ts';
@@ -27,7 +32,6 @@ const DEFAULT_SETTINGS: Settings = {
   staleWarningHours: 3, feedEnabled: true, autoCheckUpdates: true, wifiOnly: true,
   topicReportsOptIn: false, damageReportsOptIn: false,
 };
-const MODEL_FILE = 'Llama-3.2-1B-Instruct-Q4_K_M.gguf';
 const ok = <T>(value: T): Result<T, never> => ({ ok: true, value });
 const err = <E extends string>(code: E, message: string = code): Result<never, E> => ({
   ok: false,
@@ -62,14 +66,15 @@ function profileFrom(owner: Member, id: string, name: string, at: string): Profi
   };
 }
 
-function warningInputKeys(warnings: Context['warnings']): PhaseInputKey[] {
-  const keys: PhaseInputKey[] = [];
-  if (warnings.tcws) keys.push(`warning:tcws-${warnings.tcws.level}`);
-  if (warnings.rainfall) keys.push(`warning:rainfall-${warnings.rainfall.level}`);
-  if (warnings.surge) keys.push(`warning:surge-${warnings.surge.level}`);
-  if (warnings.gale) keys.push('warning:gale');
-  if (warnings.barangay_order) keys.push('warning:barangay-order');
-  return keys;
+function cloneProfile(profile: Profile): Profile {
+  return JSON.parse(JSON.stringify(profile)) as Profile;
+}
+
+function p50(values: number[]): number | undefined {
+  const sorted = values.filter((value) => Number.isFinite(value) && value >= 0).sort((a, b) => a - b);
+  if (!sorted.length) return undefined;
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[middle] : ((sorted[middle - 1] ?? 0) + (sorted[middle] ?? 0)) / 2;
 }
 
 export function createEngine(overrides: EngineOverrides = {}): Engine {
@@ -82,46 +87,81 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
   let context = emptyContext(iso(now()));
   let settings: Settings = { ...DEFAULT_SETTINGS };
   let history: StoreSchema['questionLog'] = [];
-  let feedCache = store.get('feed');
+  // The feed cache is the store's `feed` entry, read through this helper so a seeded, refreshed or
+  // cleared cache (including the contract harness's) is always observed (docs section 6: the latest
+  // bulletin comes "from the feed cache").
+  const storedFeed = (): StoreSchema['feed'] | undefined => {
+    try { return store.get('feed'); } catch { return undefined; }
+  };
+  const initialFeed = storedFeed();
+  let lastFeedCheckAt: string | undefined =
+    typeof initialFeed?.checkedAt === 'string' ? initialFeed.checkedAt : undefined;
   let installedModel = false;
   let cachedTier: EngineStatus['tier'] = 'none';
   let battery: EngineStatus['battery'] = null;
   let ai: AiDecision = { allowed: false, reason: 'no_model' };
+  let refreshing = false;
   let activeController: AbortController | null = null;
   let idSeq = 0;
   const listeners = new Set<(change: EngineChange) => void>();
-  const emit = (change: EngineChange) => { for (const listener of [...listeners]) listener(change); };
+  const emit = (change: EngineChange) => {
+    for (const listener of [...listeners]) {
+      try { listener(change); } catch { /* a throwing listener must not break the engine */ }
+    }
+  };
   const newId = (kind: string) => `${kind}-${now().getTime()}-${++idSeq}`;
-  const active = () => profiles.find((profile) => profile.id === activeId) ?? null;
-  const phaseRules = () => {
-    const raw = overrides.content?.['phase_rules.json'] as { rules?: ReturnType<typeof fallbackRules> } | undefined;
-    return raw?.rules ?? fallbackRules();
+  const activeRef = () => profiles.find((profile) => profile.id === activeId) ?? null;
+  const active = () => { const profile = activeRef(); return profile ? cloneProfile(profile) : null; };
+  const phaseRules = (): PhaseRules => content.phaseRules ?? fallbackRules();
+  // A malformed cached feed or bulletin degrades to null instead of throwing.
+  const cachedBulletin = (): Bulletin | null => {
+    const bulletins = storedFeed()?.bulletins;
+    if (!Array.isArray(bulletins) || bulletins.length === 0) return null;
+    const bulletin = bulletins[0] as Partial<Bulletin> | undefined;
+    if (!bulletin || typeof bulletin !== 'object') return null;
+    if (typeof bulletin.id !== 'string' || typeof bulletin.stormId !== 'string') return null;
+    if (typeof bulletin.issuedAt !== 'string' || typeof bulletin.fetchedAt !== 'string') return null;
+    if (!bulletin.storm || typeof bulletin.storm.category !== 'string') return null;
+    if (!bulletin.position || typeof bulletin.position.lat !== 'number'
+      || typeof bulletin.position.lon !== 'number' || typeof bulletin.position.at !== 'string') return null;
+    if (!Array.isArray(bulletin.forecast) || !Array.isArray(bulletin.signalAreas)) return null;
+    return bulletin as Bulletin;
   };
   const currentFeed = () => {
     if (!settings.feedEnabled || !overrides.updates) {
-      return { status: 'off' as const, refreshing: false, latest: null, serverStale: false };
+      return { status: 'off' as const, refreshing, latest: null, serverStale: false };
     }
-    const bulletin = feedCache?.bulletins[0];
-    if (!bulletin) {
+    try {
+      const feed = storedFeed();
+      const fetchedAt = typeof feed?.fetchedAt === 'string' ? feed.fetchedAt : undefined;
+      const checkedAt = typeof lastFeedCheckAt === 'string' ? lastFeedCheckAt : undefined;
+      const serverStale = feed?.serverStale === true;
+      const bulletin = cachedBulletin();
+      if (!bulletin) {
+        return {
+          status: 'empty' as const,
+          refreshing,
+          latest: null,
+          ...(fetchedAt ? { fetchedAt } : {}),
+          ...(checkedAt ? { checkedAt } : {}),
+          serverStale,
+        };
+      }
+      const nowMs = now().getTime();
+      const issuedHoursAgo = Math.max(0, Math.floor((nowMs - Date.parse(bulletin.issuedAt)) / 3_600_000));
+      const fetchedHoursAgo = Math.max(0, Math.floor((nowMs - Date.parse(bulletin.fetchedAt)) / 3_600_000));
+      const stale = serverStale || issuedHoursAgo >= settings.staleWarningHours;
       return {
-        status: 'empty' as const,
-        refreshing: false,
-        latest: null,
-        ...(feedCache ? { fetchedAt: feedCache.fetchedAt, checkedAt: feedCache.checkedAt } : {}),
-        serverStale: feedCache?.serverStale ?? false,
+        status: stale ? 'stale' as const : 'fresh' as const, refreshing,
+        latest: { bulletin, issuedHoursAgo, fetchedHoursAgo, stale,
+          ageText: copyText('bulletin_age', { vars: { issuedAt: bulletin.issuedAt, fetchedAt: bulletin.fetchedAt } }) },
+        ...(fetchedAt ? { fetchedAt } : {}),
+        ...(checkedAt ? { checkedAt } : {}),
+        serverStale,
       };
+    } catch {
+      return { status: 'empty' as const, refreshing, latest: null, serverStale: false };
     }
-    const nowMs = now().getTime();
-    const issuedHoursAgo = Math.max(0, Math.floor((nowMs - Date.parse(bulletin.issuedAt)) / 3_600_000));
-    const fetchedHoursAgo = Math.max(0, Math.floor((nowMs - Date.parse(bulletin.fetchedAt)) / 3_600_000));
-    const stale = feedCache?.serverStale === true || issuedHoursAgo >= settings.staleWarningHours;
-    return {
-      status: stale ? 'stale' as const : 'fresh' as const, refreshing: false,
-      latest: { bulletin, issuedHoursAgo, fetchedHoursAgo, stale,
-        ageText: copyText('bulletin_age', { vars: { issuedAt: bulletin.issuedAt, fetchedAt: bulletin.fetchedAt } }) },
-      ...(feedCache ? { fetchedAt: feedCache.fetchedAt, checkedAt: feedCache.checkedAt } : {}),
-      serverStale: feedCache?.serverStale ?? false,
-    };
   };
   const powerService: PowerPolicyService | null = overrides.power ? null : createPowerPolicy({
     getSettings: () => settings,
@@ -130,8 +170,12 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
   const power = overrides.power ?? powerService!;
   const model = overrides.model ?? createModelManager({
     backend: defaultLlamaBackend(),
+    files: defaultModelFiles(),
     readTier: async () => powerService?.tier() ?? 'none',
   });
+  const photosService = overrides.photos ?? createPhotoService();
+  const shareService = overrides.share ?? createShareService();
+  const filePicker = overrides.files ?? createFilePicker();
   const packs = createPackManager({ store, now: () => iso(now()) });
   const powerUpdate = async () => {
     cachedTier = powerService
@@ -148,18 +192,61 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
   });
   model.onStateChange(() => emit('status'));
 
-  const save = <K extends keyof StoreSchema>(key: K, value: StoreSchema[K]) => store.set(key, value);
+  const save = <K extends keyof StoreSchema>(key: K, value: StoreSchema[K]): boolean => {
+    try { store.set(key, value); return true; } catch { return false; }
+  };
+  const drop = (key: Parameters<Store['delete']>[0]): void => {
+    try { store.delete(key); } catch { /* a failed delete must not throw */ }
+  };
   const applyDecision = (next: Context) => {
-    const changedPhase = next.phase !== context.phase;
+    const phaseChanged = next.phase !== context.phase || next.phaseSource !== context.phaseSource
+      || JSON.stringify(next.reason) !== JSON.stringify(context.reason)
+      || JSON.stringify(next.recommended) !== JSON.stringify(context.recommended)
+      || JSON.stringify(next.lastSwitch) !== JSON.stringify(context.lastSwitch);
+    const warningsChanged = JSON.stringify(next.warnings) !== JSON.stringify(context.warnings);
     context = next;
     save('context', context);
-    emit('context');
-    emit('checklist');
-    emit('status');
-    if (changedPhase) emit('phase');
+    if (warningsChanged) emit('context');
+    if (warningsChanged || phaseChanged) {
+      emit('checklist');
+      emit('status');
+    }
+    if (phaseChanged) emit('phase');
   };
   const getPlaces = (): Place[] =>
-    (overrides.content?.['places.json'] as { items?: Place[] } | undefined)?.items ?? content.places?.items ?? [];
+    content.places?.items ?? [];
+  const homePoint = (): HomePoint | null => {
+    const location = active()?.location;
+    if (!location) return null;
+    const areaCodes: string[] = [];
+    let place = getPlaces().find((item) => item.psgc === location.psgc);
+    const seen = new Set<string>();
+    while (place && !seen.has(place.psgc)) {
+      areaCodes.push(place.psgc);
+      seen.add(place.psgc);
+      place = getPlaces().find((item) => item.psgc === place?.parent);
+    }
+    if (!areaCodes.length) areaCodes.push(location.psgc);
+    if (location.coords) return {
+      point: { lat: location.coords.lat, lon: location.coords.lon }, from: 'gps', areaCodes,
+    };
+    const centroid = getPlaces().find((item) => item.psgc === location.psgc)?.centroid;
+    return centroid ? { point: centroid, from: 'area', areaCodes } : null;
+  };
+  // The one storm input every decidePhase call shares: the latest cached bulletin measured against
+  // the household home point, regardless of whether it was fetched this session.
+  const stormInput = (): { bulletin: Bulletin; measure: StormMeasure } | null => {
+    const bulletin = cachedBulletin();
+    const home = homePoint();
+    if (!bulletin || !home) return null;
+    try { return { bulletin, measure: measureStorm(bulletin, home) }; }
+    catch { return null; }
+  };
+  const decideCurrentPhase = () => {
+    const decision = decidePhase({ context, storm: stormInput(), rules: phaseRules(), now: iso(now()) });
+    applyDecision({ ...decision.state, warnings: context.warnings });
+    return decision;
+  };
   const refs = () => content.sources;
   const sourceRef = (sourceId: string, locator?: string) => {
     const source = content.sources.find((item) => item.id === sourceId);
@@ -186,10 +273,16 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
       }
       : { id: 'emergency-default', title: '', steps: [], hotlines: [], source: sourceRef('') };
   };
+  const readChecklist = (profileId: string): Record<string, ChecklistTick> => {
+    try { return store.get(keyFor(profileId)) ?? {}; } catch { return {}; }
+  };
+  const damageDrafts = (): StoreSchema['damageReports'] => {
+    try { return store.get('damageReports') ?? []; } catch { return []; }
+  };
   const checklistView = (): ChecklistView => {
     const profile = active();
     if (!profile) return { phase: context.phase, warningCards: [], groups: [], progress: { done: 0, total: 0 } };
-    return buildChecklist(profile, context, content.checklist, content.warnings, store.get(keyFor(profile.id)) ?? {},
+    return buildChecklist(profile, context, content.checklist, content.warnings, readChecklist(profile.id),
       now(), settings.staleWarningHours);
   };
   const info = (): EngineInfo => {
@@ -199,7 +292,7 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
     );
     return { appVersion: '0.0.0', engineApiVersion: ENGINE_API_VERSION, guideDate,
       passagesCount: content.passages.length, sourcesCount: content.sources.length, packs: packs.installed(),
-      online: false, model: { fileName: MODEL_FILE, sizeBytes: 0, present: installedModel,
+      online: false, model: { fileName: BUNDLED_MODEL.file_name, sizeBytes: BUNDLED_MODEL.size, present: installedModel,
         attribution: 'Built with Llama' } };
   };
   const status = (): EngineStatus => {
@@ -213,19 +306,15 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
     cards: () => checklistView().warningCards,
     setPhase: (phase: Phase) => {
       const before = context;
+      const candidates = decidePhase({ context, storm: stormInput(), rules: phaseRules(), now: iso(now()) }).candidates;
       const next = {
         ...context, phase, phaseSource: 'manual' as const, reason: { source: 'manual' as const, text: '' },
         changedAt: iso(now()), recommended: null, warnings: phase === 'after' ? {} : context.warnings,
         undo: { phase: before.phase, phaseSource: before.phaseSource, reason: before.reason,
           warnings: before.warnings },
-        suppressed: [...new Set([...context.suppressed, ...warningInputKeys(context.warnings)])],
+        suppressed: [...new Set([...context.suppressed, ...candidates.map((candidate) => candidate.key)])],
       };
-      context = next;
-      save('context', next);
-      emit('context');
-      emit('checklist');
-      emit('status');
-      emit('phase');
+      applyDecision(next);
       return next;
     },
     undoPhase: () => {
@@ -234,13 +323,9 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
       const { undo: _undo, ...prior } = context;
       void _undo;
       const next = { ...prior, phase: undo.phase, phaseSource: undo.phaseSource, reason: undo.reason,
-        warnings: undo.warnings, changedAt: iso(now()), recommended: null };
-      context = next;
-      save('context', next);
-      emit('context');
-      emit('checklist');
-      emit('status');
-      emit('phase');
+        warnings: undo.warnings, changedAt: iso(now()), recommended: null,
+        suppressed: undo.cause ? [...new Set([...context.suppressed, undo.cause])] : context.suppressed };
+      applyDecision(next);
       return ok(next);
     },
     setWarning: (input: WarningInput) => {
@@ -253,13 +338,8 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
         warnings[input.kind] = { level: input.level, setAt: iso(now()) };
       }
       const candidate = { ...context, warnings };
-      const decision = decidePhase({ context: candidate, rules: phaseRules(), now: iso(now()) });
-      context = { ...decision.state, warnings };
-      save('context', context);
-      emit('context');
-      emit('checklist');
-      emit('status');
-      if (decision.switched) emit('phase');
+      const decision = decidePhase({ context: candidate, storm: stormInput(), rules: phaseRules(), now: iso(now()) });
+      applyDecision({ ...decision.state, warnings });
       return context;
     },
     clearWarning: (kind: WarningKind) => {
@@ -267,10 +347,10 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
       delete warnings[kind];
       const prefix = `warning:${kind === 'barangay_order' ? 'barangay-order' : kind}`;
       context = { ...context, warnings, suppressed: context.suppressed.filter((key) => !key.startsWith(prefix)) };
-      save('context', context);
       emit('context');
       emit('checklist');
       emit('status');
+      decideCurrentPhase();
       return context;
     },
     reconfirmWarning: (kind: WarningKind) => {
@@ -301,6 +381,12 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
         errors.push({ code: 'phone_invalid', field: 'owner.phone' });
       }
       if (errors.length) return { ok: false as const, errors };
+      for (const oldProfile of profiles) {
+        for (const oldMember of oldProfile.people) {
+          if (oldMember.photo) void photosService.remove(oldMember.photo.uri).catch(() => undefined);
+        }
+        drop(keyFor(oldProfile.id));
+      }
       const member: Member = { id: newId('member'), name: ownerName, relation: 'self', ageGroup: input.owner.ageGroup,
         needs: [...input.owner.needs], photoStatus: 'pending', updatedAt: iso(now()),
         ...(input.owner.phone ? { phone: input.owner.phone } : {}),
@@ -317,7 +403,7 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
       return { ok: true as const, value: profile };
     },
     save(input) {
-      const profile = active();
+      const profile = activeRef();
       if (!profile || input.id !== profile.id) {
         return { ok: false as const, errors: [{ code: 'name_required' as const, field: 'id' }] };
       }
@@ -348,13 +434,13 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
     remove(id) {
       if (!active() || activeId !== id) return err('not_found', 'Household not found');
       for (const member of active()?.people ?? []) {
-        if (member.photo) void overrides.photos?.remove(member.photo.uri).catch(() => undefined);
+        if (member.photo) void photosService.remove(member.photo.uri).catch(() => undefined);
       }
       profiles = [];
       activeId = null;
       save('profiles', profiles);
       save('activeProfileId', null);
-      store.delete(keyFor(id));
+      drop(keyFor(id));
       emit('profiles');
       emit('family');
       emit('checklist');
@@ -366,12 +452,9 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
     async start(target, source) {
       const member = active()?.people.find((person) => person.id === target.memberId);
       if (!member) return err('not_found', 'Member not found');
-      if (!overrides.photos) {
-        return err(source === 'camera' ? 'no_camera' : 'unreadable', 'Photo service is unavailable');
-      }
       let picked: Result<PickedPhoto | null, PhotoError>;
       try {
-        picked = await overrides.photos.pick(source);
+        picked = await photosService.pick(source);
       } catch {
         return err(source === 'camera' ? 'no_camera' : 'unreadable', 'Photo could not be opened');
       }
@@ -379,7 +462,7 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
       if (!picked.value) return ok(null);
       let detected: { detection: FaceDetection; faces: FaceBox[] };
       try {
-        detected = await overrides.photos.detect(picked.value.uri);
+        detected = await photosService.detect(picked.value.uri);
       } catch {
         detected = { detection: 'unavailable', faces: [] };
       }
@@ -397,14 +480,17 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
       if (!draft) return err('not_found', 'Photo draft not found');
       if (Date.parse(draft.expiresAt) <= now().getTime()) {
         photoDrafts.delete(draftId);
+        photoSources.delete(draftId);
+        await photosService.remove(draft.previewUri).catch(() => undefined);
         return err('draft_expired', 'Photo draft expired');
       }
-      const member = active()?.people.find((person) => person.id === draft.memberId);
-      if (!member || !overrides.photos) return err('io', 'Photo service unavailable');
-      const savedPhoto = await overrides.photos
+      const member = activeRef()?.people.find((person) => person.id === draft.memberId);
+      if (!member) return err('io', 'Member unavailable');
+      const savedPhoto = await photosService
         .saveCrop(draft.previewUri, crop, member.id)
         .catch(() => err('io', 'Photo could not be saved'));
       if (!savedPhoto.ok) return savedPhoto;
+      if (member.photo) await photosService.remove(member.photo.uri).catch(() => undefined);
       const photo: MemberPhoto = { ...savedPhoto.value, source: photoSources.get(draftId) ?? 'gallery',
         faceCheck: draft.detection === 'one_face' ? 'one_face' : 'manual', takenAt: iso(now()), version: 1 };
       member.photo = photo;
@@ -412,19 +498,22 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
       member.updatedAt = iso(now());
       photoDrafts.delete(draftId);
       photoSources.delete(draftId);
-      save('profiles', profiles);
+      await photosService.remove(draft.previewUri).catch(() => undefined);
+      if (!save('profiles', profiles)) return err('io', 'Photo could not be saved');
       emit('family');
       emit('checklist');
       return ok(photo);
     },
     discard(draftId) {
+      const draft = photoDrafts.get(draftId);
+      if (draft) void photosService.remove(draft.previewUri).catch(() => undefined);
       photoDrafts.delete(draftId);
       photoSources.delete(draftId);
     },
     remove(memberId) {
-      const member = active()?.people.find((person) => person.id === memberId);
+      const member = activeRef()?.people.find((person) => person.id === memberId);
       if (!member) return err('not_found', 'Member not found');
-      if (member.photo) void overrides.photos?.remove(member.photo.uri).catch(() => undefined);
+      if (member.photo) void photosService.remove(member.photo.uri).catch(() => undefined);
       delete member.photo;
       member.photoStatus = 'pending';
       save('profiles', profiles);
@@ -434,7 +523,7 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
     removeAll() {
       for (const profile of profiles) {
         for (const member of profile.people) {
-          if (member.photo) void overrides.photos?.remove(member.photo.uri).catch(() => undefined);
+          if (member.photo) void photosService.remove(member.photo.uri).catch(() => undefined);
           delete member.photo;
           member.photoStatus = 'pending';
         }
@@ -450,7 +539,7 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
     members: () => active()?.people ?? [],
     pending: () => (active()?.people ?? []).filter((member) => member.photoStatus === 'pending'),
     saveMember(input) {
-      const profile = active();
+      const profile = activeRef();
       if (!profile) return { ok: false, errors: [{ code: 'name_required', field: 'member.name' }] };
       const name = input.name.trim();
       const errors: Extract<SaveMemberResult, { ok: false }>['errors'] = [];
@@ -483,11 +572,11 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
       return { ok: true, value: member };
     },
     removeMember(memberId) {
-      const profile = active();
+      const profile = activeRef();
       const member = profile?.people.find((person) => person.id === memberId);
       if (!profile || !member) return err('not_found', 'Member not found');
       if (memberId === profile.ownerId) return err('owner_required', 'Cannot remove owner');
-      if (member.photo) void overrides.photos?.remove(member.photo.uri).catch(() => undefined);
+      if (member.photo) void photosService.remove(member.photo.uri).catch(() => undefined);
       profile.people = profile.people.filter((person) => person.id !== memberId);
       Object.assign(profile, deriveHousehold(profile.people, profile.petsCount), { updatedAt: iso(now()) });
       save('profiles', profiles);
@@ -499,20 +588,34 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
     location: {
       get: () => active()?.location ?? null,
       places(parentPsgc) {
-        return getPlaces()
-          .filter((place) => place.parent === (parentPsgc ?? null))
+        // Section 3.2: provinces when omitted, then municipalities and cities, then barangays.
+        // A city or municipality whose parent is a region (e.g. NCR) is listed too, so those areas
+        // stay reachable even though they have no province (contract gap: the doc says "provinces").
+        const places = getPlaces();
+        const regionPsgc = new Set(places
+          .filter((place) => place.level === 'region')
+          .map((place) => place.psgc));
+        const level = parentPsgc === undefined
+          ? places.filter((place) => place.level === 'province'
+            || ((place.level === 'city' || place.level === 'municipality')
+              && place.parent !== null && regionPsgc.has(place.parent)))
+          : places.filter((place) => place.parent === parentPsgc);
+        return level
+          .slice()
+          .sort((a, b) => a.name.localeCompare(b.name))
           .map((place) => ({ psgc: place.psgc, name: place.name, level: place.level,
-            hasChildren: getPlaces().some((child) => child.parent === place.psgc) }));
+            hasChildren: places.some((child) => child.parent === place.psgc) }));
       },
       setArea(psgc) {
         const place = getPlaces().find((item) => item.psgc === psgc && item.level === 'barangay');
         if (!place) return err('unknown_place', 'Unknown place');
-        const profile = active();
+        const profile = activeRef();
         if (!profile) return err('unknown_place', 'No household');
         profile.location = { psgc };
         profile.updatedAt = iso(now());
         save('profiles', profiles);
         emit('profiles');
+        decideCurrentPhase();
         return ok(profile.location);
       },
       async useGps() {
@@ -535,8 +638,7 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
     },
     async shareCard(memberId, cardView) {
       if (!active()?.people.some((person) => person.id === memberId)) return err('not_found', 'Member not found');
-      if (!overrides.share) return err('failed', 'Share service unavailable');
-      return overrides.share.shareMemberCard(cardView).catch(() => err('failed', 'Share failed'));
+      return shareService.shareMemberCard(cardView).catch(() => err('failed', 'Share failed'));
     },
   };
 
@@ -548,15 +650,15 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
         return err('unknown_item', 'Checklist item not found');
       }
       const key = keyFor(profile.id);
-      const ticks = store.get(key) ?? {};
+      const ticks = readChecklist(profile.id);
       ticks[itemId] = { ticked, updatedAt: iso(now()) } satisfies ChecklistTick;
-      store.set(key, ticks);
+      save(key, ticks);
       emit('checklist');
       return ok(checklistView());
     },
     reset() {
       const profile = active();
-      if (profile) store.delete(keyFor(profile.id));
+      if (profile) drop(keyFor(profile.id));
       emit('checklist');
       return checklistView();
     },
@@ -565,7 +667,7 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
     list: (limit = 200) => [...history].reverse().slice(0, limit),
     clear() {
       history = [];
-      store.delete('questionLog');
+      drop('questionLog');
       emit('history');
     },
   };
@@ -581,7 +683,9 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
         content, index, profile: active, context: () => context, phaseRules: phaseRules(),
         applyContext: applyDecision,
         power, model, emergencyCard, hotlines: () => content.hotlines.filter((h) => h.scope === 'national'),
-        evacuationCenters: () => [], latestBulletin: () => currentFeed().latest,
+        evacuationCenters: () => [],
+        latestBulletin: () => currentFeed().latest,
+        storm: stormInput,
         now: () => now().getTime(), newId: () => newId('question'),
         log(entry) {
           history = [...history, entry].slice(-200);
@@ -629,15 +733,21 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
     async refresh() {
       if (!settings.feedEnabled) return err('disabled', 'Feed is disabled');
       if (!overrides.updates) return err('disabled', 'Online feed is not configured');
-      const result = await overrides.updates
-        .fetchFeed({ trigger: 'pull' })
+      lastFeedCheckAt = iso(now());
+      refreshing = true;
+      emit('feed');
+      const result = await Promise.resolve().then(() => overrides.updates!.fetchFeed({ trigger: 'pull' }))
         .catch(() => err('http', 'Feed request failed'));
-      if (!result.ok) return result;
+      refreshing = false;
+      if (!result.ok) {
+        emit('feed');
+        return result;
+      }
       if (result.value !== 'unchanged') {
-        feedCache = result.value;
-        save('feed', feedCache);
+        save('feed', result.value);
       }
       emit('feed');
+      decideCurrentPhase();
       return ok(currentFeed());
     },
   };
@@ -645,30 +755,45 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
     hotlines: () => content.hotlines.filter((hotline) => hotline.scope === 'national'),
     async call(hotlineIdOrPhone) {
       const byId = content.hotlines.find((hotline) => hotline.id === hotlineIdOrPhone);
-      const isPhone = phoneRe.test(cleanPhone(hotlineIdOrPhone));
-      if (!byId && !isPhone) return err('not_found', 'Hotline not found');
-      return err('no_dialer', 'Dialer is unavailable');
+      const number = cleanPhone(byId?.number ?? hotlineIdOrPhone);
+      if ((!byId && !phoneRe.test(number)) || (byId && !/^\+?\d+$/.test(number))) {
+        return err('not_found', 'Hotline not found');
+      }
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { Linking } = require('react-native') as { Linking?: { openURL(url: string): Promise<unknown> } };
+        if (!Linking?.openURL) return err('no_dialer', 'Dialer is unavailable');
+        await Linking.openURL(`tel:${number}`);
+        return ok(undefined);
+      } catch {
+        return err('no_dialer', 'Dialer is unavailable');
+      }
     },
   };
   const settingsApi: Engine['settings'] = {
     get: () => ({ ...settings }),
     update(patch) {
+      const settingKeys = ['language', 'lowBatteryThreshold', 'aiEnabled', 'lowBatteryMode',
+        'staleWarningHours', 'feedEnabled', 'autoCheckUpdates', 'wifiOnly', 'topicReportsOptIn',
+        'damageReportsOptIn'];
+      if (Object.keys(patch).some((key) => !settingKeys.includes(key))) return err('out_of_range');
       if (patch.lowBatteryThreshold !== undefined
-        && (!Number.isFinite(patch.lowBatteryThreshold)
-          || patch.lowBatteryThreshold < 5
-          || patch.lowBatteryThreshold > 50)) {
-        return err('out_of_range');
-      }
+        && (typeof patch.lowBatteryThreshold !== 'number' || !Number.isFinite(patch.lowBatteryThreshold)
+          || patch.lowBatteryThreshold < 5 || patch.lowBatteryThreshold > 50)) return err('out_of_range');
       if (patch.staleWarningHours !== undefined
-        && (!Number.isFinite(patch.staleWarningHours)
-          || patch.staleWarningHours < 1
-          || patch.staleWarningHours > 12)) {
-        return err('out_of_range');
+        && (typeof patch.staleWarningHours !== 'number' || !Number.isFinite(patch.staleWarningHours)
+          || patch.staleWarningHours < 1 || patch.staleWarningHours > 12)) return err('out_of_range');
+      if (patch.language !== undefined && patch.language !== 'tl' && patch.language !== 'en') return err('out_of_range');
+      for (const key of ['aiEnabled', 'lowBatteryMode', 'feedEnabled', 'autoCheckUpdates', 'wifiOnly',
+        'topicReportsOptIn', 'damageReportsOptIn'] as const) {
+        if (patch[key] !== undefined && typeof patch[key] !== 'boolean') return err('out_of_range');
       }
       settings = { ...settings, ...patch };
       save('settings', settings);
-      void powerUpdate();
+      if (patch.lowBatteryMode === true) ai = { allowed: false, reason: 'low_battery' };
       emit('settings');
+      void powerUpdate();
+      if (patch.feedEnabled !== undefined) emit('feed');
       return ok(settings);
     },
   };
@@ -688,17 +813,18 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
           : emptyContext(iso(now()));
         history = (store.get('questionLog') ?? []).slice(-200);
         settings = { ...DEFAULT_SETTINGS, ...(store.get('settings') ?? {}) };
-        feedCache = store.get('feed');
-        save('profiles', profiles);
-        save('activeProfileId', activeId);
-        save('settings', settings);
-        save('context', context);
+        const storedInitialFeed = storedFeed();
+        lastFeedCheckAt = typeof storedInitialFeed?.checkedAt === 'string'
+          ? storedInitialFeed.checkedAt : undefined;
+        if (!save('profiles', profiles) || !save('activeProfileId', activeId)
+          || !save('settings', settings) || !save('context', context)) {
+          return err('storage_failed', 'Could not save local data');
+        }
         const present = (model as typeof model & { present?: () => Promise<boolean> }).present;
         installedModel = present ? await present().catch(() => false) : model.state() !== 'absent';
         await powerService?.refresh().catch(() => undefined);
         await powerUpdate();
-        const phase = decidePhase({ context, rules: phaseRules(), now: iso(now()) });
-        applyDecision({ ...phase.state, warnings: context.warnings });
+        decideCurrentPhase();
         return ok(info());
       } catch (cause) {
         return err('storage_failed', cause instanceof Error ? cause.message : 'Could not load local data');
@@ -714,14 +840,28 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
     emergency: { card: emergencyCard }, plan, feed,
     evacuation: {
       view() {
-        const profile = active();
-        const latest = currentFeed().latest;
-        return {
-          ...(profile?.plan.evacuationCenter ? { householdCenter: profile.plan.evacuationCenter } : {}),
-          bulletin: latest,
-          storm: null, centers: [], centersFirst: false, barangayCopyKey: 'barangay_decides' as const,
-          needsLocation: !profile?.location,
-        };
+        try {
+          const profile = active();
+          const latest = currentFeed().latest;
+          const storm = stormInput();
+          const threshold = phaseRules().evacuation_threshold;
+          const categoryOrder = ['TD', 'TS', 'STS', 'TY', 'STY'];
+          const categoryCrossed = threshold.category_min !== null && storm !== null
+            && categoryOrder.indexOf(storm.bulletin.storm.category) >= categoryOrder.indexOf(threshold.category_min);
+          const signalHere = storm?.measure.signalHere ?? null;
+          const signalCrossed = threshold.tcws_min !== null && signalHere !== null
+            && signalHere >= threshold.tcws_min;
+          return {
+            ...(profile?.plan.evacuationCenter ? { householdCenter: profile.plan.evacuationCenter } : {}),
+            bulletin: latest,
+            storm: storm?.measure ?? null, centers: [], centersFirst: !threshold.placeholder && (categoryCrossed || signalCrossed),
+            barangayCopyKey: 'barangay_decides' as const,
+            needsLocation: !profile?.location,
+          };
+        } catch {
+          return { bulletin: null, storm: null, centers: [], centersFirst: false,
+            barangayCopyKey: 'barangay_decides' as const, needsLocation: !active()?.location };
+        }
       },
     },
     account: {
@@ -732,8 +872,7 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
     },
     model: {
       async installFromPicker(onProgress, signal) {
-        if (!overrides.files) return err('io', 'File picker is unavailable');
-        const picked = await overrides.files.pick('model').catch(() => err('io', 'File picker failed'));
+        const picked = await filePicker.pick('model').catch(() => err('io', 'File picker failed'));
         if (!picked.ok) return picked;
         if (!picked.value) return ok(null);
         if (signal?.aborted) return err('cancelled');
@@ -741,7 +880,8 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
           .install(picked.value, onProgress, signal)
           .catch(() => err('io', 'Model installation failed'));
         if (!result.ok) return result;
-        installedModel = true;
+        const present = (model as typeof model & { present?: () => Promise<boolean> }).present;
+        installedModel = present ? await present().catch(() => true) : true;
         await powerUpdate();
         emit('status');
         return ok('installed');
@@ -758,24 +898,24 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
       sosOff: async () => { await overrides.screen?.sosOff().catch(() => undefined); },
     },
     damage: {
-      list: () => store.get('damageReports') ?? [],
+      list: () => damageDrafts(),
       save(input) {
         if (!Number.isInteger(input.affectedMembers) || input.affectedMembers < 0
           || (input.notes?.length ?? 0) > 300) {
           return err('invalid');
         }
-        const drafts = store.get('damageReports') ?? [];
+        const drafts = damageDrafts();
         const draft = { id: input.id ?? newId('damage'), createdAt: iso(now()), damageType: input.damageType,
           severity: input.severity, affectedMembers: input.affectedMembers,
           ...(input.notes ? { notes: input.notes } : {}),
           photoPaths: [], sentAt: null };
         const next = [draft, ...drafts.filter((item) => item.id !== draft.id)];
-        save('damageReports', next);
+        if (!save('damageReports', next)) return err('io');
         emit('damage');
         return ok(draft);
       },
       async addPhoto(id, source) {
-        const draft = (store.get('damageReports') ?? []).find((item) => item.id === id);
+        const draft = damageDrafts().find((item) => item.id === id);
         if (!draft) return err('not_found');
         if (draft.photoPaths.length >= 5) return err('too_many_photos');
         if (!overrides.photos) return err(source === 'camera' ? 'no_camera' : 'unreadable');
@@ -789,12 +929,12 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
           .catch(() => err('io', 'Photo could not be saved'));
         if (!savedPhoto.ok) return savedPhoto;
         draft.photoPaths.push(savedPhoto.value.uri);
-        save('damageReports', [draft, ...(store.get('damageReports') ?? []).filter((item) => item.id !== id)]);
+        if (!save('damageReports', [draft, ...damageDrafts().filter((item) => item.id !== id)])) return err('io');
         emit('damage');
         return ok(draft);
       },
       removePhoto(id, photoIndex) {
-        const drafts = store.get('damageReports') ?? [];
+        const drafts = damageDrafts();
         const draft = drafts.find((item) => item.id === id);
         if (!draft || !draft.photoPaths[photoIndex]) return err('not_found');
         const [removed] = draft.photoPaths.splice(photoIndex, 1);
@@ -805,10 +945,10 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
       },
       async send(id) {
         if (!settings.damageReportsOptIn) return err('not_opted_in');
-        return (store.get('damageReports') ?? []).some((item) => item.id === id) ? err('offline') : err('not_found');
+        return damageDrafts().some((item) => item.id === id) ? err('offline') : err('not_found');
       },
       remove(id) {
-        const drafts = store.get('damageReports') ?? [];
+        const drafts = damageDrafts();
         const removed = drafts.find((item) => item.id === id);
         for (const path of removed?.photoPaths ?? []) void overrides.photos?.remove(path).catch(() => undefined);
         save('damageReports', drafts.filter((item) => item.id !== id));
@@ -816,12 +956,23 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
       },
     },
     settings: settingsApi, history: historyApi,
-    evaluation: { summary: (): EvalSummary | null => EVAL_SUMMARY_FIXTURE },
+    evaluation: { summary: (): EvalSummary | null => {
+      const summaryP50Ms = p50(history.filter((entry) => entry.outcome === 'answered_summary')
+        .map((entry) => entry.timings.totalMs));
+      const firstWordsP50Ms = p50(history.flatMap((entry) => entry.timings.firstTokenMs === undefined
+        ? [] : [entry.timings.firstTokenMs]));
+      const fullAnswerP50Ms = p50(history.filter((entry) => entry.outcome === 'answered_ai')
+        .map((entry) => entry.timings.totalMs));
+      return { ...EVAL_SUMMARY_FIXTURE, device: {
+        ...(summaryP50Ms !== undefined ? { summaryP50Ms } : {}),
+        ...(firstWordsP50Ms !== undefined ? { firstWordsP50Ms } : {}),
+        ...(fullAnswerP50Ms !== undefined ? { fullAnswerP50Ms } : {}),
+      } };
+    } },
     packs: {
       installed: () => packs.installed(),
       async importFromPicker() {
-        if (!overrides.files) return err('bad_archive');
-        const picked = await overrides.files.pick('pack').catch(() => err('io', 'File picker failed'));
+        const picked = await filePicker.pick('pack').catch(() => err('io', 'File picker failed'));
         if (!picked.ok) return err('bad_archive');
         return picked.value ? packs.importFile(picked.value.uri).catch(() => err('bad_archive')) : ok(null);
       },
@@ -854,7 +1005,7 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
         if (!result.value || result.value.planId !== planId) return err('disabled');
         return overrides.updates.download(result.value, onProgress, signal).catch(() => err('http'));
       },
-      networkLog: () => store.get('networkLog') ?? [],
+      networkLog: () => { try { return store.get('networkLog') ?? []; } catch { return []; } },
     },
   };
   return engine;

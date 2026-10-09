@@ -1,263 +1,391 @@
-import { describe, expect, it } from 'vitest';
-import type { EngineChange, MockEngine } from '../types/index.ts';
+import { afterEach, describe, expect, it } from 'vitest';
+import type { AnswerEvent, Engine, EngineChange } from '../types/index.ts';
 import { PHASE_GROUPS } from '../core/checklist.ts';
-import { createMockEngine } from './mock.ts';
+import { ENGINES, type EngineUnderTest } from './contractHarness.ts';
 
-// Red contract tests for context, checklist, settings and status, written from
-// docs/api-layer.md sections 3.2, 3.6, 3.7, 4 (phase types) and 5 (buildChecklist).
-// The version-2 mock is being written in parallel; these fail until it lands.
+// Contract tests for context, checklist, settings and status, written from
+// docs/api-layer.md sections 3.2, 3.5, 3.6, 3.7, 4 (phase types) and 5
+// (decidePhase, buildChecklist). The same cases run against the mock and the real
+// engine through the shared harness, using only Engine and ContractControls.
 
-async function ready(): Promise<MockEngine> {
-  const engine = createMockEngine({ speed: 'fast' });
-  const res = await engine.init();
-  if (!res.ok) throw new Error(res.error.message);
-  return engine;
+async function collect(engine: Engine, question: string): Promise<AnswerEvent[]> {
+  const events: AnswerEvent[] = [];
+  for await (const event of engine.ask.run(question)) events.push(event);
+  return events;
 }
 
-describe('mock context: phase switching', () => {
-  it('setWarning in before switches to during with phaseSource warning and fires phase', async () => {
-    const engine = await ready();
-    const changes: EngineChange[] = [];
-    engine.onChange((c) => changes.push(c));
+describe.each(ENGINES)('$name', (factory) => {
+  let current: EngineUnderTest | null = null;
 
-    const ctx = engine.context.setWarning({ kind: 'tcws', level: 2 });
-
-    expect(ctx.phase).toBe('during');
-    expect(ctx.phaseSource).toBe('warning');
-    expect(ctx.lastSwitch).toBeDefined();
-    expect(ctx.lastSwitch?.from).toBe('before');
-    expect(ctx.lastSwitch?.to).toBe('during');
-    expect(ctx.warnings.tcws?.level).toBe(2);
-    expect(changes).toContain('phase');
+  afterEach(() => {
+    current?.ctl.dispose();
+    current = null;
   });
 
-  it('undoPhase reverts and suppresses that warning; a different warning switches again', async () => {
-    const engine = await ready();
-    engine.context.setWarning({ kind: 'tcws', level: 2 });
-    expect(engine.context.get().phase).toBe('during');
+  async function create(): Promise<EngineUnderTest> {
+    current = await factory.create();
+    return current;
+  }
 
-    const undone = engine.context.undoPhase();
-    expect(undone.ok).toBe(true);
-    if (undone.ok) {
-      expect(undone.value.phase).toBe('before');
-      expect(undone.value.warnings.tcws?.level).toBe(2);
-    }
+  describe('phase switching from warnings', () => {
+    it('setWarning in before switches to during with phaseSource warning and a lastSwitch', async () => {
+      const { engine } = await create();
+      const changes: EngineChange[] = [];
+      engine.onChange((change) => changes.push(change));
+      expect(engine.context.get().phase).toBe('before');
 
-    // The same warning (same kind and level) must not switch the phase again.
-    engine.context.setWarning({ kind: 'tcws', level: 2 });
-    expect(engine.context.get().phase).toBe('before');
+      const ctx = engine.context.setWarning({ kind: 'tcws', level: 2 });
 
-    // Another level is a new input and switches again.
-    engine.context.setWarning({ kind: 'tcws', level: 3 });
-    expect(engine.context.get().phase).toBe('during');
+      expect(ctx.phase).toBe('during');
+      expect(ctx.phaseSource).toBe('warning');
+      expect(ctx.lastSwitch?.from).toBe('before');
+      expect(ctx.lastSwitch?.to).toBe('during');
+      expect(ctx.warnings.tcws?.level).toBe(2);
+      expect(changes).toContain('phase');
+      expect(changes).toContain('context');
+    });
+
+    it('undoPhase suppresses the warning so re-init and the next ask do not switch again; a different warning does', async () => {
+      const { engine, ctl } = await create();
+      engine.context.setWarning({ kind: 'tcws', level: 2 });
+      expect(engine.context.get().phase).toBe('during');
+
+      const undone = engine.context.undoPhase();
+      expect(undone.ok).toBe(true);
+      if (undone.ok) {
+        expect(undone.value.phase).toBe('before');
+        expect(undone.value.warnings.tcws?.level).toBe(2);
+      }
+      expect(engine.context.get().phase).toBe('before');
+      expect(engine.context.get().suppressed).toContain('warning:tcws-2');
+
+      // init() re-runs the phase decision on the stored inputs
+      const reinit = await engine.init();
+      expect(reinit.ok).toBe(true);
+      expect(engine.context.get().phase).toBe('before');
+
+      // the next question also runs decidePhase
+      const question = ctl.scenario('guide_full');
+      await collect(engine, question);
+      expect(engine.context.get().phase).toBe('before');
+
+      // the same warning (same kind and level) stays suppressed
+      engine.context.setWarning({ kind: 'tcws', level: 2 });
+      expect(engine.context.get().phase).toBe('before');
+
+      // another level is a new input and switches again
+      engine.context.setWarning({ kind: 'tcws', level: 3 });
+      expect(engine.context.get().phase).toBe('during');
+    });
+
+    it('setPhase before while a warning is active suppresses it; clearing and setting it again is new', async () => {
+      const { engine } = await create();
+      engine.context.setWarning({ kind: 'tcws', level: 3 });
+      expect(engine.context.get().phase).toBe('during');
+
+      engine.context.setPhase('before');
+      expect(engine.context.get().phase).toBe('before');
+      expect(engine.context.get().warnings.tcws?.level).toBe(3);
+
+      engine.context.setWarning({ kind: 'tcws', level: 3 });
+      expect(engine.context.get().phase).toBe('before');
+
+      engine.context.clearWarning('tcws');
+      engine.context.setWarning({ kind: 'tcws', level: 3 });
+      expect(engine.context.get().phase).toBe('during');
+    });
+
+    it('clearWarning removes the warning, drops its suppression and re-runs the phase decision', async () => {
+      const { engine } = await create();
+      engine.context.setWarning({ kind: 'tcws', level: 2 });
+      engine.context.undoPhase();
+      expect(engine.context.get().phase).toBe('before');
+
+      const cleared = engine.context.clearWarning('tcws');
+      expect(cleared.warnings.tcws).toBeUndefined();
+      expect(cleared.phase).toBe('before');
+
+      // the same warning is now a fresh input
+      engine.context.setWarning({ kind: 'tcws', level: 2 });
+      expect(engine.context.get().phase).toBe('during');
+    });
+
+    it('setPhase after clears the warnings and undoPhase restores them', async () => {
+      const { engine } = await create();
+      engine.context.setWarning({ kind: 'tcws', level: 2 });
+      engine.context.setWarning({ kind: 'gale' });
+      expect(Object.keys(engine.context.get().warnings).length).toBeGreaterThan(0);
+      expect(engine.context.get().phase).toBe('during');
+
+      engine.context.setPhase('after');
+      expect(engine.context.get().phase).toBe('after');
+      expect(engine.context.get().warnings).toEqual({});
+
+      const undone = engine.context.undoPhase();
+      expect(undone.ok).toBe(true);
+      if (undone.ok) {
+        expect(undone.value.phase).toBe('during');
+        expect(undone.value.warnings.tcws?.level).toBe(2);
+        expect(undone.value.warnings.gale).toBeDefined();
+      }
+    });
+
+    it('onChange fires phase on every phase change and context on warning changes', async () => {
+      const { engine } = await create();
+      const changes: EngineChange[] = [];
+      engine.onChange((change) => changes.push(change));
+
+      engine.context.setWarning({ kind: 'tcws', level: 2 });
+      expect(changes).toContain('phase');
+      expect(changes).toContain('context');
+
+      changes.length = 0;
+      engine.context.reconfirmWarning('tcws');
+      expect(changes).toContain('context');
+      expect(changes).not.toContain('phase');
+
+      changes.length = 0;
+      const undone = engine.context.undoPhase();
+      expect(undone.ok).toBe(true);
+      expect(changes).toContain('phase');
+
+      changes.length = 0;
+      engine.context.clearWarning('tcws');
+      expect(changes).toContain('context');
+    });
   });
 
-  it('setPhase before while a warning is active suppresses it; clearing and setting again is new', async () => {
-    const engine = await ready();
-    engine.context.setWarning({ kind: 'tcws', level: 3 });
-    expect(engine.context.get().phase).toBe('during');
+  describe('ask phase cues', () => {
+    it('a strong storm-is-here cue switches to during with phase_change(switched) and can be undone', async () => {
+      const { engine, ctl } = await create();
+      const changes: EngineChange[] = [];
+      engine.onChange((change) => changes.push(change));
+      expect(engine.context.get().phase).toBe('before');
 
-    engine.context.setPhase('before');
-    expect(engine.context.get().phase).toBe('before');
-    expect(engine.context.get().warnings.tcws?.level).toBe(3);
+      const question = ctl.scenario('phase_cue_during');
+      const events = await collect(engine, question);
 
-    engine.context.setWarning({ kind: 'tcws', level: 3 });
-    expect(engine.context.get().phase).toBe('before');
+      const change = events.find((event) => event.type === 'phase_change');
+      expect(change).toBeDefined();
+      if (change?.type === 'phase_change') {
+        expect(change.kind).toBe('switched');
+        expect(change.from).toBe('before');
+        expect(change.to).toBe('during');
+        expect(change.source).toBe('ask');
+      }
+      expect(engine.context.get().phase).toBe('during');
+      expect(changes).toContain('phase');
 
-    engine.context.clearWarning('tcws');
-    engine.context.setWarning({ kind: 'tcws', level: 3 });
-    expect(engine.context.get().phase).toBe('during');
+      const undone = engine.context.undoPhase();
+      expect(undone.ok).toBe(true);
+      expect(engine.context.get().phase).toBe('before');
+    });
+
+    it('a weak cue with no accepted hint does not switch the phase', async () => {
+      // The harness has no control for a weak cue paired with a matching phase_hint
+      // or for an unbacked hint; this covers the negative direction only.
+      const { engine, ctl } = await create();
+      ctl.scenario('guide_full');
+      await collect(engine, 'weak during cue paano maghanda?');
+      expect(engine.context.get().phase).toBe('before');
+      expect(engine.context.get().recommended?.phase ?? 'before').not.toBe('during');
+    });
+
+    it('a humupa-na cue only recommends after and never switches the phase', async () => {
+      const { engine, ctl } = await create();
+      expect(engine.context.get().phase).toBe('before');
+
+      const question = ctl.scenario('phase_cue_after');
+      const events = await collect(engine, question);
+
+      const change = events.find((event) => event.type === 'phase_change');
+      expect(change).toBeDefined();
+      if (change?.type === 'phase_change') {
+        expect(change.kind).toBe('recommended');
+        expect(change.to).toBe('after');
+      }
+      expect(engine.context.get().phase).toBe('before');
+      expect(engine.context.get().recommended?.phase).toBe('after');
+    });
+
+    it('when inputs disagree the more cautious phase wins', async () => {
+      const { engine, ctl } = await create();
+      engine.context.setWarning({ kind: 'tcws', level: 2 });
+      expect(engine.context.get().phase).toBe('during');
+
+      const question = ctl.scenario('phase_cue_after');
+      await collect(engine, question);
+      expect(engine.context.get().phase).toBe('during');
+    });
   });
 
-  it('setPhase after clears warnings and undoPhase restores them', async () => {
-    const engine = await ready();
-    engine.context.setWarning({ kind: 'tcws', level: 2 });
-    engine.context.setWarning({ kind: 'gale' });
-    expect(Object.keys(engine.context.get().warnings).length).toBeGreaterThan(0);
+  describe('feed-driven phase decisions', () => {
+    it('with placeholder bands a bulletin never switches the phase on distance', async () => {
+      const { engine, ctl } = await create();
+      expect(engine.context.get().phase).toBe('before');
+      await ctl.setFeed('fresh');
+      expect(engine.context.get().phase).toBe('before');
+    });
 
-    engine.context.setPhase('after');
-    expect(engine.context.get().phase).toBe('after');
-    expect(engine.context.get().warnings).toEqual({});
+    it('a signal raised for the household area switches to during', async () => {
+      const { engine, ctl } = await create();
+      await ctl.setFeed('signal_here');
+      expect(engine.context.get().phase).toBe('during');
+      expect(engine.context.get().lastSwitch?.source).toBe('bulletin');
 
-    const undone = engine.context.undoPhase();
-    expect(undone.ok).toBe(true);
-    if (undone.ok) {
-      expect(undone.value.phase).toBe('during');
-      expect(undone.value.warnings.tcws?.level).toBe(2);
-      expect(undone.value.warnings.gale).toBeDefined();
-    }
+      const undone = engine.context.undoPhase();
+      expect(undone.ok).toBe(true);
+      expect(engine.context.get().phase).toBe('before');
+    });
+
+    it('a bagyo inside near switches to during; the same bulletin after an undo does not', async () => {
+      const { engine, ctl } = await create();
+      await ctl.setFeed('near');
+      expect(engine.context.get().phase).toBe('during');
+      expect(engine.context.get().lastSwitch?.source).toBe('bulletin');
+
+      const undone = engine.context.undoPhase();
+      expect(undone.ok).toBe(true);
+      expect(engine.context.get().phase).toBe('before');
+
+      await ctl.setFeed('near');
+      expect(engine.context.get().phase).toBe('before');
+    });
+
+    it('a track entering approach switches after to before; the same after an undo does not', async () => {
+      const { engine, ctl } = await create();
+      engine.context.setPhase('after');
+      await ctl.setFeed('track_approach');
+      expect(engine.context.get().phase).toBe('before');
+
+      const undone = engine.context.undoPhase();
+      expect(undone.ok).toBe(true);
+      expect(engine.context.get().phase).toBe('after');
+
+      await ctl.setFeed('track_approach');
+      expect(engine.context.get().phase).toBe('after');
+    });
+
+    it('a final bulletin only recommends after and never switches to it', async () => {
+      const { engine, ctl } = await create();
+      await ctl.setFeed('left');
+      expect(engine.context.get().phase).not.toBe('after');
+      expect(engine.context.get().recommended?.phase).toBe('after');
+    });
+
+    it.each(['off', 'empty', 'stale'] as const)('%s feeds never switch the phase', async (feed) => {
+      const { engine, ctl } = await create();
+      expect(engine.context.get().phase).toBe('before');
+      await ctl.setFeed(feed);
+      expect(engine.context.get().phase).toBe('before');
+    });
   });
 
-  it('never switches to after automatically', async () => {
-    const engine = await ready();
-    engine.context.setWarning({ kind: 'tcws', level: 2 });
-    expect(engine.context.get().phase).toBe('during');
+  describe('warning cards', () => {
+    it('cards report hoursSinceSet and stale from the clock and staleWarningHours; reconfirmWarning resets both', async () => {
+      const { engine, ctl } = await create();
+      engine.context.setWarning({ kind: 'tcws', level: 2 });
 
-    engine.debug.setFeed('left');
-    await engine.feed.refresh();
-    expect(engine.context.get().phase).not.toBe('after');
-  });
-});
+      const fresh = engine.context.cards().find((card) => card.kind === 'tcws');
+      expect(fresh).toBeDefined();
+      expect(fresh?.hoursSinceSet).toBe(0);
+      expect(fresh?.stale).toBe(false);
+      expect(typeof fresh?.setAt).toBe('string');
 
-describe('mock context: warning cards', () => {
-  it('cards() reports a fresh warning as not stale; reconfirmWarning keeps it and is not a new input', async () => {
-    const engine = await ready();
-    engine.context.setWarning({ kind: 'tcws', level: 2 });
+      const staleWarningHours = engine.settings.get().staleWarningHours;
+      ctl.advance(staleWarningHours * 3_600_000);
 
-    const card = engine.context.cards().find((c) => c.kind === 'tcws');
-    expect(card).toBeDefined();
-    expect(card?.hoursSinceSet).toBe(0);
-    expect(card?.stale).toBe(false);
-    expect(typeof card?.setAt).toBe('string');
+      const aged = engine.context.cards().find((card) => card.kind === 'tcws');
+      expect(aged?.hoursSinceSet).toBe(staleWarningHours);
+      expect(aged?.stale).toBe(true);
 
-    const switchAt = engine.context.get().lastSwitch?.at;
-    const returned = engine.context.reconfirmWarning('tcws');
-    expect(returned.warnings.tcws?.level).toBe(2);
-    expect(engine.context.get().lastSwitch?.at).toBe(switchAt);
+      const changes: EngineChange[] = [];
+      engine.onChange((change) => changes.push(change));
+      const returned = engine.context.reconfirmWarning('tcws');
+      expect(returned.warnings.tcws?.level).toBe(2);
 
-    const after = engine.context.cards().find((c) => c.kind === 'tcws');
-    expect(after?.hoursSinceSet).toBe(0);
-    expect(after?.stale).toBe(false);
-  });
-});
-
-describe('mock checklist ordering', () => {
-  it('barangay_order leads now with evacuate items; clearing restores', async () => {
-    const engine = await ready();
-    engine.context.setWarning({ kind: 'barangay_order' });
-
-    const active = engine.checklist.view();
-    expect(active.phase).toBe('during');
-    expect(active.groups[0]?.id).toBe('now');
-    expect(active.groups[1]?.id).toBe('evacuate');
-    const nowActive = active.groups.find((g) => g.id === 'now');
-    expect(nowActive?.items[0]?.id.startsWith('evacuate-')).toBe(true);
-
-    engine.context.clearWarning('barangay_order');
-    expect(engine.context.get().warnings.barangay_order).toBeUndefined();
-    const restored = engine.checklist.view();
-    const nowRestored = restored.groups.find((g) => g.id === 'now');
-    expect(restored.groups.map((group) => group.id).slice(0, PHASE_GROUPS.during.length)).toEqual(PHASE_GROUPS.during);
-    expect(nowRestored?.items[0]?.id.startsWith('evacuate-')).toBe(true);
-  });
-});
-
-describe('mock debug.setFeed phase effects', () => {
-  it('near switches to during immediately', async () => {
-    const engine = await ready();
-    engine.context.setPhase('before');
-    engine.debug.setFeed('near');
-    expect(engine.context.get().phase).toBe('during');
-    expect(engine.feed.get().status).toBe('fresh');
+      const reset = engine.context.cards().find((card) => card.kind === 'tcws');
+      expect(reset?.hoursSinceSet).toBe(0);
+      expect(reset?.stale).toBe(false);
+      expect(changes).toContain('context');
+      expect(changes).not.toContain('phase');
+    });
   });
 
-  it('signal_here switches to during', async () => {
-    const engine = await ready();
-    engine.context.setPhase('before');
-    engine.debug.setFeed('signal_here');
-    expect(engine.context.get().phase).toBe('during');
+  describe('checklist order', () => {
+    it('barangay_order puts evacuate right after now and fills now from evacuate items first; clearing restores', async () => {
+      const { engine } = await create();
+      engine.context.setWarning({ kind: 'barangay_order' });
+      // Keep the warning active but hold the phase manual, so the ordering shows on its own.
+      engine.context.setPhase('before');
+
+      const active = engine.checklist.view();
+      expect(active.phase).toBe('before');
+      expect(active.groups[0]?.id).toBe('now');
+      expect(active.groups[1]?.id).toBe('evacuate');
+      const nowActive = active.groups.find((group) => group.id === 'now');
+      expect(nowActive?.items[0]?.id.startsWith('evacuate-')).toBe(true);
+
+      engine.context.clearWarning('barangay_order');
+      expect(engine.context.get().warnings.barangay_order).toBeUndefined();
+
+      const restored = engine.checklist.view();
+      expect(restored.phase).toBe('before');
+      expect(restored.groups.slice(0, PHASE_GROUPS.before.length).map((group) => group.id)).toEqual(PHASE_GROUPS.before);
+      expect(restored.groups[1]?.id).toBe('go_bag');
+    });
   });
 
-  it('track_approach switches after to before', async () => {
-    const engine = await ready();
-    engine.context.setPhase('after');
-    engine.debug.setFeed('track_approach');
-    expect(engine.context.get().phase).toBe('before');
+  describe('settings and status', () => {
+    it('lowBatteryMode makes status().ai low_battery whatever the battery', async () => {
+      const { engine, ctl } = await create();
+      ctl.setBattery({ level: 100, charging: true, saver: false });
+
+      const updated = engine.settings.update({ lowBatteryMode: true });
+      expect(updated.ok).toBe(true);
+      expect(engine.status().ai).toEqual({ allowed: false, reason: 'low_battery' });
+    });
   });
 
-  it.each(['stale', 'off', 'empty'] as const)('%s never switches the phase', async (feed) => {
-    const engine = await ready();
-    engine.context.setPhase('before');
-    engine.debug.setFeed(feed);
-    expect(engine.context.get().phase).toBe('before');
-  });
+  describe('Result shapes', () => {
+    it('undoPhase returns nothing_to_undo with the documented error shape', async () => {
+      const { engine } = await create();
 
-  it('feed errors fail the next refresh and preserve the cached feed', async () => {
-    const engine = await ready();
-    const cached = engine.feed.get();
-    engine.debug.setFeed('offline');
+      const res = engine.context.undoPhase();
 
-    expect(engine.feed.get()).toEqual(cached);
-    const failed = await engine.feed.refresh();
-    expect(failed.ok).toBe(false);
-    if (!failed.ok) expect(failed.error.code).toBe('offline');
-    expect(engine.feed.get()).toEqual(cached);
-    expect((await engine.feed.refresh()).ok).toBe(true);
-  });
-});
+      expect(res.ok).toBe(false);
+      if (!res.ok) {
+        expect(res.error.code).toBe('nothing_to_undo');
+        expect(typeof res.error.message).toBe('string');
+        expect(res).not.toHaveProperty('value');
+      }
+    });
 
-describe('mock settings and status', () => {
-  it('debug.setStatus fires onChange(status)', async () => {
-    const engine = await ready();
-    const changes: EngineChange[] = [];
-    engine.onChange((c) => changes.push(c));
+    it('a successful Result carries { ok: true, value }', async () => {
+      const { engine } = await create();
 
-    engine.debug.setStatus({ battery: { level: 10, charging: false, saver: false } });
+      const res = engine.checklist.tick('now-listen-radio', true);
 
-    expect(engine.status().battery?.level).toBe(10);
-    expect(changes).toContain('status');
-  });
+      expect(res.ok).toBe(true);
+      if (res.ok) {
+        expect(res.value.progress.total).toBeGreaterThan(0);
+        expect(res).not.toHaveProperty('error');
+      }
+    });
 
-  it('lowBatteryMode forces status().ai to low_battery whatever the battery', async () => {
-    const engine = await ready();
-    engine.debug.setStatus({ battery: { level: 100, charging: true, saver: false } });
+    it('a failing Result carries { ok: false, error }', async () => {
+      const { engine } = await create();
 
-    const res = engine.settings.update({ lowBatteryMode: true });
-    expect(res.ok).toBe(true);
-    expect(engine.status().ai).toEqual({ allowed: false, reason: 'low_battery' });
-  });
+      const unknown = engine.checklist.tick('hindi-totoong-item', true);
+      expect(unknown.ok).toBe(false);
+      if (!unknown.ok) {
+        expect(unknown.error.code).toBe('unknown_item');
+        expect(unknown).not.toHaveProperty('value');
+      }
 
-  it('debug.reset restores the fixtures', async () => {
-    const engine = await ready();
-    engine.context.setWarning({ kind: 'tcws', level: 3 });
-    engine.settings.update({ lowBatteryMode: true });
-
-    engine.debug.reset();
-
-    expect(engine.context.get().phase).toBe('before');
-    expect(engine.context.get().warnings).toEqual({});
-    expect(engine.settings.get().lowBatteryMode).toBe(false);
-  });
-});
-
-describe('mock contract: Result shapes', () => {
-  it('undoPhase returns nothing_to_undo with the documented error shape', async () => {
-    const engine = await ready();
-
-    const res = engine.context.undoPhase();
-
-    expect(res.ok).toBe(false);
-    if (!res.ok) {
-      expect(res.error.code).toBe('nothing_to_undo');
-      expect(typeof res.error.message).toBe('string');
-      expect(res).not.toHaveProperty('value');
-    }
-  });
-
-  it('a successful Result carries { ok: true, value }', async () => {
-    const engine = await ready();
-
-    const res = engine.checklist.tick('now-listen-radio', true);
-
-    expect(res.ok).toBe(true);
-    if (res.ok) {
-      expect(res.value.progress.total).toBeGreaterThan(0);
-      expect(res).not.toHaveProperty('error');
-    }
-  });
-
-  it('a failing Result carries { ok: false, error }', async () => {
-    const engine = await ready();
-
-    const unknown = engine.checklist.tick('hindi-totoong-item', true);
-    expect(unknown.ok).toBe(false);
-    if (!unknown.ok) {
-      expect(unknown.error.code).toBe('unknown_item');
-      expect(unknown).not.toHaveProperty('value');
-    }
-
-    const outOfRange = engine.settings.update({ lowBatteryThreshold: 100 });
-    expect(outOfRange.ok).toBe(false);
-    if (!outOfRange.ok) expect(outOfRange.error.code).toBe('out_of_range');
+      const outOfRange = engine.settings.update({ lowBatteryThreshold: 100 });
+      expect(outOfRange.ok).toBe(false);
+      if (!outOfRange.ok) expect(outOfRange.error.code).toBe('out_of_range');
+    });
   });
 });

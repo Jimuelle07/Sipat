@@ -2,24 +2,44 @@
 import type {
   Bulletin,
   BulletinCardView,
-  CompassPoint,
   EvacuationCenter,
   FeedState,
+  HomePoint,
   PhaseRules,
-  StormFix,
   StormMeasure,
 } from '../../types/index.ts';
+import { measureStorm } from '../../core/measureStorm.ts';
+import { FIXTURE_PLACES } from './content.ts';
 
 const AT = '2026-10-10T06:00:00+08:00';
 const FETCHED_AT = '2026-10-10T06:30:00+08:00';
 const CHECKED_AT = '2026-10-10T06:31:00+08:00';
+const FORECAST_AT = '2026-10-11T06:00:00+08:00';
 
-// Fixture distances only. They are not real-world bands or thresholds; the demo rules below are
-// derived from these numbers so the phase rules can be exercised "as if bands were sourced".
-const SAMPLE_NOW_KM = 320;
-const SAMPLE_FORECAST_KM = 300;
-const NEAR_KM = 120;
-const APPROACH_KM = 200;
+// The fixture household lives in SAMPLE-BRGY-1. This mirrors the engine's homePoint() for that
+// location: the barangay centroid with its ancestor PSGC codes. Every sample bulletin is measured
+// against it with the real measureStorm(), so the mock's precomputed measures and the real engine
+// agree.
+function fixtureHome(): HomePoint {
+  const items = FIXTURE_PLACES.items;
+  const start = items.find((place) => place.psgc === 'SAMPLE-BRGY-1');
+  const areaCodes: string[] = [];
+  let place = start;
+  const seen = new Set<string>();
+  while (place && !seen.has(place.psgc)) {
+    areaCodes.push(place.psgc);
+    seen.add(place.psgc);
+    place = items.find((item) => item.psgc === place?.parent);
+  }
+  return { point: start?.centroid ?? { lat: 14.01, lon: 122.01 }, from: 'area', areaCodes };
+}
+
+const FIXTURE_HOME = fixtureHome();
+
+// SAMPLE-PROVINCE-2 is not an ancestor of SAMPLE-BRGY-1, so a signal raised there never reaches
+// the fixture household. Only 'signal_here' raises a signal for the household's own province.
+const OTHER_PROVINCE = 'SAMPLE-PROVINCE-2';
+const HOME_PROVINCE = 'SAMPLE-PROVINCE-1';
 
 function sampleBulletin(): Bulletin {
   return {
@@ -36,8 +56,8 @@ function sampleBulletin(): Bulletin {
     storm: { name: 'Bagyong SAMPLE', category: 'TS' },
     position: { lat: 14.0, lon: 124.0, at: AT, text: 'SAMPLE – hindi totoong posisyon' },
     movement: { text: 'SAMPLE – gumagalaw pahilaga-kanluran (placeholder)' },
-    forecast: [{ lat: 14.5, lon: 123.5, at: '2026-10-11T06:00:00+08:00' }],
-    signalAreas: [{ level: 1, psgc: ['SAMPLE-PROVINCE-1'] }],
+    forecast: [{ lat: 14.5, lon: 123.5, at: FORECAST_AT }],
+    signalAreas: [{ level: 1, psgc: [OTHER_PROVINCE] }],
     final: false,
     text: 'SAMPLE – hindi totoong bulletin',
   };
@@ -86,50 +106,45 @@ export const FIXTURE_CENTERS: EvacuationCenter[] = [
 
 export type FeedVariant = 'near' | 'signal_here' | 'track_approach' | 'left';
 
-function fix(distanceKm: number, direction: CompassPoint = 'N'): StormFix {
-  return { at: AT, distanceKm, bearingDeg: 0, direction };
-}
-
-function baseMeasure(): StormMeasure {
-  return {
-    bulletinId: FIXTURE_BULLETIN.id,
-    from: 'area',
-    now: fix(SAMPLE_NOW_KM),
-    forecast: [fix(SAMPLE_FORECAST_KM)],
-    closestKm: SAMPLE_FORECAST_KM,
-    signalHere: null,
-  };
-}
-
 /**
- * The sample bulletin and its measure, one variant per automatic-switch case. No arg gives the
- * sample bulletin and its base measure. Each variant changes only what its case needs.
+ * The sample bulletin for one automatic-switch case. Only what the case needs changes: position
+ * for 'near', forecast for 'track_approach', the final flag for 'left' and the signal area for
+ * 'signal_here'. Every other variant keeps the far sample track and the other province's signal.
  */
-export function fixtureStorm(variant?: FeedVariant): { bulletin: Bulletin; measure: StormMeasure } {
+function variantBulletin(variant?: FeedVariant): Bulletin {
   const bulletin = sampleBulletin();
-  const measure = baseMeasure();
   switch (variant) {
     case 'near':
-      measure.now = fix(NEAR_KM);
-      measure.closestKm = NEAR_KM;
+      bulletin.position = { ...bulletin.position, lat: 14.05, lon: 122.2 };
       break;
     case 'signal_here':
-      measure.signalHere = 2;
+      bulletin.signalAreas = [{ level: 2, psgc: [HOME_PROVINCE] }];
       break;
     case 'track_approach':
-      measure.forecast = [fix(APPROACH_KM)];
-      measure.closestKm = APPROACH_KM;
+      bulletin.forecast = [{ lat: 14.11, lon: 122.2, at: FORECAST_AT }];
       break;
     case 'left':
       bulletin.final = true;
-      measure.now = fix(SAMPLE_NOW_KM + 80);
-      measure.closestKm = SAMPLE_NOW_KM + 80;
       break;
     default:
       break;
   }
-  return { bulletin, measure };
+  return bulletin;
 }
+
+/**
+ * The sample bulletin and its measure, one variant per automatic-switch case. No arg gives the
+ * sample bulletin and its base measure. The measure is always what measureStorm() computes for the
+ * fixture home, so the mock and the real engine read the same numbers.
+ */
+export function fixtureStorm(variant?: FeedVariant): { bulletin: Bulletin; measure: StormMeasure } {
+  const bulletin = variantBulletin(variant);
+  return { bulletin, measure: measureStorm(bulletin, FIXTURE_HOME) };
+}
+
+// Bands derived from the fixture measures above, so no real-world number appears.
+const NEAR_MAX_KM = fixtureStorm('near').measure.now.distanceKm;
+const APPROACH_MAX_KM = fixtureStorm('track_approach').measure.closestKm;
 
 /**
  * Mock-only phase rules whose bands are derived from the fixture measures above, so no real-world
@@ -140,14 +155,14 @@ export const DEMO_SOURCED_RULES: PhaseRules = {
   warning_to_phase: { any_active_warning: 'during', basis: 'product_rule' },
   bands: {
     near: {
-      max_km: NEAR_KM,
+      max_km: NEAR_MAX_KM,
       placeholder: false,
       source_id: 'src-pagasa-sample',
       reviewed_by: 'SAMPLE Reviewer B',
       reviewed_at: '2026-10-09',
     },
     approach: {
-      max_km: APPROACH_KM,
+      max_km: APPROACH_MAX_KM,
       placeholder: false,
       source_id: 'src-pagasa-sample',
       reviewed_by: 'SAMPLE Reviewer B',

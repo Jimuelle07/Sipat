@@ -1,5 +1,6 @@
 import { buildChecklist, PHASE_GROUPS } from '../core/checklist.ts';
 import { decidePhase } from '../core/decidePhase.ts';
+import { redactQuestion } from '../core/prompt.ts';
 import { decideAi } from '../services/power.ts';
 import { deriveHousehold } from '../core/deriveHousehold.ts';
 import { COPY, COPY_EN } from './copy.ts';
@@ -146,7 +147,7 @@ export function createMockEngine(opts: MockOptions = {}): MockEngine {
   let context = defaultContext(now());
   let settings: Settings = {
     language: 'tl', lowBatteryThreshold: 15, aiEnabled: true, lowBatteryMode: false,
-    staleWarningHours: 6, feedEnabled: true, autoCheckUpdates: false, wifiOnly: true,
+    staleWarningHours: 3, feedEnabled: true, autoCheckUpdates: false, wifiOnly: true,
     topicReportsOptIn: false, damageReportsOptIn: false,
   };
   let ticks: Record<string, ChecklistTick> = {};
@@ -179,23 +180,21 @@ export function createMockEngine(opts: MockOptions = {}): MockEngine {
     packPreviews.set(preview.previewId, preview);
     return preview;
   };
-  const logQuestion = (question: string): string => {
-    const privateValues = profile.people.flatMap((member) => [
-      member.name, member.note, member.phone, member.photo?.uri,
-    ]).filter((value): value is string => value !== undefined && value.length > 0);
-    if (profile.location) {
-      privateValues.push(profile.location.psgc);
-      if (profile.location.coords) {
-        privateValues.push(String(profile.location.coords.lat), String(profile.location.coords.lon));
-      }
+  const areaValues = (): string[] => {
+    const values: string[] = [];
+    let psgc = profile.location?.psgc;
+    const seen = new Set<string>();
+    while (psgc && !seen.has(psgc)) {
+      seen.add(psgc);
+      const place = FIXTURE_PLACES.items.find((item) => item.psgc === psgc);
+      if (!place) break;
+      values.push(place.name, place.psgc);
+      psgc = place.parent ?? undefined;
     }
-    let safe = question;
-    for (const value of privateValues) {
-      const escaped = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      safe = safe.replace(new RegExp(escaped, 'gi'), '[private]');
-    }
-    return safe.slice(0, 200);
+    return values;
   };
+  const logQuestion = (question: string): string =>
+    redactQuestion(question, profile, areaValues()).slice(0, 200);
 
   const phaseRules = () => demoFeedVariant ? DEMO_SOURCED_RULES : FIXTURE_PHASE_RULES;
   const storm = () => feedVariant;
@@ -249,7 +248,10 @@ export function createMockEngine(opts: MockOptions = {}): MockEngine {
     decidePhase({ context, rules: phaseRules(), storm: storm(), ask, now: toManilaIso(now()) });
   const applyDecision = (decision: ReturnType<typeof decidePhase>, captureUndo = true, notifyPhase = true) => {
     const previous = { ...context, warnings: { ...context.warnings } };
-    const changed = decision.state.phase !== context.phase || decision.state.phaseSource !== context.phaseSource;
+    const changed = decision.state.phase !== context.phase || decision.state.phaseSource !== context.phaseSource
+      || JSON.stringify(decision.state.reason) !== JSON.stringify(context.reason)
+      || JSON.stringify(decision.state.recommended) !== JSON.stringify(context.recommended)
+      || JSON.stringify(decision.state.lastSwitch) !== JSON.stringify(context.lastSwitch);
     if (captureUndo && decision.switched) undo = { state: previous, cause: decision.switched.input };
     context = { ...decision.state, warnings: context.warnings };
     if (changed && notifyPhase) emit('phase');
@@ -636,12 +638,11 @@ export function createMockEngine(opts: MockOptions = {}): MockEngine {
           updatedAt: toManilaIso(now()),
         };
         if (old?.photo) member.photo = old.photo;
-        profile.people = old
+        const people = old
           ? profile.people.map((value) => value.id === old.id ? member : value)
           : [...profile.people, member];
-        const derived = deriveHousehold(profile.people, profile.petsCount);
-        profile.headcount = derived.headcount;
-        profile.members = derived.members;
+        const derived = deriveHousehold(people, profile.petsCount);
+        profile = { ...profile, people, headcount: derived.headcount, members: derived.members };
         emit('family');
         emit('checklist');
         return { ok: true, value: member };
@@ -736,18 +737,31 @@ export function createMockEngine(opts: MockOptions = {}): MockEngine {
       },
       location: {
         get: profileLocation,
-        places: (parent) => FIXTURE_PLACES.items
-          .filter((place) => place.parent === (parent ?? null))
-          .map((place) => ({
-            psgc: place.psgc,
-            name: place.name,
-            level: place.level,
-            hasChildren: FIXTURE_PLACES.items.some((child) => child.parent === place.psgc),
-          })),
+        places: (parent) => {
+          const items = FIXTURE_PLACES.items;
+          const regionPsgc = new Set(items
+            .filter((place) => place.level === 'region')
+            .map((place) => place.psgc));
+          const topLevel = parent === undefined
+            ? items.filter((place) => place.level === 'province'
+              || ((place.level === 'city' || place.level === 'municipality')
+                && place.parent !== null && regionPsgc.has(place.parent)))
+            : items.filter((place) => place.parent === parent);
+          return topLevel
+            .slice()
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .map((place) => ({
+              psgc: place.psgc,
+              name: place.name,
+              level: place.level,
+              hasChildren: items.some((child) => child.parent === place.psgc),
+            }));
+        },
         setArea: (psgc) => {
           const place = FIXTURE_PLACES.items.find((item) => item.psgc === psgc && item.level === 'barangay');
           if (!hasProfile || !place) return resultErr('unknown_place');
           profile.location = { psgc };
+          applyDecision(decide());
           emit('profiles');
           return resultOk(profile.location);
         },
@@ -931,8 +945,10 @@ export function createMockEngine(opts: MockOptions = {}): MockEngine {
     },
     model: {
       installFromPicker: async (onProgress, signal) => {
+        if (status().tier === 'none') return resultErr('tier');
         const result = modelInstallResult;
         modelInstallResult = 'installed';
+        if (result === 'cancelled') return resultOk(null);
         if (result !== 'installed') return resultErr(result);
         const total = 810_000_000;
         const steps = speed === 'fast' ? 1 : 30;
@@ -1147,7 +1163,7 @@ export function createMockEngine(opts: MockOptions = {}): MockEngine {
           lowBatteryThreshold: 15,
           aiEnabled: true,
           lowBatteryMode: false,
-          staleWarningHours: 6,
+          staleWarningHours: 3,
           feedEnabled: true,
           autoCheckUpdates: false,
           wifiOnly: true,

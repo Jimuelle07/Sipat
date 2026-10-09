@@ -21,10 +21,8 @@ type Rec = Record<string, unknown>;
 const isRec = (v: unknown): v is Rec => typeof v === 'object' && v !== null && !Array.isArray(v);
 const nonEmpty = (v: unknown): v is string => typeof v === 'string' && v.trim().length > 0;
 
-export function loadBundledContent(): Result<BundledContent, string> {
-  const result = validateContent(rawContent);
-  if (result.ok) return { ok: true, value: result.value };
-  return { ok: false, error: { code: result.error.code, message: result.error.message } };
+export function loadBundledContent(): Result<BundledContent, 'content_invalid'> {
+  return validateContent(rawContent);
 }
 
 function guideVersion(): number {
@@ -33,13 +31,17 @@ function guideVersion(): number {
   return 1;
 }
 
-function newestGuideDate(content: BundledContent): string {
-  let newest = '';
-  for (const passage of content.passages) {
-    if (typeof passage.reviewed_at === 'string' && passage.reviewed_at > newest) newest = passage.reviewed_at;
-  }
-  if (newest) return newest;
+function newestGuideDate(): string {
   const guide = rawContent['guide.tl.json'];
+  if (isRec(guide) && Array.isArray(guide.items)) {
+    let newest = '';
+    for (const passage of guide.items) {
+      if (isRec(passage) && typeof passage.reviewed_at === 'string' && passage.reviewed_at > newest) {
+        newest = passage.reviewed_at;
+      }
+    }
+    if (newest) return newest;
+  }
   if (isRec(guide) && typeof guide.generated_at === 'string') return guide.generated_at.slice(0, 10);
   return '';
 }
@@ -67,13 +69,11 @@ export function createPackManager(deps: {
   now?: () => string;
   readFile?: (uri: string) => Promise<string | Uint8Array>;
   publicKeys?: Record<string, string>;
-}): PackManager & { content(): BundledContent; corePack(): InstalledPack } {
+}): PackManager & { content(): Result<BundledContent, 'content_invalid'>; corePack(): InstalledPack } {
   const { store, publicKeys } = deps;
 
-  const loaded = loadBundledContent();
-  if (!loaded.ok) throw new Error(`Bundled content is invalid: ${loaded.error.message}`);
-  const contentValue = loaded.value;
-  const guideDate = newestGuideDate(contentValue);
+  // Never validate or throw here: the engine's init() validates and returns content_invalid.
+  const guideDate = newestGuideDate();
   const version = guideVersion();
 
   const nowIso = (): string => toManilaIso(deps.now ? new Date(deps.now()) : new Date());
@@ -247,7 +247,7 @@ export function createPackManager(deps: {
     importFile,
     apply,
     rollback,
-    content: () => contentValue,
+    content: () => loadBundledContent(),
     corePack,
   };
 }

@@ -1,16 +1,23 @@
 import type { DeviceTier, Result } from '../types/common.ts';
-import type {
-  BuiltPrompt,
-} from '../types/core.ts';
+import type { BuiltPrompt } from '../types/core.ts';
 import type { ModelInstallError } from '../types/engine.ts';
 import type {
   CompletionSettings, GenerateRequest, GenerateResult, ModelError, ModelManager, ModelState, PickedFile,
 } from '../types/services.ts';
+import { EXAMPLE_1_JSON, EXAMPLE_1_USER, EXAMPLE_2_JSON, EXAMPLE_2_USER, SYSTEM_TL } from '../core/prompt.ts';
+import { BUNDLED_MODEL } from './modelEntry.ts';
 
-export const MODEL_FILE_NAME = 'Llama-3.2-1B-Instruct-Q4_K_M.gguf';
-
-/** Idle time before the loaded context is released (docs: 2 minutes). */
+export const MODEL_FILE_NAME = BUNDLED_MODEL.file_name;
 export const MODEL_IDLE_UNLOAD_MS = 2 * 60 * 1000;
+
+/** The fixed system + worked-example turns (section 8). Cached as the session prefix; the last user turn is variable. */
+export const FIXED_INSTRUCTION_PREFIX: BuiltPrompt['messages'] = [
+  { role: 'system', content: SYSTEM_TL },
+  { role: 'user', content: EXAMPLE_1_USER },
+  { role: 'assistant', content: EXAMPLE_1_JSON },
+  { role: 'user', content: EXAMPLE_2_USER },
+  { role: 'assistant', content: EXAMPLE_2_JSON },
+];
 
 type CompletionParams = {
   messages: BuiltPrompt['messages'];
@@ -29,72 +36,91 @@ export interface LlamaCtx {
   completion(params: CompletionParams, onToken: (tok: string) => void): Promise<{ text: string; timings?: LlamaTimings }>;
   stopCompletion(): Promise<void>;
   release(): Promise<void>;
-  /** Restores the cached instruction prefix. Returns true when a session was loaded. */
   loadSession?(path: string): Promise<boolean>;
-  /** Persists the instruction prefix after the first load. */
   saveSession?(path: string): Promise<void>;
 }
 
 export interface LlamaBackend {
-  exists(path: string): Promise<boolean>;
-  init(opts: { model: string; n_ctx: number; n_threads?: number }): Promise<LlamaCtx>;
-  /** Copies a picked GGUF into app-private storage while hashing it. */
-  install?(
-    file: PickedFile, destPath: string, onProgress: (bytes: number, total: number) => void, signal?: AbortSignal,
-  ): Promise<void>;
-  remove?(path: string): Promise<void>;
+  init(opts: { model: string; n_ctx: number; n_threads: number; use_mmap: true; use_mlock: false }): Promise<LlamaCtx>;
 }
 
-/** Native dependencies stay out of module initialization so core logic can run in Node and web. */
-export function defaultLlamaBackend(): LlamaBackend | null {
+export interface ModelFiles {
+  freeBytes(): Promise<number>;
+  exists(path: string): Promise<boolean>;
+  size(path: string): Promise<number | null>;
+  copyWithSha256(
+    srcUri: string, destPath: string, onProgress: (bytes: number, total: number) => void, signal?: AbortSignal,
+  ): Promise<string>;
+  remove(path: string): Promise<void>;
+  move(srcPath: string, destPath: string): Promise<void>;
+}
+
+/** Native dependencies are resolved lazily so importing the service remains safe in Node. */
+export function defaultModelFiles(): ModelFiles | null {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const llama = require('llama.rn') as { initLlama: (opts: object) => Promise<any> };
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const fs = require('expo-file-system/legacy') as {
-      documentDirectory?: string | null;
-      getInfoAsync: (path: string) => Promise<{ exists: boolean }>;
-      copyAsync?: (opts: { from: string; to: string }) => Promise<void>;
-      deleteAsync?: (path: string, opts?: { idempotent?: boolean }) => Promise<void>;
+    const fs = require('expo-file-system') as {
+      Paths: { document: unknown; availableDiskSpace: number };
+      File: new (...parts: unknown[]) => {
+        uri: string; exists: boolean; size: number; open(mode?: string): {
+          size: number | null; readBytes(length: number): Uint8Array; writeBytes(bytes: Uint8Array): void; close(): void;
+        };
+        create(options?: { intermediates?: boolean; overwrite?: boolean }): void;
+        delete(): void;
+        move(destination: unknown): void;
+      };
+      Directory: new (...parts: unknown[]) => {
+        create(options?: { intermediates?: boolean; idempotent?: boolean }): void;
+      };
     };
-    if (!llama?.initLlama || typeof fs?.getInfoAsync !== 'function') return null;
-    if (typeof fs.copyAsync !== 'function' || typeof fs.deleteAsync !== 'function') return null;
-    const ctxWithSession = llama as unknown as { initLlama: (opts: object) => Promise<Record<string, unknown>> };
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const crypto = require('react-native-quick-crypto') as {
+      createHash(algorithm: string): { update(chunk: Uint8Array): void; digest(encoding: 'hex'): string };
+    };
+    if (!fs?.File || !fs?.Directory || !fs?.Paths || !crypto?.createHash) return null;
+    const chunkSize = 1024 * 1024;
+    const fileFor = (path: string) => new fs.File(path);
     return {
-      exists: async (path) => (await fs.getInfoAsync(path)).exists,
-      init: async (opts) => {
-        const ctx = (await ctxWithSession.initLlama({ ...opts, use_mmap: true, use_mlock: false })) as {
-          completion: (params: unknown, cb: (data: { token?: string }) => void) => Promise<{ text: string; timings?: LlamaTimings }>;
-          stopCompletion: () => Promise<void>;
-          release: () => Promise<void>;
-          loadSession?: (path: string) => Promise<boolean>;
-          saveSession?: (path: string) => Promise<void>;
-        };
-        return {
-          completion: async (params, onToken) => ctx.completion(params, (data) => {
-            if (typeof data?.token === 'string') onToken(data.token);
-          }),
-          stopCompletion: () => ctx.stopCompletion(),
-          release: () => ctx.release(),
-          ...(typeof ctx.loadSession === 'function'
-            ? { loadSession: (path: string) => ctx.loadSession!(path) }
-            : {}),
-          ...(typeof ctx.saveSession === 'function'
-            ? { saveSession: (path: string) => ctx.saveSession!(path) }
-            : {}),
-        };
+      freeBytes: async () => fs.Paths.availableDiskSpace,
+      exists: async (path) => fileFor(path).exists,
+      size: async (path) => {
+        const file = fileFor(path);
+        return file.exists ? file.size : null;
       },
-      // The streaming SHA-256 check waits on the native module; this copies and reports progress.
-      install: async (file, destPath, onProgress, signal) => {
-        await fs.copyAsync!({ from: file.uri, to: destPath });
-        if (signal?.aborted) {
-          await fs.deleteAsync!(destPath, { idempotent: true });
-          throw new Error('cancelled');
+      copyWithSha256: async (srcUri, destPath, onProgress, signal) => {
+        const source = fileFor(srcUri);
+        const dest = fileFor(destPath);
+        const directory = new fs.Directory(fs.Paths.document, 'models');
+        directory.create({ intermediates: true, idempotent: true });
+        if (dest.exists) dest.delete();
+        dest.create({ intermediates: true, overwrite: true });
+        const input = source.open('r');
+        const output = dest.open('w');
+        const total = input.size ?? source.size;
+        const hash = crypto.createHash('sha256');
+        let bytes = 0;
+        try {
+          while (bytes < total) {
+            if (signal?.aborted) throw new Error('cancelled');
+            const chunk = input.readBytes(Math.min(chunkSize, total - bytes));
+            if (chunk.byteLength === 0) throw new Error('Unexpected end of model file');
+            hash.update(chunk);
+            output.writeBytes(chunk);
+            bytes += chunk.byteLength;
+            onProgress(bytes, total);
+          }
+          if (signal?.aborted) throw new Error('cancelled');
+          return hash.digest('hex');
+        } finally {
+          input.close();
+          output.close();
         }
-        onProgress(file.size, file.size);
       },
-      remove: async (path) => {
-        await fs.deleteAsync!(path, { idempotent: true });
+      remove: async (path) => { const file = fileFor(path); if (file.exists) file.delete(); },
+      move: async (srcPath, destPath) => {
+        const destination = fileFor(destPath);
+        if (destination.exists) destination.delete();
+        await fileFor(srcPath).move(destination);
       },
     };
   } catch {
@@ -102,13 +128,35 @@ export function defaultLlamaBackend(): LlamaBackend | null {
   }
 }
 
-function defaultModelPath(): string {
+export function defaultLlamaBackend(): LlamaBackend | null {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const fs = require('expo-file-system/legacy') as { documentDirectory?: string | null };
-    return `${fs.documentDirectory ?? ''}models/${MODEL_FILE_NAME}`;
+    const llama = require('llama.rn') as {
+      initLlama: (opts: object) => Promise<{
+        completion: (params: unknown, cb: (data: { token?: string }) => void) => Promise<{ text: string; timings?: LlamaTimings }>;
+        stopCompletion: () => Promise<void>;
+        release: () => Promise<void>;
+        loadSession?: (path: string) => Promise<boolean>;
+        saveSession?: (path: string) => Promise<void>;
+      }>;
+    };
+    if (typeof llama?.initLlama !== 'function') return null;
+    return {
+      init: async (opts) => {
+        const ctx = await llama.initLlama(opts);
+        return {
+          completion: async (params, onToken) => ctx.completion(params, (data) => {
+            if (typeof data?.token === 'string') onToken(data.token);
+          }),
+          stopCompletion: () => ctx.stopCompletion(),
+          release: () => ctx.release(),
+          ...(typeof ctx.loadSession === 'function' ? { loadSession: (path: string) => ctx.loadSession!(path) } : {}),
+          ...(typeof ctx.saveSession === 'function' ? { saveSession: (path: string) => ctx.saveSession!(path) } : {}),
+        };
+      },
+    };
   } catch {
-    return `models/${MODEL_FILE_NAME}`;
+    return null;
   }
 }
 
@@ -148,23 +196,40 @@ const ierr = (code: ModelInstallError, message: string = code): Result<never, Mo
 
 export function createModelManager(deps: {
   backend?: LlamaBackend | null;
-  modelPath?: string;
+  files?: ModelFiles | null;
+  modelDir?: string;
   readTier: () => Promise<DeviceTier>;
   nCtx?: number;
-  /** Idle time before the loaded context is released; 0 disables the timer (tests). */
   idleUnloadMs?: number;
+  expected?: { file_name: string; size: number; sha256: string };
+  installMarginBytes?: number;
+  onBackground?: (cb: () => void) => () => void;
+  instructionPrefix?: () => BuiltPrompt['messages'];
 }): ModelManager & { present(): Promise<boolean> } {
   const backend = deps.backend === undefined ? defaultLlamaBackend() : deps.backend;
-  const modelPath = deps.modelPath ?? defaultModelPath();
+  const files = deps.files === undefined ? defaultModelFiles() : deps.files;
+  const expected = deps.expected ?? BUNDLED_MODEL;
+  const instructionPrefix = deps.instructionPrefix ?? (() => FIXED_INSTRUCTION_PREFIX);
+  let modelDir = deps.modelDir;
+  if (!modelDir) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const fs = require('expo-file-system') as { Paths: { document: { uri: string } } };
+      modelDir = `${fs.Paths.document.uri.replace(/\/$/, '')}/models`;
+    } catch { modelDir = 'models'; }
+  }
+  const modelPath = `${modelDir}/${expected.file_name}`;
+  const partialPath = `${modelPath}.part`;
   const sessionPath = `${modelPath}.session`;
   const nCtx = deps.nCtx ?? 1024;
   const idleUnloadMs = deps.idleUnloadMs ?? MODEL_IDLE_UNLOAD_MS;
-  let current: ModelState = backend ? 'unloaded' : 'absent';
+  let current: ModelState = backend && files ? 'unloaded' : 'absent';
   let ctx: LlamaCtx | null = null;
   let generating = false;
   let lastLoadMs = 0;
   let loadAttempts = 0;
   let idleTimer: ReturnType<typeof setTimeout> | null = null;
+  let removeBackgroundListener: (() => void) | null = null;
   const listeners = new Set<(s: ModelState) => void>();
   const setState = (next: ModelState) => {
     if (current === next) return;
@@ -173,9 +238,9 @@ export function createModelManager(deps: {
   };
 
   const present = async () => {
-    if (!backend) { setState('absent'); return false; }
+    if (!files || !backend) { setState('absent'); return false; }
     try {
-      const exists = await backend.exists(modelPath);
+      const exists = await files.exists(modelPath);
       if (!exists && !generating) setState('absent');
       else if (exists && current === 'absent') setState('unloaded');
       return exists;
@@ -184,20 +249,34 @@ export function createModelManager(deps: {
       return false;
     }
   };
-
   const clearIdle = (): void => {
-    if (idleTimer !== null) {
-      clearTimeout(idleTimer);
-      idleTimer = null;
-    }
+    if (idleTimer !== null) { clearTimeout(idleTimer); idleTimer = null; }
+  };
+  const detachBackground = (): void => {
+    removeBackgroundListener?.();
+    removeBackgroundListener = null;
+  };
+  const attachBackground = (): void => {
+    if (removeBackgroundListener) return;
+    try {
+      if (deps.onBackground) removeBackgroundListener = deps.onBackground(() => { void unload(); });
+      else {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { AppState } = require('react-native') as {
+          AppState?: { addEventListener?: (type: string, cb: (state: string) => void) => { remove(): void } };
+        };
+        const subscription = AppState?.addEventListener?.('change', (state) => {
+          if (state !== 'active') void unload();
+        });
+        if (subscription) removeBackgroundListener = () => subscription.remove();
+      }
+    } catch { /* lifecycle events are unavailable in Node */ }
   };
 
   const warm = async (): Promise<Result<void, ModelError>> => {
     if (!(await present())) return err('no_model', 'Model file or native backend is unavailable');
     let tier: DeviceTier;
-    try { tier = await deps.readTier(); } catch {
-      return err('native', 'Could not read device tier');
-    }
+    try { tier = await deps.readTier(); } catch { return err('native', 'Could not read device tier'); }
     if (tier === 'none') return err('tier', 'This device tier does not support AI');
     if (ctx) return ok(undefined);
     if (loadAttempts >= 2) return err('load_failed', 'Could not load the on-device model');
@@ -205,19 +284,28 @@ export function createModelManager(deps: {
     setState('loading');
     const started = Date.now();
     try {
-      const loaded = await backend!.init({ model: modelPath, n_ctx: nCtx, n_threads: tier === 'lite' ? 2 : 4 });
-      // Cache the fixed instruction prefix in a session file.
+      const loaded = await backend!.init({ model: modelPath, n_ctx: nCtx, n_threads: tier === 'lite' ? 2 : 4, use_mmap: true, use_mlock: false });
       let restored = false;
       if (typeof loaded.loadSession === 'function') {
         try { restored = await loaded.loadSession(sessionPath); } catch { restored = false; }
       }
       if (!restored && typeof loaded.saveSession === 'function') {
-        try { await loaded.saveSession(sessionPath); } catch { /* prefix cache is optional */ }
+        try {
+          const prefix = instructionPrefix();
+          if (prefix.length > 0) {
+            await loaded.completion(
+              { messages: prefix, n_predict: 0, temperature: 0, top_p: 1, stop: [] },
+              () => undefined,
+            );
+          }
+          await loaded.saveSession(sessionPath);
+        } catch { /* prefix cache is optional */ }
       }
       ctx = loaded;
       lastLoadMs = Date.now() - started;
-      loadAttempts = 0;
       setState('ready');
+      attachBackground();
+      armIdle();
       return ok(undefined);
     } catch {
       ctx = null;
@@ -226,25 +314,20 @@ export function createModelManager(deps: {
       return err('load_failed', 'Could not load the on-device model');
     }
   };
-
   const stop = async () => {
-    if (ctx && generating) {
-      try { await ctx.stopCompletion(); } catch { /* completion will report its own result */ }
-    }
+    if (ctx && generating) { try { await ctx.stopCompletion(); } catch { /* completion reports its own result */ } }
   };
-
   const unload = async () => {
     clearIdle();
     if (generating) await stop();
     const loaded = ctx;
     ctx = null;
+    detachBackground();
     if (loaded) {
       try { await loaded.release(); } catch { setState('error'); return; }
     }
     setState(await present() ? 'unloaded' : 'absent');
   };
-
-  /** Releases the loaded context after a quiet period so the phone keeps its memory. */
   const armIdle = (): void => {
     if (idleUnloadMs <= 0) return;
     clearIdle();
@@ -256,32 +339,36 @@ export function createModelManager(deps: {
     file: PickedFile, onProgress: (bytes: number, total: number) => void, signal?: AbortSignal,
   ): Promise<Result<void, ModelInstallError>> => {
     let tier: DeviceTier;
-    try { tier = await deps.readTier(); } catch {
-      return ierr('tier', 'Could not read device tier');
-    }
+    try { tier = await deps.readTier(); } catch { return ierr('tier', 'Could not read device tier'); }
     if (tier === 'none') return ierr('tier', 'This device tier does not support AI');
-    if (!backend) return ierr('io', 'No native file backend is available');
-    if (file.name !== MODEL_FILE_NAME) return ierr('wrong_file', 'The selected file is not the bundled model');
-    if (signal?.aborted) return ierr('cancelled', 'Install was cancelled');
-    if (typeof backend.install !== 'function') return ierr('io', 'Model install is not available on this build');
+    if (!files) return ierr('io', 'Model file access is unavailable');
+    let freeBytes: number;
+    try { freeBytes = await files.freeBytes(); } catch { return ierr('io', 'Could not check free storage'); }
+    if (freeBytes < expected.size + (deps.installMarginBytes ?? 64 * 1024 * 1024)) return ierr('no_space', 'Not enough free storage for the model');
+    if (file.name !== expected.file_name || file.size !== expected.size) return ierr('wrong_file', 'The selected file is not the bundled model');
     try {
-      await backend.install(file, modelPath, onProgress, signal);
-    } catch {
-      if (signal?.aborted) return ierr('cancelled', 'Install was cancelled');
+      if (signal?.aborted) throw new Error('cancelled');
+      const digest = await files.copyWithSha256(file.uri, partialPath, onProgress, signal);
+      if (signal?.aborted) throw new Error('cancelled');
+      if (digest.toLowerCase() !== expected.sha256.toLowerCase()) {
+        await files.remove(partialPath);
+        return ierr('hash_mismatch', 'The selected file hash does not match');
+      }
+      await files.move(partialPath, modelPath);
+      setState('unloaded');
+      return iok(undefined);
+    } catch (error) {
+      try { await files.remove(partialPath); } catch { /* cleanup is best effort */ }
+      if (signal?.aborted || (error instanceof Error && error.message === 'cancelled')) return ierr('cancelled', 'Install was cancelled');
       return ierr('io', 'Could not copy the model file');
     }
-    await present();
-    return iok(undefined);
   };
 
   const remove = async (): Promise<void> => {
     await unload();
-    if (typeof backend?.remove === 'function') {
-      try { await backend.remove(modelPath); } catch { /* leave the file in place */ }
-    }
+    try { await files?.remove(modelPath); } catch { /* retain the current state if storage rejects deletion */ }
     setState(await present() ? 'unloaded' : 'absent');
   };
-
   const generate = async (
     req: GenerateRequest, onAnswerText: (textSoFar: string) => void, signal?: AbortSignal,
   ): Promise<Result<GenerateResult, ModelError>> => {
@@ -295,6 +382,7 @@ export function createModelManager(deps: {
       const alreadyLoaded = ctx !== null;
       const loaded = await warm();
       if (!loaded.ok) return loaded;
+      clearIdle();
       loadMs = alreadyLoaded ? 0 : lastLoadMs;
       const activeCtx = ctx;
       if (!activeCtx) return err('load_failed', 'Model context was not created');
@@ -308,13 +396,9 @@ export function createModelManager(deps: {
       try {
         const settings: CompletionSettings = req.settings;
         const params: CompletionParams = {
-          messages: req.prompt.messages,
-          response_format: req.prompt.responseFormat,
-          n_predict: settings.nPredict,
-          temperature: settings.temperature,
-          top_p: settings.topP,
-          stop: settings.stop,
-          ...(settings.seed === undefined ? {} : { seed: settings.seed }),
+          messages: req.prompt.messages, response_format: req.prompt.responseFormat,
+          n_predict: settings.nPredict, temperature: settings.temperature, top_p: settings.topP,
+          stop: settings.stop, ...(settings.seed === undefined ? {} : { seed: settings.seed }),
         };
         const result = await activeCtx.completion(params, (token) => {
           if (firstTokenMs === undefined) firstTokenMs = Date.now() - started;
@@ -323,16 +407,10 @@ export function createModelManager(deps: {
         });
         if (aborted || signal?.aborted) return err('cancelled', 'Generation was cancelled');
         const timings = result.timings ?? {};
-        return ok({
-          raw: result.text || raw,
-          timings: {
-            loadMs,
-            promptTokens: timings.prompt_n ?? 0,
-            promptMs: timings.prompt_ms ?? 0,
-            firstTokenMs: firstTokenMs ?? 0,
-            predictedTokens: timings.predicted_n ?? 0,
-          },
-        });
+        return ok({ raw: result.text || raw, timings: {
+          loadMs, promptTokens: timings.prompt_n ?? 0, promptMs: timings.prompt_ms ?? 0,
+          firstTokenMs: firstTokenMs ?? 0, predictedTokens: timings.predicted_n ?? 0,
+        } });
       } catch {
         if (aborted || signal?.aborted) return err('cancelled', 'Generation was cancelled');
         setState('error');
@@ -344,34 +422,12 @@ export function createModelManager(deps: {
         if (ctx) armIdle();
       }
     } finally {
-      // Early exits before a completion also release the serialization lock.
       if (generating && current !== 'generating') generating = false;
     }
   };
 
-  try {
-    // Unload when the app leaves the foreground. Native only; Node tests skip this.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { AppState } = require('react-native') as {
-      AppState?: { addEventListener?: (type: string, cb: (state: string) => void) => unknown };
-    };
-    AppState?.addEventListener?.('change', (state) => {
-      if (state !== 'active') void unload();
-    });
-  } catch {
-    /* no app lifecycle outside a React Native build */
-  }
-
   return {
-    state: () => current,
-    tier: deps.readTier,
-    warm,
-    generate,
-    stop,
-    unload,
-    present,
-    install,
-    remove,
+    state: () => current, tier: deps.readTier, warm, generate, stop, unload, present, install, remove,
     onStateChange(listener) { listeners.add(listener); return () => listeners.delete(listener); },
   };
 }
