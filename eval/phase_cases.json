@@ -1,0 +1,139 @@
+[
+  {
+    "id": "pc-01",
+    "inputs": {
+      "context": { "phase": "before", "phaseSource": "manual", "reason": { "source": "manual", "text": "" }, "changedAt": "2026-10-10T08:00:00+08:00", "recommended": null, "warnings": {}, "suppressed": [] },
+      "rules": { "warning_to_phase": { "any_active_warning": "during", "basis": "product_rule" }, "bands": { "near": { "max_km": null, "placeholder": true, "source_id": null, "reviewed_by": null, "reviewed_at": null }, "approach": { "max_km": null, "placeholder": true, "source_id": null, "reviewed_by": null, "reviewed_at": null } }, "evacuation_threshold": { "category_min": null, "tcws_min": null, "placeholder": true, "source_id": null, "reviewed_by": null, "reviewed_at": null } },
+      "now": "2026-10-10T08:00:00+08:00"
+    },
+    "expect": { "phase": "before", "switched": false, "recommended": null }
+  },
+  {
+    "id": "pc-02",
+    "inputs": {
+      "context": { "phase": "before", "phaseSource": "manual", "reason": { "source": "manual", "text": "" }, "changedAt": "2026-10-10T08:00:00+08:00", "recommended": null, "warnings": { "tcws": { "level": 3, "setAt": "2026-10-10T07:00:00+08:00" } }, "suppressed": [] },
+      "rules": { "warning_to_phase": { "any_active_warning": "during", "basis": "product_rule" }, "bands": { "near": { "max_km": null, "placeholder": true, "source_id": null, "reviewed_by": null, "reviewed_at": null }, "approach": { "max_km": null, "placeholder": true, "source_id": null, "reviewed_by": null, "reviewed_at": null } }, "evacuation_threshold": { "category_min": null, "tcws_min": null, "placeholder": true, "source_id": null, "reviewed_by": null, "reviewed_at": null } },
+      "now": "2026-10-10T08:00:00+08:00"
+    },
+    "expect": { "phase": "during", "switched": true, "recommended": "during" }
+  },
+  {
+    "id": "pc-03",
+    "inputs": {
+      "context": { "phase": "before", "phaseSource": "manual", "reason": { "source": "manual", "text": "" }, "changedAt": "2026-10-10T08:00:00+08:00", "recommended": null, "warnings": { "rainfall": { "level": "orange", "setAt": "2026-10-10T07:00:00+08:00" }, "gale": { "setAt": "2026-10-10T07:00:00+08:00" } }, "suppressed": [] },
+      "rules": { "warning_to_phase": { "any_active_warning": "during", "basis": "product_rule" }, "bands": { "near": { "max_km": null, "placeholder": true, "source_id": null, "reviewed_by": null, "reviewed_at": null }, "approach": { "max_km": null, "placeholder": true, "source_id": null, "reviewed_by": null, "reviewed_at": null } }, "evacuation_threshold": { "category_min": null, "tcws_min": null, "placeholder": true, "source_id": null, "reviewed_by": null, "reviewed_at": null } },
+      "now": "2026-10-10T08:00:00+08:00"
+    },
+    "expect": { "phase": "during", "switched": true, "recommended": "during" }
+  },
+  {
+    "id": "pc-04",
+    "inputs": {
+      "context": { "phase": "before", "phaseSource": "manual", "reason": { "source": "manual", "text": "" }, "changedAt": "2026-10-10T08:00:00+08:00", "recommended": null, "warnings": {}, "suppressed": [] },
+      "ask": { "questionId": "pc-q04", "cue": { "phase": "during", "strong": true, "matched": ["nandito na ang bagyo"] }, "hint": null },
+      "rules": { "warning_to_phase": { "any_active_warning": "during", "basis": "product_rule" }, "bands": { "near": { "max_km": null, "placeholder": true, "source_id": null, "reviewed_by": null, "reviewed_at": null }, "approach": { "max_km": null, "placeholder": true, "source_id": null, "reviewed_by": null, "reviewed_at": null } }, "evacuation_threshold": { "category_min": null, "tcws_min": null, "placeholder": true, "source_id": null, "reviewed_by": null, "reviewed_at": null } },
+      "now": "2026-10-10T08:00:00+08:00"
+    },
+    "expect": { "phase": "during", "switched": true, "recommended": "during" }
+  },
+  {
+    "id": "pc-05",
+    "inputs": {
+      "context": { "phase": "during", "phaseSource": "manual", "reason": { "source": "manual", "text": "" }, "changedAt": "2026-10-10T08:00:00+08:00", "recommended": null, "warnings": {}, "suppressed": [] },
+      "ask": { "questionId": "pc-q05", "cue": { "phase": "before", "strong": true, "matched": ["may paparating na bagyo"] }, "hint": null },
+      "rules": { "warning_to_phase": { "any_active_warning": "during", "basis": "product_rule" }, "bands": { "near": { "max_km": null, "placeholder": true, "source_id": null, "reviewed_by": null, "reviewed_at": null }, "approach": { "max_km": null, "placeholder": true, "source_id": null, "reviewed_by": null, "reviewed_at": null } }, "evacuation_threshold": { "category_min": null, "tcws_min": null, "placeholder": true, "source_id": null, "reviewed_by": null, "reviewed_at": null } },
+      "now": "2026-10-10T08:00:00+08:00"
+    },
+    "expect": { "phase": "during", "switched": false, "recommended": "before" }
+  },
+  {
+    "id": "pc-06",
+    "inputs": {
+      "context": { "phase": "during", "phaseSource": "manual", "reason": { "source": "manual", "text": "" }, "changedAt": "2026-10-10T08:00:00+08:00", "recommended": null, "warnings": {}, "suppressed": [] },
+      "ask": { "questionId": "pc-q06", "cue": { "phase": "after", "strong": true, "matched": ["humupa na ang bagyo"] }, "hint": null },
+      "rules": { "warning_to_phase": { "any_active_warning": "during", "basis": "product_rule" }, "bands": { "near": { "max_km": null, "placeholder": true, "source_id": null, "reviewed_by": null, "reviewed_at": null }, "approach": { "max_km": null, "placeholder": true, "source_id": null, "reviewed_by": null, "reviewed_at": null } }, "evacuation_threshold": { "category_min": null, "tcws_min": null, "placeholder": true, "source_id": null, "reviewed_by": null, "reviewed_at": null } },
+      "now": "2026-10-10T08:00:00+08:00"
+    },
+    "expect": { "phase": "during", "switched": false, "recommended": "after" }
+  },
+  {
+    "id": "pc-07",
+    "inputs": {
+      "context": { "phase": "before", "phaseSource": "manual", "reason": { "source": "manual", "text": "" }, "changedAt": "2026-10-10T08:00:00+08:00", "recommended": null, "warnings": {}, "suppressed": [] },
+      "ask": { "questionId": "pc-q07", "cue": { "phase": "during", "strong": false, "matched": ["lumalakas na ang hangin"] }, "hint": "during" },
+      "rules": { "warning_to_phase": { "any_active_warning": "during", "basis": "product_rule" }, "bands": { "near": { "max_km": null, "placeholder": true, "source_id": null, "reviewed_by": null, "reviewed_at": null }, "approach": { "max_km": null, "placeholder": true, "source_id": null, "reviewed_by": null, "reviewed_at": null } }, "evacuation_threshold": { "category_min": null, "tcws_min": null, "placeholder": true, "source_id": null, "reviewed_by": null, "reviewed_at": null } },
+      "now": "2026-10-10T08:00:00+08:00"
+    },
+    "expect": { "phase": "during", "switched": true, "recommended": "during", "hint": "accepted" }
+  },
+  {
+    "id": "pc-08",
+    "inputs": {
+      "context": { "phase": "before", "phaseSource": "manual", "reason": { "source": "manual", "text": "" }, "changedAt": "2026-10-10T08:00:00+08:00", "recommended": null, "warnings": {}, "suppressed": [] },
+      "ask": { "questionId": "pc-q08", "cue": { "phase": "during", "strong": false, "matched": ["lumalakas na ang hangin"] }, "hint": null },
+      "rules": { "warning_to_phase": { "any_active_warning": "during", "basis": "product_rule" }, "bands": { "near": { "max_km": null, "placeholder": true, "source_id": null, "reviewed_by": null, "reviewed_at": null }, "approach": { "max_km": null, "placeholder": true, "source_id": null, "reviewed_by": null, "reviewed_at": null } }, "evacuation_threshold": { "category_min": null, "tcws_min": null, "placeholder": true, "source_id": null, "reviewed_by": null, "reviewed_at": null } },
+      "now": "2026-10-10T08:00:00+08:00"
+    },
+    "expect": { "phase": "before", "switched": false, "recommended": null, "hint": "none" }
+  },
+  {
+    "id": "pc-09",
+    "inputs": {
+      "context": { "phase": "before", "phaseSource": "manual", "reason": { "source": "manual", "text": "" }, "changedAt": "2026-10-10T08:00:00+08:00", "recommended": null, "warnings": {}, "suppressed": [] },
+      "storm": { "bulletin": { "id": "bulletin-sample-1", "stormId": "storm-sample-1", "source": { "agency": "PAGASA", "title": "SAMPLE – hindi totoong bulletin", "url": "https://example.invalid/bulletin-sample-1" }, "issuedAt": "2026-10-10T06:00:00+08:00", "scrapedAt": "2026-10-10T06:05:00+08:00", "fetchedAt": "2026-10-10T06:10:00+08:00", "storm": { "name": "Bagyong SAMPLE", "internationalName": "SAMPLE", "category": "TS" }, "position": { "lat": 14, "lon": 122, "at": "2026-10-10T06:00:00+08:00", "text": "SAMPLE na lokasyon" }, "forecast": [], "signalAreas": [], "final": true, "text": "SAMPLE – hindi totoong bulletin" }, "measure": { "bulletinId": "bulletin-sample-1", "from": "area", "now": { "at": "2026-10-10T08:00:00+08:00", "distanceKm": 400, "bearingDeg": 0, "direction": "N" }, "forecast": [], "closestKm": 400, "signalHere": null } },
+      "rules": { "warning_to_phase": { "any_active_warning": "during", "basis": "product_rule" }, "bands": { "near": { "max_km": null, "placeholder": true, "source_id": null, "reviewed_by": null, "reviewed_at": null }, "approach": { "max_km": null, "placeholder": true, "source_id": null, "reviewed_by": null, "reviewed_at": null } }, "evacuation_threshold": { "category_min": null, "tcws_min": null, "placeholder": true, "source_id": null, "reviewed_by": null, "reviewed_at": null } },
+      "now": "2026-10-10T08:00:00+08:00"
+    },
+    "expect": { "phase": "before", "switched": false, "recommended": "after" }
+  },
+  {
+    "id": "pc-10",
+    "inputs": {
+      "context": { "phase": "before", "phaseSource": "manual", "reason": { "source": "manual", "text": "" }, "changedAt": "2026-10-10T08:00:00+08:00", "recommended": null, "warnings": {}, "suppressed": [] },
+      "storm": { "bulletin": { "id": "bulletin-sample-1", "stormId": "storm-sample-1", "source": { "agency": "PAGASA", "title": "SAMPLE – hindi totoong bulletin", "url": "https://example.invalid/bulletin-sample-1" }, "issuedAt": "2026-10-10T06:00:00+08:00", "scrapedAt": "2026-10-10T06:05:00+08:00", "fetchedAt": "2026-10-10T06:10:00+08:00", "storm": { "name": "Bagyong SAMPLE", "internationalName": "SAMPLE", "category": "TS" }, "position": { "lat": 14, "lon": 122, "at": "2026-10-10T06:00:00+08:00", "text": "SAMPLE na lokasyon" }, "forecast": [], "signalAreas": [], "final": false, "text": "SAMPLE – hindi totoong bulletin" }, "measure": { "bulletinId": "bulletin-sample-1", "from": "area", "now": { "at": "2026-10-10T08:00:00+08:00", "distanceKm": 400, "bearingDeg": 0, "direction": "N" }, "forecast": [], "closestKm": 400, "signalHere": 2 } },
+      "rules": { "warning_to_phase": { "any_active_warning": "during", "basis": "product_rule" }, "bands": { "near": { "max_km": null, "placeholder": true, "source_id": null, "reviewed_by": null, "reviewed_at": null }, "approach": { "max_km": null, "placeholder": true, "source_id": null, "reviewed_by": null, "reviewed_at": null } }, "evacuation_threshold": { "category_min": null, "tcws_min": null, "placeholder": true, "source_id": null, "reviewed_by": null, "reviewed_at": null } },
+      "now": "2026-10-10T08:00:00+08:00"
+    },
+    "expect": { "phase": "during", "switched": true, "recommended": "during" }
+  },
+  {
+    "id": "pc-11",
+    "inputs": {
+      "context": { "phase": "before", "phaseSource": "manual", "reason": { "source": "manual", "text": "" }, "changedAt": "2026-10-10T08:00:00+08:00", "recommended": null, "warnings": {}, "suppressed": [] },
+      "storm": { "bulletin": { "id": "bulletin-sample-2", "stormId": "storm-sample-2", "source": { "agency": "PAGASA", "title": "SAMPLE – hindi totoong bulletin", "url": "https://example.invalid/bulletin-sample-2" }, "issuedAt": "2026-10-10T06:00:00+08:00", "scrapedAt": "2026-10-10T06:05:00+08:00", "fetchedAt": "2026-10-10T06:10:00+08:00", "storm": { "name": "Bagyong SAMPLE", "internationalName": "SAMPLE", "category": "TS" }, "position": { "lat": 14, "lon": 122, "at": "2026-10-10T06:00:00+08:00", "text": "SAMPLE na lokasyon" }, "forecast": [], "signalAreas": [], "final": false, "text": "SAMPLE – hindi totoong bulletin" }, "measure": { "bulletinId": "bulletin-sample-2", "from": "area", "now": { "at": "2026-10-10T08:00:00+08:00", "distanceKm": 100, "bearingDeg": 0, "direction": "N" }, "forecast": [], "closestKm": 100, "signalHere": null } },
+      "rules": { "warning_to_phase": { "any_active_warning": "during", "basis": "product_rule" }, "bands": { "near": { "max_km": 150, "placeholder": false, "source_id": "SAMPLE-source", "reviewed_by": "SAMPLE reviewer", "reviewed_at": "2026-01-01" }, "approach": { "max_km": 250, "placeholder": false, "source_id": "SAMPLE-source", "reviewed_by": "SAMPLE reviewer", "reviewed_at": "2026-01-01" } }, "evacuation_threshold": { "category_min": null, "tcws_min": null, "placeholder": true, "source_id": null, "reviewed_by": null, "reviewed_at": null } },
+      "now": "2026-10-10T08:00:00+08:00"
+    },
+    "expect": { "phase": "during", "switched": true, "recommended": "during" }
+  },
+  {
+    "id": "pc-12",
+    "inputs": {
+      "context": { "phase": "after", "phaseSource": "manual", "reason": { "source": "manual", "text": "" }, "changedAt": "2026-10-10T08:00:00+08:00", "recommended": null, "warnings": {}, "suppressed": [] },
+      "storm": { "bulletin": { "id": "bulletin-sample-3", "stormId": "storm-sample-3", "source": { "agency": "PAGASA", "title": "SAMPLE – hindi totoong bulletin", "url": "https://example.invalid/bulletin-sample-3" }, "issuedAt": "2026-10-10T06:00:00+08:00", "scrapedAt": "2026-10-10T06:05:00+08:00", "fetchedAt": "2026-10-10T06:10:00+08:00", "storm": { "name": "Bagyong SAMPLE", "internationalName": "SAMPLE", "category": "TS" }, "position": { "lat": 14, "lon": 122, "at": "2026-10-10T06:00:00+08:00", "text": "SAMPLE na lokasyon" }, "forecast": [ { "lat": 15, "lon": 123, "at": "2026-10-11T06:00:00+08:00" } ], "signalAreas": [], "final": false, "text": "SAMPLE – hindi totoong bulletin" }, "measure": { "bulletinId": "bulletin-sample-3", "from": "area", "now": { "at": "2026-10-10T08:00:00+08:00", "distanceKm": 300, "bearingDeg": 0, "direction": "N" }, "forecast": [ { "at": "2026-10-11T06:00:00+08:00", "distanceKm": 100, "bearingDeg": 0, "direction": "N" } ], "closestKm": 100, "signalHere": null } },
+      "rules": { "warning_to_phase": { "any_active_warning": "during", "basis": "product_rule" }, "bands": { "near": { "max_km": 150, "placeholder": false, "source_id": "SAMPLE-source", "reviewed_by": "SAMPLE reviewer", "reviewed_at": "2026-01-01" }, "approach": { "max_km": 250, "placeholder": false, "source_id": "SAMPLE-source", "reviewed_by": "SAMPLE reviewer", "reviewed_at": "2026-01-01" } }, "evacuation_threshold": { "category_min": null, "tcws_min": null, "placeholder": true, "source_id": null, "reviewed_by": null, "reviewed_at": null } },
+      "now": "2026-10-10T08:00:00+08:00"
+    },
+    "expect": { "phase": "before", "switched": true, "recommended": "before" }
+  },
+  {
+    "id": "pc-13",
+    "inputs": {
+      "context": { "phase": "before", "phaseSource": "manual", "reason": { "source": "manual", "text": "" }, "changedAt": "2026-10-10T08:00:00+08:00", "recommended": null, "warnings": {}, "suppressed": [] },
+      "ask": { "questionId": "pc-q13", "cue": null, "hint": "after" },
+      "storm": { "bulletin": { "id": "bulletin-sample-4", "stormId": "storm-sample-4", "source": { "agency": "PAGASA", "title": "SAMPLE – hindi totoong bulletin", "url": "https://example.invalid/bulletin-sample-4" }, "issuedAt": "2026-10-10T06:00:00+08:00", "scrapedAt": "2026-10-10T06:05:00+08:00", "fetchedAt": "2026-10-10T06:10:00+08:00", "storm": { "name": "Bagyong SAMPLE", "internationalName": "SAMPLE", "category": "TS" }, "position": { "lat": 14, "lon": 122, "at": "2026-10-10T06:00:00+08:00", "text": "SAMPLE na lokasyon" }, "forecast": [], "signalAreas": [], "final": true, "text": "SAMPLE – hindi totoong bulletin" }, "measure": { "bulletinId": "bulletin-sample-4", "from": "area", "now": { "at": "2026-10-10T08:00:00+08:00", "distanceKm": 400, "bearingDeg": 0, "direction": "N" }, "forecast": [], "closestKm": 400, "signalHere": null } },
+      "rules": { "warning_to_phase": { "any_active_warning": "during", "basis": "product_rule" }, "bands": { "near": { "max_km": null, "placeholder": true, "source_id": null, "reviewed_by": null, "reviewed_at": null }, "approach": { "max_km": null, "placeholder": true, "source_id": null, "reviewed_by": null, "reviewed_at": null } }, "evacuation_threshold": { "category_min": null, "tcws_min": null, "placeholder": true, "source_id": null, "reviewed_by": null, "reviewed_at": null } },
+      "now": "2026-10-10T08:00:00+08:00"
+    },
+    "expect": { "phase": "before", "switched": false, "recommended": "after", "hint": "accepted" }
+  },
+  {
+    "id": "pc-14",
+    "inputs": {
+      "context": { "phase": "before", "phaseSource": "manual", "reason": { "source": "manual", "text": "" }, "changedAt": "2026-10-10T08:00:00+08:00", "recommended": null, "warnings": {}, "suppressed": ["warning:tcws-3"] },
+      "rules": { "warning_to_phase": { "any_active_warning": "during", "basis": "product_rule" }, "bands": { "near": { "max_km": null, "placeholder": true, "source_id": null, "reviewed_by": null, "reviewed_at": null }, "approach": { "max_km": null, "placeholder": true, "source_id": null, "reviewed_by": null, "reviewed_at": null } }, "evacuation_threshold": { "category_min": null, "tcws_min": null, "placeholder": true, "source_id": null, "reviewed_by": null, "reviewed_at": null } },
+      "now": "2026-10-10T08:00:00+08:00"
+    },
+    "expect": { "phase": "before", "switched": false, "recommended": null }
+  }
+]
