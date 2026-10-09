@@ -1,7 +1,42 @@
 import type { JSX } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, font, minTouch } from '../theme';
-export function SectionHeader({ title, action }: { title: string; action?: { label: string; onPress: () => void } }): JSX.Element {
-  return <View style={styles.row}><Text accessibilityRole="header" style={styles.title}>{title}</Text>{action ? <Pressable accessibilityRole="button" onPress={action.onPress} style={styles.action}><Text style={styles.actionText}>{action.label}</Text></Pressable> : null}</View>;
+import type { AccessibilityState } from 'react-native';
+import { View, StyleSheet } from 'react-native';
+import { useThemedStyles } from '../theme';
+import type { Theme } from '../theme';
+import { Button } from './Button';
+import { Txt } from './Txt';
+
+export interface SectionHeaderProps {
+  title: string;
+  action?: { label: string; onPress: () => void; accessibilityState?: AccessibilityState };
 }
-const styles = StyleSheet.create({ row: { minHeight: minTouch, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }, title: { color: colors.text, fontSize: font.lg, fontWeight: '700' }, action: { minHeight: minTouch, justifyContent: 'center' }, actionText: { color: colors.accent, fontSize: font.sm, fontWeight: '700' } });
+
+/**
+ * Section title row for Home and Guide: a headline with an optional quiet text action such as
+ * "Lahat" on the right.
+ */
+export function SectionHeader({ title, action }: SectionHeaderProps): JSX.Element {
+  const styles = useThemedStyles(makeStyles);
+
+  return (
+    <View style={styles.row}>
+      <Txt role="headline" accessibilityRole="header" style={styles.title}>{title}</Txt>
+      {action !== undefined ? (
+        <Button label={action.label} onPress={action.onPress} variant="text" accessibilityState={action.accessibilityState} />
+      ) : null}
+    </View>
+  );
+}
+
+const makeStyles = (t: Theme) => StyleSheet.create({
+  row: {
+    minHeight: t.minTouch,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: t.space.gutter,
+  },
+  title: {
+    flexShrink: 1,
+  },
+})

@@ -1,15 +1,19 @@
 import type { JSX, ReactNode } from 'react';
+import type { ComponentProps } from 'react';
 import { useEffect, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import type { AgeGroup, Contact, HomeTag, Member, MemberInput, NeedTag, Profile, ProfileInput, Relation, Settings } from '../../engine';
 import type { EngineContextValue } from '../context/useEngine';
 import { useEngine, useEngineChange } from '../context/useEngine';
-import { Button, Card, Chip, Field, InlineError, Screen, SectionHeader } from '../components';
+import { Button, Chip, Field, InlineError, MemberAvatar, Screen, SectionHeader, Tile, ToggleRow, Txt } from '../components';
 import { useLang, useT } from '../i18n';
-import { strings } from '../strings';
+import { commonStrings } from '../strings/common';
 import { profileStrings } from '../strings/profile';
-import { colors, font, minTouch, space } from '../theme';
+import { useThemedStyles, useTheme } from '../theme';
+import type { Theme } from '../theme';
+
+type IconName = ComponentProps<typeof Ionicons>['name'];
 
 const HOME_TAGS = ['near_river', 'near_sea', 'slope', 'low_lying', 'light_materials', 'concrete', 'upper_floor'] as const satisfies readonly HomeTag[];
 const RELATIONS = ['self', 'spouse', 'child', 'parent', 'grandparent', 'grandchild', 'sibling', 'relative', 'other'] as const satisfies readonly Relation[];
@@ -31,6 +35,7 @@ interface Copy extends Record<string, string> {
   cancelEdit: string; noMembers: string; addMember: string; settings: string; aiEnabled: string; on: string; off: string;
   lowBatteryThreshold: string; staleWarningHours: string; settingsHint: string; clearHistory: string; historyCleared: string;
   language: string; fieldName: string; fieldPhone: string; fieldRelation: string; fieldNote: string;
+  memberAvatar: string; percentSign: string; hoursSign: string; langTl: string; langEn: string;
   error_owner_required: string; error_not_found: string; error_out_of_range: string; error_unknown: string;
 }
 interface BaseCopy extends Record<string, string> {
@@ -99,7 +104,7 @@ function errorCopy(code: string, t: Copy, base: BaseCopy): string {
   };
   return messages[code] ?? t.error_unknown;
 }
-export function errorMessage(code: string, t: Copy = profileStrings.tl, base: BaseCopy = strings.tl): string { return errorCopy(code, t, base); }
+export function errorMessage(code: string, t: Copy = profileStrings.tl, base: BaseCopy = commonStrings.tl): string { return errorCopy(code, t, base); }
 function fieldLabel(field: string, t: Copy, base: BaseCopy): string {
   switch (field.split('.').pop() ?? field) {
     case 'name': return t.fieldName;
@@ -113,7 +118,7 @@ function fieldLabel(field: string, t: Copy, base: BaseCopy): string {
     default: return field;
   }
 }
-export function fieldErrorLines(errors: readonly { code: string; field: string }[], t: Copy = profileStrings.tl, base: BaseCopy = strings.tl): string[] {
+export function fieldErrorLines(errors: readonly { code: string; field: string }[], t: Copy = profileStrings.tl, base: BaseCopy = commonStrings.tl): string[] {
   return errors.map((error) => `${fieldLabel(error.field, t, base)}: ${errorCopy(error.code, t, base)}`);
 }
 
@@ -122,16 +127,22 @@ function firstFieldError(errors: readonly { code: string; field: string }[], fie
   return found ? errorCopy(found.code, t, base) : undefined;
 }
 function dynamicCopy(copy: Record<string, string>, key: string): string { return copy[key] ?? key; }
+function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/).filter((part) => part.length > 0);
+  const first = parts[0]?.charAt(0) ?? '';
+  const last = parts.length > 1 ? parts[parts.length - 1]?.charAt(0) ?? '' : '';
+  return `${first}${last}`.toUpperCase();
+}
 
 export function ProfileScreen(): JSX.Element {
   const engine = useEngine();
   const t = useT(profileStrings);
-  const base = useT(strings);
+  const base = useT(commonStrings);
   useEngineChange(['profiles', 'family', 'settings', 'history']);
   const profile = engine.profiles.active();
   return <Screen title={t.screenTitle}>
     {profile ? <>
-      <HouseholdCard engine={engine} profile={profile} t={t} base={base} />
+      <HouseholdTile engine={engine} profile={profile} t={t} base={base} />
       <MembersSection engine={engine} profile={profile} t={t} base={base} />
       <SettingsSection engine={engine} t={t} />
     </> : <SetupForm engine={engine} t={t} base={base} />}
@@ -147,6 +158,7 @@ function SetupForm({ engine, t, base }: { engine: EngineContextValue; t: Copy; b
   const [ownerPhone, setOwnerPhone] = useState('');
   const [errors, setErrors] = useState<readonly { code: string; field: string }[]>([]);
   const [busy, setBusy] = useState(false);
+  const styles = useThemedStyles(makeStyles);
 
   const next = (): void => {
     if (householdName.trim().length === 0) { setErrors([{ code: 'name_required', field: 'name' }]); return; }
@@ -166,33 +178,34 @@ function SetupForm({ engine, t, base }: { engine: EngineContextValue; t: Copy; b
     } finally { setBusy(false); }
   };
   const label = step === 1 ? t.householdStep : t.ownerStep;
-  return <Card title={t.setupTitle} subtitle={t.setupIntro}>
-    <Text style={styles.eyebrow}>{label}</Text>
+  return <Tile title={t.setupTitle} subtitle={t.setupIntro}>
+    <Txt role="label" tone="accent">{label}</Txt>
     {step === 1 ? <>
       <Field label={base.householdName} value={householdName} onChangeText={setHouseholdName} error={firstFieldError(errors, 'name', t, base)} />
       <Button label={t.continue} onPress={next} icon="arrow-forward" />
     </> : <>
       <Field label={base.personName} value={ownerName} onChangeText={setOwnerName} error={firstFieldError(errors, 'name', t, base)} />
-      <Text style={styles.label}>{base.ageGroup}</Text>
+      <Txt role="label">{base.ageGroup}</Txt>
       <Selector>{AGE_GROUPS.map((item) => <Chip key={item} label={dynamicCopy(base, `age_${item}`)} selected={ownerAge === item} onPress={() => setOwnerAge(item)} />)}</Selector>
-      <Text style={styles.label}>{base.needs}</Text>
+      <Txt role="label">{base.needs}</Txt>
       <Selector>{NEED_TAGS.map((item) => <Chip key={item} label={dynamicCopy(base, `need_${item}`)} selected={ownerNeeds.includes(item)} onPress={() => setOwnerNeeds((current) => toggleInList(current, item))} />)}</Selector>
       <Field label={t.memberPhone} value={ownerPhone} onChangeText={setOwnerPhone} keyboardType="phone-pad" error={firstFieldError(errors, 'phone', t, base)} />
       {errors.length > 0 && !errors.some((error) => ['name', 'phone'].includes(error.field.split('.').pop() ?? '')) ? <InlineError message={fieldErrorLines(errors, t, base).join('\n')} /> : null}
       <View style={styles.actions}>
-        <Button label={t.back} variant="secondary" onPress={() => { setErrors([]); setStep(1); }} />
+        <Button label={t.back} variant="tonal" onPress={() => { setErrors([]); setStep(1); }} />
         <Button label={busy ? t.saving : base.createHousehold} onPress={() => { void create(); }} disabled={busy} icon="checkmark" />
       </View>
     </>}
-  </Card>;
+  </Tile>;
 }
 
-function HouseholdCard({ engine, profile, t, base }: { engine: EngineContextValue; profile: Profile; t: Copy; base: BaseCopy }): JSX.Element {
+function HouseholdTile({ engine, profile, t, base }: { engine: EngineContextValue; profile: Profile; t: Copy; base: BaseCopy }): JSX.Element {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<HouseholdDraft>(() => householdDraftFrom(profile));
   const [errors, setErrors] = useState<readonly { code: string; field: string }[]>([]);
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
+  const styles = useThemedStyles(makeStyles);
   useEffect(() => { setDraft(householdDraftFrom(profile)); setSaved(false); }, [profile.id]);
   const patch = (next: Partial<HouseholdDraft>): void => { setDraft((current) => ({ ...current, ...next })); setSaved(false); };
   const save = async (): Promise<void> => {
@@ -210,38 +223,38 @@ function HouseholdCard({ engine, profile, t, base }: { engine: EngineContextValu
     ...profile.members.filter((tag) => tag !== 'pets').map((tag) => tag === 'pregnant' || tag === 'pwd' || tag === 'maintenance_meds' ? dynamicCopy(base, `need_${tag}`) : dynamicCopy(base, `age_${tag}`)),
     ...(profile.petsCount > 0 ? [`${profile.petsCount} ${base.petsCount}`] : []),
   ];
-  return <Card>
-    <SectionHeader title={t.householdSummary} action={{ label: editing ? t.doneEditing : t.editHousehold, onPress: () => { setEditing((value) => !value); setErrors([]); } }} />
+  return <Tile>
+    <SectionHeader title={t.householdSummary} action={{ label: editing ? t.doneEditing : t.editHousehold, accessibilityState: { expanded: editing }, onPress: () => { setEditing((value) => !value); setErrors([]); } }} />
     {!editing ? <>
-      <Text style={styles.householdName}>{profile.name}</Text>
-      <Text style={styles.muted}>{profile.headcount} {t.headcount}</Text>
-      <Selector>{summaryTags.length > 0 ? summaryTags.map((tag, index) => <Chip key={`${tag}-${index}`} label={tag} />) : <Text style={styles.muted}>{base.emptyPlan}</Text>}</Selector>
+      <Txt role="title">{profile.name}</Txt>
+      <Txt role="bodySmall" tone="muted">{profile.headcount} {t.headcount}</Txt>
+      <Selector>{summaryTags.length > 0 ? summaryTags.map((tag, index) => <Chip key={`${tag}-${index}`} label={tag} />) : <Txt role="bodySmall" tone="muted">{base.emptyPlan}</Txt>}</Selector>
     </> : <>
       <Field label={base.householdName} value={draft.name} onChangeText={(value) => patch({ name: value })} error={firstFieldError(errors, 'name', t, base)} />
       <View style={styles.stepper}>
-        <Text style={styles.label}>{base.petsCount}: {draft.petsCount}</Text>
-        <Button label="−" variant="secondary" onPress={() => patch({ petsCount: clampNumber(draft.petsCount - 1, MIN_PETS, MAX_PETS) })} accessibilityLabel={`${base.decrease} ${base.petsCount}`} />
-        <Button label="+" variant="secondary" onPress={() => patch({ petsCount: clampNumber(draft.petsCount + 1, MIN_PETS, MAX_PETS) })} accessibilityLabel={`${base.increase} ${base.petsCount}`} />
+        <Txt role="label" style={styles.stepperLabel}>{base.petsCount}: {draft.petsCount}</Txt>
+        <Button label={base.decrease} variant="tonal" icon="remove" onPress={() => patch({ petsCount: clampNumber(draft.petsCount - 1, MIN_PETS, MAX_PETS) })} accessibilityLabel={`${base.decrease} ${base.petsCount}`} />
+        <Button label={base.increase} variant="tonal" icon="add" onPress={() => patch({ petsCount: clampNumber(draft.petsCount + 1, MIN_PETS, MAX_PETS) })} accessibilityLabel={`${base.increase} ${base.petsCount}`} />
       </View>
-      <Text style={styles.label}>{base.homeTags}</Text>
+      <Txt role="label">{base.homeTags}</Txt>
       <Selector>{HOME_TAGS.map((tag) => <Chip key={tag} label={dynamicCopy(base, `home_${tag}`)} selected={draft.home.includes(tag)} onPress={() => patch({ home: toggleInList(draft.home, tag) })} />)}</Selector>
-      <Text style={styles.subheading}>{t.plan}</Text>
+      <Txt role="title">{t.plan}</Txt>
       <Field label={t.evacuationCenter} value={draft.evacuationCenter} onChangeText={(value) => patch({ evacuationCenter: value })} error={firstFieldError(errors, 'evacuationCenter', t, base)} />
       <Field label={t.meetingPlace} value={draft.meetingPlace} onChangeText={(value) => patch({ meetingPlace: value })} error={firstFieldError(errors, 'meetingPlace', t, base)} />
-      <Text style={styles.label}>{t.contacts}</Text>
-      {draft.contacts.length === 0 ? <Text style={styles.muted}>{t.noContacts}</Text> : null}
-      {draft.contacts.map((contact, index) => <View key={`contact-${index}`} style={styles.nestedCard}>
+      <Txt role="label">{t.contacts}</Txt>
+      {draft.contacts.length === 0 ? <Txt role="bodySmall" tone="muted">{t.noContacts}</Txt> : null}
+      {draft.contacts.map((contact, index) => <View key={`contact-${index}`} style={styles.contactEditor}>
         <Field label={t.contactName} value={contact.name} onChangeText={(value) => updateContact(index, { name: value })} error={firstFieldError(errors, 'contacts', t, base)} />
         <Field label={t.contactPhone} value={contact.phone} onChangeText={(value) => updateContact(index, { phone: value })} keyboardType="phone-pad" error={firstFieldError(errors, 'phone', t, base)} />
         <Field label={t.contactRelation} value={contact.relation ?? ''} onChangeText={(value) => updateContact(index, { relation: value })} />
         <IconButton label={base.remove} icon="trash-outline" onPress={() => patch({ contacts: draft.contacts.filter((_, i) => i !== index) })} danger />
       </View>)}
-      {draft.contacts.length < MAX_CONTACTS ? <Button label={t.addContact} variant="secondary" icon="add" onPress={() => patch({ contacts: [...draft.contacts, { name: '', phone: '' }] })} /> : null}
+      {draft.contacts.length < MAX_CONTACTS ? <Button label={t.addContact} variant="tonal" icon="add" onPress={() => patch({ contacts: [...draft.contacts, { name: '', phone: '' }] })} /> : null}
       {errors.length > 0 && errors.some((error) => !['name', 'evacuationCenter', 'meetingPlace', 'contacts', 'phone'].includes(error.field.split('.').pop() ?? '')) ? <InlineError message={fieldErrorLines(errors, t, base).join('\n')} /> : null}
-      {saved ? <Text style={styles.muted}>{t.saved}</Text> : null}
+      {saved ? <Txt role="bodySmall" tone="muted">{t.saved}</Txt> : null}
       <Button label={busy ? t.saving : t.save} onPress={() => { void save(); }} disabled={busy} icon="checkmark" />
     </>}
-  </Card>;
+  </Tile>;
 }
 
 function MembersSection({ engine, profile, t, base }: { engine: EngineContextValue; profile: Profile; t: Copy; base: BaseCopy }): JSX.Element {
@@ -250,6 +263,8 @@ function MembersSection({ engine, profile, t, base }: { engine: EngineContextVal
   const [errors, setErrors] = useState<readonly { code: string; field: string }[]>([]);
   const [generalError, setGeneralError] = useState('');
   const [busy, setBusy] = useState(false);
+  const theme = useTheme();
+  const styles = useThemedStyles(makeStyles);
   const editing = draft?.id !== undefined;
   const submit = async (): Promise<void> => {
     if (!draft) return;
@@ -267,14 +282,21 @@ function MembersSection({ engine, profile, t, base }: { engine: EngineContextVal
     else { setGeneralError(errorCopy(result.error.code, t, base)); setErrors([]); }
   };
   const translatedRelation = (value: Relation): string => dynamicCopy(base, `relation_${value}`);
-  return <Card>
+  return <Tile>
     <SectionHeader title={t.members} />
-    {members.length === 0 ? <Text style={styles.muted}>{t.noMembers}</Text> : null}
+    {members.length === 0 ? <Txt role="bodySmall" tone="muted">{t.noMembers}</Txt> : null}
     {members.map((member) => <View key={member.id} style={styles.memberRow}>
+      <MemberAvatar
+        photoUri={member.photo?.uri}
+        initials={initialsOf(member.name)}
+        size={theme.space.xxxl}
+        pending={member.photo === undefined}
+        pendingLabel={t.memberAvatar}
+      />
       <View style={styles.memberInfo}>
-        <Text style={styles.memberName}>{member.name}</Text>
-        <Text style={styles.muted}>{translatedRelation(member.relation)} · {dynamicCopy(base, `age_${member.ageGroup}`)}</Text>
-        {member.note ? <Text style={styles.muted}>{member.note}</Text> : null}
+        <Txt role="title" numberOfLines={1}>{member.name}</Txt>
+        <Txt role="bodySmall" tone="muted">{translatedRelation(member.relation)} · {dynamicCopy(base, `age_${member.ageGroup}`)}</Txt>
+        {member.note ? <Txt role="bodySmall" tone="muted">{member.note}</Txt> : null}
         {member.needs.length > 0 ? <Selector>{member.needs.map((need) => <Chip key={need} label={dynamicCopy(base, `need_${need}`)} />)}</Selector> : null}
       </View>
       <View style={styles.iconActions}>
@@ -283,30 +305,33 @@ function MembersSection({ engine, profile, t, base }: { engine: EngineContextVal
       </View>
     </View>)}
     {generalError ? <InlineError message={generalError} /> : null}
-    {!draft ? <Button label={t.addMember} onPress={() => { setDraft(blankMemberDraft()); setErrors([]); }} icon="add" /> : <Card title={editing ? t.edit : t.addMember}>
+    {!draft ? <Button label={t.addMember} onPress={() => { setDraft(blankMemberDraft()); setErrors([]); }} icon="add" /> : <View style={styles.memberEditor}>
+      <Txt role="title">{editing ? t.edit : t.addMember}</Txt>
       <Field label={base.memberName} value={draft.name} onChangeText={(value) => setDraft((current) => current ? { ...current, name: value } : current)} error={firstFieldError(errors, 'name', t, base)} />
-      <Text style={styles.label}>{base.relation}</Text>
+      <Txt role="label">{base.relation}</Txt>
       <Selector>{RELATIONS.filter((item) => item !== 'self').map((item) => <Chip key={item} label={dynamicCopy(base, `relation_${item}`)} selected={draft.relation === item} onPress={() => setDraft((current) => current ? { ...current, relation: item } : current)} />)}</Selector>
-      <Text style={styles.label}>{base.ageGroup}</Text>
+      <Txt role="label">{base.ageGroup}</Txt>
       <Selector>{AGE_GROUPS.map((item) => <Chip key={item} label={dynamicCopy(base, `age_${item}`)} selected={draft.ageGroup === item} onPress={() => setDraft((current) => current ? { ...current, ageGroup: item } : current)} />)}</Selector>
-      <Text style={styles.label}>{base.needs}</Text>
+      <Txt role="label">{base.needs}</Txt>
       <Selector>{NEED_TAGS.map((item) => <Chip key={item} label={dynamicCopy(base, `need_${item}`)} selected={draft.needs.includes(item)} onPress={() => setDraft((current) => current ? { ...current, needs: toggleInList(current.needs, item) } : current)} />)}</Selector>
       <Field label={t.memberNote} value={draft.note} onChangeText={(value) => setDraft((current) => current ? { ...current, note: value } : current)} error={firstFieldError(errors, 'note', t, base)} />
       <Field label={t.memberPhone} value={draft.phone} onChangeText={(value) => setDraft((current) => current ? { ...current, phone: value } : current)} keyboardType="phone-pad" error={firstFieldError(errors, 'phone', t, base)} />
       {errors.length > 0 && errors.some((error) => !['name', 'note', 'phone'].includes(error.field.split('.').pop() ?? '')) ? <InlineError message={fieldErrorLines(errors, t, base).join('\n')} /> : null}
       <View style={styles.actions}>
-        <Button label={t.cancelEdit} variant="secondary" onPress={() => { setDraft(null); setErrors([]); }} />
+        <Button label={t.cancelEdit} variant="tonal" onPress={() => { setDraft(null); setErrors([]); }} />
         <Button label={busy ? t.saving : t.saveMember} onPress={() => { void submit(); }} disabled={busy} icon="checkmark" />
       </View>
-    </Card>}
-  </Card>;
+    </View>}
+  </Tile>;
 }
 
 function SettingsSection({ engine, t }: { engine: EngineContextValue; t: Copy }): JSX.Element {
   const settings = engine.settings.get();
+  const base = useT(commonStrings);
   const { lang, setLang } = useLang();
   const [error, setError] = useState('');
   const [historyCleared, setHistoryCleared] = useState(false);
+  const styles = useThemedStyles(makeStyles);
   const updateSetting = (patch: Partial<Settings>): void => {
     const result = engine.settings.update(patch);
     setError(result.ok ? '' : t.error_out_of_range);
@@ -319,52 +344,67 @@ function SettingsSection({ engine, t }: { engine: EngineContextValue; t: Copy })
     if (settings[key] < bounds.min || settings[key] > bounds.max) setError(t.error_out_of_range);
   };
   const clearHistory = (): void => { engine.history.clear(); setHistoryCleared(true); };
-  return <Card title={t.settings}>
-    <View style={styles.settingRow}><Text style={styles.settingTitle}>{t.language}</Text><View style={styles.languageChoices}>{(['tl', 'en'] as const).map((item) => <Chip key={item} label={item.toUpperCase()} selected={lang === item} onPress={() => setLang(item)} />)}</View></View>
-    <View style={styles.settingRow}><View style={styles.settingCopy}><Text style={styles.settingTitle}>{t.aiEnabled}</Text><Text style={styles.muted}>{settings.aiEnabled ? t.on : t.off}</Text></View><Switch value={settings.aiEnabled} onValueChange={(value) => updateSetting({ aiEnabled: value })} trackColor={{ false: colors.border, true: colors.accent }} thumbColor={colors.text} accessibilityLabel={t.aiEnabled} /></View>
-    <SettingStepper label={t.lowBatteryThreshold} value={settings.lowBatteryThreshold} suffix="%" onStep={(amount) => step('lowBatteryThreshold', amount)} />
-    <SettingStepper label={t.staleWarningHours} value={settings.staleWarningHours} suffix="h" onStep={(amount) => step('staleWarningHours', amount)} />
-    <Text style={styles.muted}>{t.settingsHint}</Text>
+  const langLabel: Record<'tl' | 'en', string> = { tl: t.langTl, en: t.langEn };
+  return <Tile title={t.settings}>
+    <View style={styles.settingRow}>
+      <Txt role="label">{t.language}</Txt>
+      <View style={styles.languageChoices}>{(['tl', 'en'] as const).map((item) => <Chip key={item} label={langLabel[item]} selected={lang === item} onPress={() => setLang(item)} />)}</View>
+    </View>
+    <ToggleRow label={t.aiEnabled} description={settings.aiEnabled ? t.on : t.off} value={settings.aiEnabled} onValueChange={(value) => updateSetting({ aiEnabled: value })} />
+    <SettingStepper label={t.lowBatteryThreshold} value={settings.lowBatteryThreshold} suffix={t.percentSign} stepDown={`${base.decrease} ${t.lowBatteryThreshold}`} stepUp={`${base.increase} ${t.lowBatteryThreshold}`} onStep={(amount) => step('lowBatteryThreshold', amount)} />
+    <SettingStepper label={t.staleWarningHours} value={settings.staleWarningHours} suffix={t.hoursSign} stepDown={`${base.decrease} ${t.staleWarningHours}`} stepUp={`${base.increase} ${t.staleWarningHours}`} onStep={(amount) => step('staleWarningHours', amount)} />
+    <Txt role="bodySmall" tone="muted">{t.settingsHint}</Txt>
     {error ? <InlineError message={error} /> : null}
-    <Button label={t.clearHistory} variant="secondary" icon="trash-outline" onPress={clearHistory} />
-    {historyCleared ? <Text style={styles.muted}>{t.historyCleared}</Text> : null}
-  </Card>;
+    <Button label={t.clearHistory} variant="tonal" icon="trash-outline" onPress={clearHistory} />
+    {historyCleared ? <Txt role="bodySmall" tone="muted">{t.historyCleared}</Txt> : null}
+  </Tile>;
 }
 
-function SettingStepper({ label, value, suffix, onStep }: { label: string; value: number; suffix: string; onStep: (amount: number) => void }): JSX.Element {
+function SettingStepper({ label, value, suffix, stepDown, stepUp, onStep }: { label: string; value: number; suffix: string; stepDown: string; stepUp: string; onStep: (amount: number) => void }): JSX.Element {
+  const base = useT(commonStrings);
+  const styles = useThemedStyles(makeStyles);
   return <View style={styles.stepper}>
-    <Text style={[styles.settingTitle, styles.stepperLabel]}>{label}</Text>
-    <Button label="−" variant="secondary" onPress={() => onStep(-1)} accessibilityLabel={`${label} −`} />
-    <Text accessibilityLiveRegion="polite" style={styles.stepValue}>{value}{suffix}</Text>
-    <Button label="+" variant="secondary" onPress={() => onStep(1)} accessibilityLabel={`${label} +`} />
+    <Txt role="label" style={styles.stepperLabel}>{label}</Txt>
+    <Button label={base.decrease} variant="tonal" icon="remove" onPress={() => onStep(-1)} accessibilityLabel={stepDown} />
+    <Txt role="title" align="center" accessibilityLiveRegion="polite" style={styles.stepValue}>{value}{suffix}</Txt>
+    <Button label={base.increase} variant="tonal" icon="add" onPress={() => onStep(1)} accessibilityLabel={stepUp} />
   </View>;
 }
 
-function Selector({ children }: { children: ReactNode }): JSX.Element { return <View style={styles.selector}>{children}</View>; }
-function IconButton({ label, icon, onPress, danger = false, disabled = false }: { label: string; icon: 'create-outline' | 'trash-outline'; onPress: () => void; danger?: boolean; disabled?: boolean }): JSX.Element {
-  return <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled }} disabled={disabled} onPress={onPress} style={[styles.iconButton, disabled && styles.disabled]}><Ionicons name={icon} size={22} color={danger ? colors.danger : colors.accent} /></Pressable>;
+function Selector({ children }: { children: ReactNode }): JSX.Element {
+  const styles = useThemedStyles(makeStyles);
+  return <View style={styles.selector}>{children}</View>;
 }
 
-const styles = StyleSheet.create({
-  eyebrow: { color: colors.accent, fontSize: font.sm, fontWeight: '700' },
-  label: { color: colors.text, fontSize: font.sm, fontWeight: '600' },
-  subheading: { color: colors.text, fontSize: font.md, fontWeight: '700', marginTop: space.sm },
-  muted: { color: colors.muted, fontSize: font.sm },
-  householdName: { color: colors.text, fontSize: font.xl, fontWeight: '700' },
-  selector: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
-  actions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: space.sm },
-  stepper: { minHeight: minTouch, flexDirection: 'row', alignItems: 'center', gap: space.sm },
+function IconButton({ label, icon, onPress, danger = false, disabled = false }: { label: string; icon: IconName; onPress: () => void; danger?: boolean; disabled?: boolean }): JSX.Element {
+  const theme = useTheme();
+  const styles = useThemedStyles(makeStyles);
+  return <Pressable
+    accessibilityRole="button"
+    accessibilityLabel={label}
+    accessibilityState={{ disabled }}
+    disabled={disabled}
+    onPress={onPress}
+    style={({ pressed }) => [styles.iconButton, disabled && styles.disabled, pressed && !disabled && styles.pressed]}
+  >
+    <Ionicons name={icon} size={theme.type.roles.title.fontSize} color={danger ? theme.colors.danger.fill : theme.colors.accentText} />
+  </Pressable>;
+}
+
+const makeStyles = (t: Theme) => StyleSheet.create({
+  selector: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.sm },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: t.space.sm },
+  stepper: { minHeight: t.minTouch, flexDirection: 'row', alignItems: 'center', gap: t.space.sm },
   stepperLabel: { flex: 1 },
-  stepValue: { color: colors.text, minWidth: 56, textAlign: 'center', fontSize: font.md, fontWeight: '700' },
-  nestedCard: { gap: space.sm, padding: space.md, borderRadius: 12, backgroundColor: colors.surfaceRaised },
-  memberRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: space.md, borderTopWidth: 1, borderTopColor: colors.border },
-  memberInfo: { flex: 1, gap: space.xs },
-  memberName: { color: colors.text, fontSize: font.md, fontWeight: '700' },
-  iconActions: { flexDirection: 'row', alignItems: 'center' },
-  iconButton: { minWidth: minTouch, minHeight: minTouch, justifyContent: 'center', alignItems: 'center', borderRadius: 12, backgroundColor: colors.surfaceRaised },
+  stepValue: { minWidth: t.space.xxxl + t.space.xl },
+  contactEditor: { gap: t.space.sm, paddingTop: t.space.md, borderTopWidth: t.border.hairline, borderTopColor: t.colors.hairline },
+  memberEditor: { gap: t.space.md, paddingTop: t.space.md, borderTopWidth: t.border.hairline, borderTopColor: t.colors.hairline },
+  memberRow: { flexDirection: 'row', alignItems: 'center', gap: t.space.md, paddingVertical: t.space.md, borderTopWidth: t.border.hairline, borderTopColor: t.colors.hairline },
+  memberInfo: { flex: 1, gap: t.space.xs },
+  iconActions: { flexDirection: 'row', alignItems: 'center', gap: t.space.xs },
+  iconButton: { minWidth: t.minTouch, minHeight: t.minTouch, justifyContent: 'center', alignItems: 'center', borderRadius: t.radius.form, backgroundColor: t.colors.surfaceSunken },
   disabled: { opacity: 0.45 },
-  settingRow: { minHeight: minTouch, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.md },
-  settingCopy: { flex: 1 },
-  settingTitle: { color: colors.text, fontSize: font.sm, fontWeight: '600' },
-  languageChoices: { flexDirection: 'row', gap: space.xs },
+  pressed: { opacity: 0.86 },
+  settingRow: { minHeight: t.minTouch, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: t.space.md },
+  languageChoices: { flexDirection: 'row', gap: t.space.xs },
 });

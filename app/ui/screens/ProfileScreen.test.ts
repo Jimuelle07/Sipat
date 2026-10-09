@@ -12,7 +12,7 @@ vi.mock('@expo/vector-icons', () => ({ Ionicons: 'Ionicons' }));
 vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' }));
 
 import type { Member, Profile } from '../../engine';
-import { strings } from '../strings';
+import { commonStrings } from '../strings/common';
 import { profileStrings } from '../strings/profile';
 import {
   blankMemberDraft,
@@ -193,8 +193,8 @@ describe('error copy', () => {
       { code: 'pets_range', field: 'petsCount' },
     ]);
     expect(lines).toHaveLength(2);
-    expect(lines[0]).toBe(`${profileStrings.tl.fieldName}: ${strings.tl.error_name_required}`);
-    expect(lines[1]).toBe(`${strings.tl.petsCount}: ${strings.tl.error_pets_range}`);
+    expect(lines[0]).toBe(`${profileStrings.tl.fieldName}: ${commonStrings.tl.error_name_required}`);
+    expect(lines[1]).toBe(`${commonStrings.tl.petsCount}: ${commonStrings.tl.error_pets_range}`);
   });
 });
 

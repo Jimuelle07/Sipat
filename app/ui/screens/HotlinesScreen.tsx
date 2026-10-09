@@ -1,12 +1,13 @@
 import type { JSX } from 'react';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import type { TextKind } from '../../engine';
 import { useEngine, useEngineChange } from '../context/useEngine';
 import { hotlineStrings } from '../strings/hotlines';
 import { useT } from '../i18n';
-import { Button, Card, EmptyState, Field, InlineError, Screen, SectionHeader } from '../components';
-import { colors, font, minTouch, radius, space } from '../theme';
+import { Button, Chip, EmptyState, Field, HotlineRow, InlineError, Screen, SectionHeader, Tile, Txt } from '../components';
+import { useThemedStyles } from '../theme';
+import type { Theme } from '../theme';
 
 export function parseRecipients(raw: string): string[] {
   return raw.split(/[;,\n]+/).map((recipient) => recipient.trim()).filter((recipient) => recipient.length > 0);
@@ -19,6 +20,7 @@ export function hotlineErrorMessage(code: string, message: string, noDialerMessa
 export function HotlinesScreen(): JSX.Element {
   const engine = useEngine();
   const t = useT(hotlineStrings);
+  const styles = useThemedStyles(makeStyles);
   useEngineChange(['packs']);
   const [callError, setCallError] = useState('');
   const [composeError, setComposeError] = useState('');
@@ -60,58 +62,47 @@ export function HotlinesScreen(): JSX.Element {
     <Screen title={t.title}>
       <SectionHeader title={t.hotlines} />
       {hotlines.length === 0 ? (
-        <Card><EmptyState icon="call-outline" title={t.noHotlines} /></Card>
+        <Tile><EmptyState icon="call-outline" title={t.noHotlines} /></Tile>
       ) : hotlines.map((hotline) => (
-        <Card key={hotline.id}>
-          <View style={styles.callRow}>
-            <View style={styles.callText}>
-              <Text style={styles.name}>{hotline.name}</Text>
-              <Text style={styles.number}>{hotline.number}</Text>
-              {hotline.hours ? <Text style={styles.muted}>{hotline.hours}</Text> : null}
-            </View>
-            <Button
-              label={t.call}
-              icon="call-outline"
-              onPress={() => { void call(hotline.id); }}
-              accessibilityLabel={`${t.call}: ${hotline.name}`}
-            />
-          </View>
-        </Card>
+        <Tile key={hotline.id}>
+          <HotlineRow
+            name={hotline.name}
+            number={hotline.number}
+            callLabel={t.call}
+            onCall={() => { void call(hotline.id); }}
+          />
+          {hotline.hours ? <Txt role="bodySmall" tone="muted">{hotline.hours}</Txt> : null}
+        </Tile>
       ))}
       {callError ? <InlineError message={callError} /> : null}
 
       <SectionHeader title={t.centers} />
       {centers.length === 0 ? (
-        <Card><EmptyState icon="home-outline" title={t.noCentersTitle} body={t.noCenters} /></Card>
+        <Tile><EmptyState icon="home-outline" title={t.noCentersTitle} body={t.noCenters} /></Tile>
       ) : centers.map((center) => (
-        <Card key={center.id} title={center.name}>
-          <Text style={styles.text}>{t.landmark}: {center.landmark}</Text>
-          {center.capacity !== undefined ? <Text style={styles.muted}>{t.capacity}: {center.capacity}</Text> : null}
-          {center.accessible !== undefined ? <Text style={styles.muted}>{t.accessible}: {center.accessible ? t.yes : t.no}</Text> : null}
-          {center.accepts_pets !== undefined ? <Text style={styles.muted}>{t.pets}: {center.accepts_pets ? t.yes : t.no}</Text> : null}
-        </Card>
+        <Tile key={center.id} title={center.name}>
+          <Txt role="body">{t.landmark}: {center.landmark}</Txt>
+          {center.capacity !== undefined ? <Txt role="bodySmall" tone="muted">{t.capacity}: {center.capacity}</Txt> : null}
+          {center.accessible !== undefined ? <Txt role="bodySmall" tone="muted">{t.accessible}: {center.accessible ? t.yes : t.no}</Txt> : null}
+          {center.accepts_pets !== undefined ? <Txt role="bodySmall" tone="muted">{t.pets}: {center.accepts_pets ? t.yes : t.no}</Txt> : null}
+        </Tile>
       ))}
 
       <SectionHeader title={t.sms} />
-      <Card>
-        <View accessibilityRole="radiogroup" style={styles.segment}>
+      <Tile>
+        <View style={styles.segment}>
           {(['safe', 'need_help'] as const).map((option) => (
-            <Pressable
+            <Chip
               key={option}
-              accessibilityRole="radio"
-              accessibilityState={{ selected: kind === option }}
+              label={option === 'safe' ? t.safe : t.needHelp}
+              selected={kind === option}
               onPress={() => setKind(option)}
-              style={[styles.segmentButton, kind === option && styles.segmentSelected]}
-            >
-              <Text style={[styles.segmentText, kind === option && styles.segmentSelectedText]}>
-                {option === 'safe' ? t.safe : t.needHelp}
-              </Text>
-            </Pressable>
+            />
           ))}
         </View>
         <Field label={t.where} value={where} onChangeText={setWhere} placeholder={t.where} />
-        <Text style={styles.previewLabel}>{t.preview}</Text>
-        <View style={styles.preview}><Text style={styles.text}>{preview}</Text></View>
+        <Txt role="label" tone="muted">{t.preview}</Txt>
+        <View style={styles.preview}><Txt role="body">{preview}</Txt></View>
         <Field
           label={t.recipients}
           value={recipients}
@@ -126,23 +117,19 @@ export function HotlinesScreen(): JSX.Element {
           disabled={busy}
         />
         {composeError ? <InlineError message={composeError} /> : null}
-      </Card>
+      </Tile>
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  callRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
-  callText: { flex: 1, gap: space.xs },
-  name: { color: colors.text, fontSize: font.md, fontWeight: '700' },
-  number: { color: colors.text, fontSize: font.lg, fontWeight: '700' },
-  text: { color: colors.text, fontSize: font.md },
-  muted: { color: colors.muted, fontSize: font.sm },
-  segment: { flexDirection: 'row', padding: 4, borderRadius: radius.md, backgroundColor: colors.surfaceRaised },
-  segmentButton: { minHeight: minTouch, flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: space.sm, borderRadius: radius.sm },
-  segmentSelected: { backgroundColor: colors.accent },
-  segmentText: { color: colors.text, fontSize: font.sm, textAlign: 'center' },
-  segmentSelectedText: { color: colors.accentText, fontWeight: '700' },
-  previewLabel: { color: colors.muted, fontSize: font.sm, fontWeight: '700' },
-  preview: { minHeight: minTouch, padding: space.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg },
+const makeStyles = (t: Theme) => StyleSheet.create({
+  segment: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.sm },
+  preview: {
+    minHeight: t.minTouch,
+    padding: t.space.md,
+    borderRadius: t.radius.form,
+    borderWidth: t.border.control,
+    borderColor: t.colors.controlBorder,
+    backgroundColor: t.colors.canvas,
+  },
 });
