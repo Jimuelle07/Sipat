@@ -375,8 +375,12 @@ export function createMockEngine(opts: MockOptions = {}): MockEngine {
       }
       yield* emitEvent({ type: 'ai_status', status: 'loading_model' }, 100);
       yield* emitEvent({ type: 'ai_status', status: 'thinking' }, 1100);
-      const answer = 'Ayon sa gabay, ihanda ang go bag na may tubig, pagkain, gamot at mahahalagang dokumento.'
-        + ' Ilagay ito malapit sa pinto at sundin ang mga opisyal na abiso ng barangay. (SAMPLE na sagot)';
+      // The AI answer follows settings.language, like the real engine's prompt.
+      const answer = settings.language === 'en'
+        ? 'According to the guide, prepare a go bag with water, food, medicine and important documents.'
+          + ' Keep it near the door and follow the official advisories of the barangay. (SAMPLE answer)'
+        : 'Ayon sa gabay, ihanda ang go bag na may tubig, pagkain, gamot at mahahalagang dokumento.'
+          + ' Ilagay ito malapit sa pinto at sundin ang mga opisyal na abiso ng barangay. (SAMPLE na sagot)';
       const partials = answer.split(/(?= )/);
       for (let index = 0; index < partials.length; index++) {
         // Section 3.6: first ai_partial at 3 s, then one every 0.12 s.
@@ -511,7 +515,7 @@ export function createMockEngine(opts: MockOptions = {}): MockEngine {
         };
       }
     }
-    yield { type: 'closing', copyKey: 'closing', text: COPY.closing };
+    yield { type: 'closing', copyKey: 'closing', text: copyText('closing', settings.language) };
     history.push({ id: logId, at: toManilaIso(now()), question: logQuestion(question), route, emergency: isEmergency,
       phaseCue: null, phaseHint: null, hint: 'none', topIds: [], topScore: 0, gatePassed: true, outcome,
       failures: [], timings: { routeMs: 1, searchMs: 1, totalMs: 1 } });

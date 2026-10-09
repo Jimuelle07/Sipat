@@ -1,7 +1,7 @@
 import type {
   AiDecision, AiSkipReason, AnswerEvent, AskOptions, Bulletin, BulletinCardView, Context,
   EmergencyCardView, EvacuationCenter, GuideIndex, Hotline, ModelError, ModelManager, Outcome, PhaseRules, Profile,
-  QuestionLogEntry, SourceRef, StormMeasure, Timings,
+  QuestionLogEntry, SourceRef, StormMeasure, Timings, UiLanguage,
 } from '../types/index.ts';
 import { DEFAULT_SEARCH_CONFIG } from '../core/config.ts';
 import { normalize } from '../core/normalize.ts';
@@ -31,6 +31,8 @@ export interface AskDeps {
   log: (entry: QuestionLogEntry) => void;
   now?: () => number;
   newId?: () => string;
+  /** `settings.language`: the AI answer and the fixed replies follow it; vetted passages stay Tagalog. */
+  language?: () => UiLanguage;
 }
 
 const zeroTimings = (): Timings => ({ routeMs: 0, searchMs: 0, totalMs: 0 });
@@ -92,6 +94,7 @@ export async function* runAskPipeline(
   const now = deps.now ?? Date.now;
   const newId = deps.newId ?? (() => `log-${now()}-${Math.random().toString(36).slice(2, 8)}`);
   const startedAt = now();
+  const lang = deps.language?.() ?? 'tl';
   const normalized = normalize(question.slice(0, 200), deps.content.synonyms);
   const profile = deps.profile();
   const bulletinCard = deps.latestBulletin();
@@ -140,11 +143,11 @@ export async function* runAskPipeline(
       yield { type: 'bulletin_card', card: bulletinCard };
       outcome = 'bulletin_card';
     } else {
-      yield { type: 'fixed_reply', route: 'live_data', copyKey: 'no_live_data', text: copyText('no_live_data') };
+      yield { type: 'fixed_reply', route: 'live_data', copyKey: 'no_live_data', text: copyText('no_live_data', { lang }) };
       outcome = 'fixed_reply';
     }
   } else if (routed.primary === 'medical_dose') {
-    yield { type: 'fixed_reply', route: 'medical_dose', copyKey: 'medical_dose', text: copyText('medical_dose') };
+    yield { type: 'fixed_reply', route: 'medical_dose', copyKey: 'medical_dose', text: copyText('medical_dose', { lang }) };
     outcome = 'fixed_reply';
   } else if (routed.primary === 'plan' && field) {
     const plan = profile?.plan;
@@ -177,7 +180,7 @@ export async function* runAskPipeline(
     logEntry.topScore = result.gate.topScore;
     logEntry.gatePassed = result.gate.passed;
     if (!result.gate.passed || result.selected.length === 0) {
-      yield { type: 'refusal', copyKey: 'refusal', text: copyText('refusal'), suggestions: result.suggestions };
+      yield { type: 'refusal', copyKey: 'refusal', text: copyText('refusal', { lang }), suggestions: result.suggestions };
       outcome = 'refused';
     } else {
       const selected = result.selected
@@ -190,7 +193,7 @@ export async function* runAskPipeline(
       }
       const fallback = selected[0];
       if (!fallback) {
-        yield { type: 'refusal', copyKey: 'refusal', text: copyText('refusal'), suggestions: result.suggestions };
+        yield { type: 'refusal', copyKey: 'refusal', text: copyText('refusal', { lang }), suggestions: result.suggestions };
         outcome = 'refused';
       } else {
         yield { type: 'summary', passageId: fallback.id, title: fallback.title, text: fallback.summary,
@@ -245,7 +248,7 @@ export async function* runAskPipeline(
               profile,
               context: initialContext,
               passages: selected,
-            });
+            }, lang);
             logEntry.timings.promptTokens = promptTokens(prompt);
             const pending: string[] = [];
             const request = Promise.resolve().then(() => deps.model.generate(
@@ -279,7 +282,7 @@ export async function* runAskPipeline(
               yield { type: 'ai_status', status: 'skipped', reason };
             } else {
               Object.assign(logEntry.timings, generated.value.timings);
-              const verification = verify(generated.value.raw, selected);
+              const verification = verify(generated.value.raw, selected, [], lang);
               if (!verification.ok || !verification.output) {
                 const failure = verification.failures[0]?.code ?? 'schema';
                 logEntry.failures = verification.failures.map((item) => item.code);
@@ -322,16 +325,16 @@ export async function* runAskPipeline(
   const switched = phaseDecision.switched;
   const recommendation = phaseDecision.state.recommended;
   if (switched) {
-    const label = copyText(phaseKey(switched.to));
+    const label = copyText(phaseKey(switched.to), { lang });
     yield { type: 'phase_change', kind: 'switched', from: switched.from, to: switched.to, source: 'ask',
-      copyKey: 'phase_switched', text: copyText('phase_switched', { vars: { phase: label } }) };
+      copyKey: 'phase_switched', text: copyText('phase_switched', { lang, vars: { phase: label } }) };
     logEntry.phaseChange = { kind: 'switched', from: switched.from, to: switched.to };
   } else if (recommendation && recommendation.phase !== initialContext.phase &&
     JSON.stringify(recommendation) !== JSON.stringify(initialContext.recommended)) {
     yield { type: 'phase_change', kind: 'recommended', from: initialContext.phase, to: recommendation.phase,
-      source: 'ask', copyKey: phaseKey(recommendation.phase), text: copyText(phaseKey(recommendation.phase)) };
+      source: 'ask', copyKey: phaseKey(recommendation.phase), text: copyText(phaseKey(recommendation.phase), { lang }) };
     logEntry.phaseChange = { kind: 'recommended', from: initialContext.phase, to: recommendation.phase };
   }
-  yield { type: 'closing', copyKey: 'closing', text: copyText('closing') };
+  yield { type: 'closing', copyKey: 'closing', text: copyText('closing', { lang }) };
   yield finish(outcome);
 }

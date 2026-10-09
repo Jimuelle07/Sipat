@@ -768,7 +768,7 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
         evacuationCenters: () => [],
         latestBulletin: () => currentFeed().latest,
         storm: stormInput,
-        now: () => now().getTime(), newId: () => newId('question'),
+        now: () => now().getTime(), newId: () => newId('question'), language: () => settings.language,
         log(entry) {
           history = [...history, entry].slice(-200);
           save('questionLog', history);
