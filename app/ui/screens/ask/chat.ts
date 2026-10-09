@@ -1,4 +1,4 @@
-import type { AnswerEvent, SourceRef } from '../../../types';
+import type { AnswerEvent, SourceRef } from '../../../engine';
 
 export type ChatMessage =
   | { id: string; kind: 'question'; text: string; time: string }

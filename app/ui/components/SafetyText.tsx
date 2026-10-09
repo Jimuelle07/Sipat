@@ -1,11 +1,35 @@
 import type { JSX } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import type { CopyKey } from '../../types';
-import { useEngine } from '../context/useEngine';
-import { useLang } from '../i18n';
-import { colors, font, space } from '../theme';
-export function SafetyText({ copyKey }: { copyKey: CopyKey }): JSX.Element {
-  const engine = useEngine(); const { lang } = useLang();
-  return <View style={styles.wrap}><Text style={styles.primary}>{engine.copy(copyKey)}</Text>{lang === 'en' ? <Text style={styles.translation}>{engine.copy(copyKey, 'en')}</Text> : null}</View>;
+import { View, StyleSheet } from 'react-native';
+import { useThemedStyles } from '../theme';
+import type { Theme } from '../theme';
+import { Txt } from './Txt';
+
+export interface SafetyTextProps {
+  text: string;
+  /** Optional plain-English helper shown under the primary text. */
+  translation?: string;
 }
-const styles = StyleSheet.create({ wrap: { gap: space.xs }, primary: { color: colors.text, fontSize: font.md }, translation: { color: colors.muted, fontSize: font.sm } });
+
+/**
+ * Safety sentence presentation (always last in an answer). Props-only: callers pass
+ * `engine.copy(key)` and the English helper; the component never reads the engine itself.
+ * Used on Home, Ask and the emergency cards.
+ */
+export function SafetyText({ text, translation }: SafetyTextProps): JSX.Element {
+  const styles = useThemedStyles(makeStyles);
+
+  return (
+    <View style={styles.wrap}>
+      <Txt role="body">{text}</Txt>
+      {translation !== undefined ? (
+        <Txt role="bodySmall" tone="muted">{translation}</Txt>
+      ) : null}
+    </View>
+  );
+}
+
+const makeStyles = (t: Theme) => StyleSheet.create({
+  wrap: {
+    gap: t.space.xs,
+  },
+})

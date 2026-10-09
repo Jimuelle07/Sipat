@@ -1,19 +1,33 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { JSX, ReactNode } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { createEngine, createMockEngine } from '../../engine';
 import type { Engine } from '../../engine';
+import { Tile, Txt } from '../components';
+import { commonStrings } from '../strings/common';
+import { ThemeProvider, useThemedStyles } from '../theme';
+import type { Theme } from '../theme';
 import { resolveEngineKind } from './engineKind';
 import type { EngineKind } from './engineKind';
-import { colors, font, space } from '../theme';
-import { strings } from '../strings';
-import { Card, InlineError } from '../components';
 import { EngineContext } from './useEngine';
 
 type ProviderState = { kind: 'loading' } | { kind: 'ready' } | { kind: 'error'; code: string };
 
 function makeEngine(kind: EngineKind): Engine {
   return kind === 'mock' ? createMockEngine() : createEngine();
+}
+
+function StartupScreen({ fatal }: { fatal: boolean }): JSX.Element {
+  const styles = useThemedStyles(makeStyles);
+  return (
+    <View style={styles.center}>
+      <Tile>
+        <Txt role="title" accessibilityRole="header">
+          {fatal ? commonStrings.tl.fatal : commonStrings.tl.loading}
+        </Txt>
+      </Tile>
+    </View>
+  );
 }
 
 export function EngineProvider({ kind: requestedKind, children }: { kind?: EngineKind; children: ReactNode }): JSX.Element {
@@ -49,15 +63,22 @@ export function EngineProvider({ kind: requestedKind, children }: { kind?: Engin
   const value = useMemo(() => ({ ...engine, engine, engineKind, switchEngine }), [engine, engineKind, switchEngine]);
 
   if (state.kind !== 'ready') {
-    const language = engine.settings.get().language ?? 'tl';
-    const copy = strings[language];
-    return <View style={styles.center}><Card title={copy.loading}>{state.kind === 'error' ? <InlineError message={`${copy.failed} (${state.code})`} /> : <Text style={styles.text}>{copy.loading}</Text>}</Card></View>;
+    return (
+      <ThemeProvider phase="before">
+        <StartupScreen fatal={state.kind === 'error'} />
+      </ThemeProvider>
+    );
   }
 
   return <EngineContext.Provider value={value}>{children}</EngineContext.Provider>;
 }
 
-const styles = StyleSheet.create({
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: space.lg, backgroundColor: colors.bg },
-  text: { color: colors.text, fontSize: font.md },
+const makeStyles = (t: Theme) => StyleSheet.create({
+  center: {
+    flex: 1,
+    alignItems: 'stretch',
+    justifyContent: 'center',
+    padding: t.space.gutter,
+    backgroundColor: t.colors.canvas,
+  },
 });
