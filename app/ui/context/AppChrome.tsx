@@ -1,6 +1,7 @@
-import { createContext, useContext, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { JSX, ReactNode } from 'react';
 import { View, StyleSheet } from 'react-native';
+import { useIsFocused, useRoute } from '@react-navigation/native';
 import { Button, StatusBadge, StaleBanner, SwitchBanner } from '../components';
 import { useLang, useT } from '../i18n';
 import { errorMessage } from '../strings/errors';
@@ -9,6 +10,7 @@ import { fill } from '../strings/format';
 import { shouldShowSwitch } from '../screens/home/homeModel';
 import { useTheme, useThemedStyles } from '../theme';
 import type { Theme } from '../theme';
+import { DevPanelEntry } from './DevPanel';
 import { useEngine, useEngineChange } from './useEngine';
 
 export type DevScheme = 'system' | 'light' | 'dark';
@@ -51,6 +53,10 @@ export function AppBanners(): JSX.Element | null {
   const theme = useTheme();
   const styles = useThemedStyles(makeStyles);
   const seen = useContext(SeenSwitchContext);
+  const isFocused = useIsFocused();
+  const route = useRoute();
+  const showDevEntry = route.name === 'Settings';
+  const [latchedAt, setLatchedAt] = useState<string | null>(null);
   useEngineChange(['phase', 'context', 'status', 'settings']);
   const context = engine.context.get();
   const lastSwitch = context.lastSwitch;
@@ -58,15 +64,29 @@ export function AppBanners(): JSX.Element | null {
 
   if (!seen) throw new Error('AppBanners must be used inside DevOverridesProvider');
 
-  const showSwitch = shouldShowSwitch(lastSwitch, seen.seenAt)
-    && lastSwitch?.to === context.phase
-    && context.phaseSource !== 'manual';
-  if (!showSwitch && stale === undefined) return null;
+  const matchesPhase = lastSwitch?.to === context.phase && context.phaseSource !== 'manual';
+  const baseShow = shouldShowSwitch(lastSwitch, seen.seenAt) && matchesPhase;
+  const showSwitch = baseShow || (latchedAt !== null && lastSwitch?.at === latchedAt && matchesPhase);
+
+  useEffect(() => {
+    if (baseShow && lastSwitch && isFocused) {
+      setLatchedAt(lastSwitch.at);
+      seen.setSeenAt(lastSwitch.at);
+    }
+  }, [baseShow, lastSwitch?.at, lastSwitch, isFocused, seen]);
+
+  useEffect(() => {
+    if (!isFocused) setLatchedAt(null);
+  }, [isFocused]);
+
+  if (!showSwitch && stale === undefined && !showDevEntry) return null;
 
   const dismissSwitch = (): void => {
+    setLatchedAt(null);
     if (lastSwitch) seen.setSeenAt(lastSwitch.at);
   };
   const undoSwitch = (): void => {
+    setLatchedAt(null);
     engine.context.undoPhase();
     if (lastSwitch) seen.setSeenAt(lastSwitch.at);
   };
@@ -92,6 +112,11 @@ export function AppBanners(): JSX.Element | null {
           <View style={styles.staleAction}>
             <Button label={t.staleReconfirm} onPress={() => engine.context.reconfirmWarning(stale.kind)} variant="tonal" />
           </View>
+        </View>
+      ) : null}
+      {showDevEntry ? (
+        <View style={styles.devEntryRow}>
+          <DevPanelEntry />
         </View>
       ) : null}
     </View>
@@ -120,6 +145,7 @@ export function StatusBadges(): JSX.Element {
         <StatusBadge label={aiLabel} state={busy ? 'busy' : available ? 'on' : 'off'} icon={busy ? undefined : 'sparkles'} />
       </View>
       {lowBattery ? <StatusBadge label={saverOn && !manualLowBattery ? t.batterySaver : t.lowBattery} state="off" icon="battery-dead" /> : null}
+      <DevPanelEntry />
     </View>
   );
 }
@@ -129,4 +155,5 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   staleWrap: { borderRadius: t.radius.menu },
   staleAction: { alignItems: 'flex-end', paddingHorizontal: t.space.lg, paddingBottom: t.space.lg },
   badges: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap', gap: t.space.xs },
+  devEntryRow: { alignItems: 'flex-end' },
 });

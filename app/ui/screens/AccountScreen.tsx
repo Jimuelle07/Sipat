@@ -6,21 +6,23 @@ import { accountStrings } from '../strings/account';
 import { useT } from '../i18n';
 import { AppBanners } from '../context/AppChrome';
 import type { RootNavigation } from '../navigation/types';
-import { Button, Field, InlineError, Screen, Tile, Txt } from '../components';
+import { Button, Field, Screen, Tile, Txt } from '../components';
 import { useThemedStyles } from '../theme';
 import type { Theme } from '../theme';
 
 type AccountMode = 'signIn' | 'signUp' | 'forgot';
+type AccountField = 'email' | 'password' | 'confirm';
+type AccountError = { field: AccountField; message: string };
 
 export function emailValid(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 }
 
-function validate(mode: AccountMode, email: string, password: string, confirm: string, t: Record<keyof typeof accountStrings.tl, string>): string | null {
-  if (mode === 'forgot') return emailValid(email) ? null : t.emailInvalid;
-  if (!emailValid(email)) return t.emailInvalid;
-  if (password.length < 8) return t.passwordShort;
-  if (mode === 'signUp' && password !== confirm) return t.passwordMismatch;
+function validate(mode: AccountMode, email: string, password: string, confirm: string, t: Record<keyof typeof accountStrings.tl, string>): AccountError | null {
+  if (mode === 'forgot') return emailValid(email) ? null : { field: 'email', message: t.emailInvalid };
+  if (!emailValid(email)) return { field: 'email', message: t.emailInvalid };
+  if (password.length < 8) return { field: 'password', message: t.passwordShort };
+  if (mode === 'signUp' && password !== confirm) return { field: 'confirm', message: t.passwordMismatch };
   return null;
 }
 
@@ -37,7 +39,7 @@ export function AccountScreen(): JSX.Element {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<AccountError | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const submit = (): void => {
@@ -57,14 +59,13 @@ export function AccountScreen(): JSX.Element {
       banner={<AppBanners />}
     >
       <Tile title={mode === 'signIn' ? t.signInTitle : mode === 'signUp' ? t.signUpTitle : t.forgotTitle}>
-        <Field label={t.email} value={email} onChangeText={setEmail} autoCapitalize="none" autoComplete="email" keyboardType="email-address" />
+        <Field label={t.email} value={email} onChangeText={setEmail} autoCapitalize="none" autoComplete="email" keyboardType="email-address" error={error?.field === 'email' ? error.message : undefined} />
         {mode !== 'forgot' ? (
-          <Field label={t.password} value={password} onChangeText={setPassword} secureTextEntry autoComplete={mode === 'signUp' ? 'new-password' : 'password'} />
+          <Field label={t.password} value={password} onChangeText={setPassword} secureTextEntry autoComplete={mode === 'signUp' ? 'new-password' : 'password'} error={error?.field === 'password' ? error.message : undefined} />
         ) : null}
         {mode === 'signUp' ? (
-          <Field label={t.confirmPassword} value={confirm} onChangeText={setConfirm} secureTextEntry autoComplete="new-password" />
+          <Field label={t.confirmPassword} value={confirm} onChangeText={setConfirm} secureTextEntry autoComplete="new-password" error={error?.field === 'confirm' ? error.message : undefined} />
         ) : null}
-        {error ? <InlineError message={error} /> : null}
         {notice ? <Txt role="bodySmall" tone="accent" accessibilityRole="alert">{notice}</Txt> : null}
         <Button label={mode === 'signIn' ? t.signIn : mode === 'signUp' ? t.signUp : t.sendReset} onPress={submit} icon={mode === 'forgot' ? 'mail-outline' : 'log-in-outline'} />
         <View style={styles.links}>

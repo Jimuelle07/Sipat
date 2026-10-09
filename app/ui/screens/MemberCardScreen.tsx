@@ -41,8 +41,11 @@ export function MemberCardScreen(): JSX.Element {
   }
 
   const pending = card.member.photoStatus === 'pending';
+  const isOwnerCard = engine.profiles.active()?.ownerId === card.member.id;
   const lines = [
-    { label: t.ownerLabel, value: card.ownerPhone ? `${card.ownerName} · ${card.ownerPhone}` : card.ownerName },
+    ...(isOwnerCard
+      ? []
+      : [{ label: t.ownerLabel, value: card.ownerPhone ? `${card.ownerName} · ${card.ownerPhone}` : card.ownerName }]),
     ...(card.evacuationCenter ? [{ label: t.centerLabel, value: card.evacuationCenter }] : []),
     ...(card.meetingPlace ? [{ label: t.meetingLabel, value: card.meetingPlace }] : []),
   ];

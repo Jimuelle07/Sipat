@@ -52,6 +52,7 @@ export function MemberEditorScreen(): JSX.Element {
   const [errors, setErrors] = useState<{ code: string; field: string }[]>([]);
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [photoError, setPhotoError] = useState<string | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState(false);
 
   const isOwner = member !== undefined && profile?.ownerId === member.id;
   const messages = fieldErrors(lang, errors);
@@ -175,6 +176,7 @@ export function MemberEditorScreen(): JSX.Element {
               size={theme.space.xxxl}
               pending={member.photoStatus === 'pending'}
               pendingLabel={t.memberAvatar}
+              label={member.name}
             />
             {member.photoStatus === 'pending' ? (
               <Txt role="bodySmall" tone="muted" style={styles.photoNote}>
@@ -185,7 +187,16 @@ export function MemberEditorScreen(): JSX.Element {
           <Button label={t.changePhoto} variant="tonal" icon="camera" onPress={() => navigation.navigate('Photo', { memberId: member.id })} />
           {member.photo ? <Button label={t.removePhoto} variant="tonal" icon="trash-outline" onPress={removePhoto} /> : null}
           {photoError ? <InlineError message={photoError} /> : null}
-          {!isOwner ? <Button label={t.removeMember} variant="danger" icon="trash-outline" onPress={removeMember} /> : null}
+          {!isOwner ? (
+            confirmRemove ? (
+              <View style={styles.actions}>
+                <Button label={t.cancel} variant="tonal" onPress={() => { setConfirmRemove(false); setGeneralError(null); }} />
+                <Button label={t.confirmRemove} variant="danger" icon="trash-outline" onPress={removeMember} />
+              </View>
+            ) : (
+              <Button label={t.removeMember} variant="danger" icon="trash-outline" onPress={() => { setConfirmRemove(true); setGeneralError(null); }} />
+            )
+          ) : null}
         </Tile>
       ) : null}
     </Screen>
@@ -196,4 +207,5 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.sm },
   photoRow: { flexDirection: 'row', alignItems: 'center', gap: t.space.md },
   photoNote: { flex: 1 },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: t.space.sm },
 });

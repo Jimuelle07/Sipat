@@ -50,7 +50,7 @@ export const profileStrings = defineStrings({
 
     settingsLink: 'Mga setting',
     accountLink: 'Account',
-    linksTitle: 'Iba pang mga screen',
+    linksTitle: 'Higit pa',
   },
   en: {
     screenTitle: 'Family',
@@ -97,6 +97,6 @@ export const profileStrings = defineStrings({
 
     settingsLink: 'Settings',
     accountLink: 'Account',
-    linksTitle: 'Other screens',
+    linksTitle: 'More',
   },
 });

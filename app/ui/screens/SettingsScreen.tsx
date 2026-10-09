@@ -6,7 +6,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import type { DeviceTier, Settings } from '../../engine';
 import { AppBanners } from '../context/AppChrome';
-import { DevPanel } from '../context/DevPanel';
 import { useEngine, useEngineChange } from '../context/useEngine';
 import { Button, InlineError, LanguageToggle, ProgressBar, Screen, Tag, Tile, ToggleRow, Txt } from '../components';
 import { useLang, useT } from '../i18n';
@@ -44,6 +43,7 @@ export function SettingsScreen(): JSX.Element {
   const model = info.model;
 
   const [error, setError] = useState<string | null>(null);
+  const [stepError, setStepError] = useState<{ key: 'lowBatteryThreshold' | 'staleWarningHours'; message: string } | null>(null);
   const [install, dispatch] = useReducer(installReducer, { kind: 'idle' } as InstallState);
   const controllerRef = useRef<AbortController | null>(null);
   const [removing, setRemoving] = useState(false);
@@ -53,11 +53,18 @@ export function SettingsScreen(): JSX.Element {
 
   const updateSetting = (patch: Partial<Settings>): void => {
     const result = engine.settings.update(patch);
+    setStepError(null);
     setError(result.ok ? null : errorMessage(lang, 'settings', result.error.code));
   };
   const step = (key: 'lowBatteryThreshold' | 'staleWarningHours', delta: number): void => {
     const result = engine.settings.update({ [key]: settings[key] + delta });
-    setError(result.ok ? null : errorMessage(lang, 'settings', result.error.code));
+    setError(null);
+    if (result.ok) {
+      setStepError(null);
+      return;
+    }
+    const message = errorMessage(lang, 'settings', result.error.code);
+    setStepError(message === null ? null : { key, message });
   };
   const startInstall = async (): Promise<void> => {
     dispatch({ type: 'start' });
@@ -124,7 +131,7 @@ export function SettingsScreen(): JSX.Element {
           <View style={styles.block}>
             <View style={styles.modelHead}>
               <Ionicons name="sparkles-outline" size={theme.type.roles.title.fontSize} color={theme.colors.accentText} />
-              <Txt role="body" style={styles.modelName} numberOfLines={1}>{model.fileName}</Txt>
+              <Txt role="body" style={styles.modelName} numberOfLines={2}>{model.fileName}</Txt>
               <Tag label={t.modelPresent} />
             </View>
             {install.kind === 'installed' ? <Txt role="bodySmall" tone="accent">{t.modelInstalled}</Txt> : null}
@@ -145,6 +152,7 @@ export function SettingsScreen(): JSX.Element {
         ) : (
           <View style={styles.block}>
             <Tag label={t.modelMissing} />
+            <Txt role="bodySmall" tone="muted">{t.modelMissingHint}</Txt>
             {install.kind === 'installed' ? <Txt role="bodySmall" tone="accent">{t.modelInstalled}</Txt> : null}
             {install.kind === 'error' && install.code !== 'cancelled' ? (
               <InlineError message={errorMessage(lang, 'model_install', install.code) ?? ''} />
@@ -176,6 +184,7 @@ export function SettingsScreen(): JSX.Element {
           onStep={(delta) => step('lowBatteryThreshold', delta)}
           decreaseLabel={base.decrease}
           increaseLabel={base.increase}
+          error={stepError?.key === 'lowBatteryThreshold' ? stepError.message : undefined}
         />
         <Stepper
           label={t.staleWarningHours}
@@ -184,11 +193,12 @@ export function SettingsScreen(): JSX.Element {
           onStep={(delta) => step('staleWarningHours', delta)}
           decreaseLabel={base.decrease}
           increaseLabel={base.increase}
+          error={stepError?.key === 'staleWarningHours' ? stepError.message : undefined}
         />
       </Tile>
 
       <Tile title={t.areaSection}>
-        <AreaPicker onPicked={() => setError(null)} />
+        <AreaPicker onPicked={() => { setError(null); setStepError(null); }} />
       </Tile>
 
       <Tile title={t.privacySection}>
@@ -225,8 +235,6 @@ export function SettingsScreen(): JSX.Element {
         <LinkRow icon="clipboard-outline" label={t.evaluation} onPress={() => nav.navigate('Evaluation')} />
         <LinkRow icon="person-circle-outline" label={t.account} onPress={() => nav.navigate('Account')} />
       </Tile>
-
-      <DevPanel />
     </Screen>
   );
 }
@@ -241,13 +249,14 @@ function StatusRow({ label, value }: { label: string; value: string }): JSX.Elem
   );
 }
 
-function Stepper({ label, value, suffix, onStep, decreaseLabel, increaseLabel }: {
+function Stepper({ label, value, suffix, onStep, decreaseLabel, increaseLabel, error }: {
   label: string;
   value: number;
   suffix: string;
   onStep: (delta: number) => void;
   decreaseLabel: string;
   increaseLabel: string;
+  error?: string;
 }): JSX.Element {
   const theme = useTheme();
   const styles = useThemedStyles(makeStyles);
@@ -273,6 +282,7 @@ function Stepper({ label, value, suffix, onStep, decreaseLabel, increaseLabel }:
           <Ionicons name="add" size={theme.type.roles.title.fontSize} color={theme.colors.capsule.ink} />
         </Pressable>
       </View>
+      {error !== undefined ? <InlineError message={error} /> : null}
     </View>
   );
 }
@@ -319,7 +329,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   },
   modelHead: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: t.space.md,
   },
   modelName: {

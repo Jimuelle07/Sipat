@@ -55,10 +55,12 @@ export function PassageScreen(): JSX.Element {
               <Txt role="bodySmall" tone="brand" selectable>{detail.source.url}</Txt>
               <Txt role="caption" tone="muted">{t.urlHint}</Txt>
             </View>
-            <Txt role="bodySmall" tone="muted">
-              {fill(t.reviewedLine, { name: detail.reviewedBy, date: detail.reviewedAt })}
-            </Txt>
-            <Txt role="bodySmall" tone="muted">{fill(t.versionLabel, { version: detail.version })}</Txt>
+            <View style={styles.meta}>
+              <Txt role="bodySmall" tone="muted">
+                {fill(t.reviewedLine, { name: detail.reviewedBy, date: detail.reviewedAt })}
+              </Txt>
+              <Txt role="bodySmall" tone="muted">{fill(t.versionLabel, { version: detail.version })}</Txt>
+            </View>
           </Tile>
         </>
       )}
@@ -76,6 +78,9 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   },
   sourceRow: {
     gap: t.space.xs,
+  },
+  meta: {
+    gap: t.space.hair,
   },
   note: {
     fontStyle: 'italic',

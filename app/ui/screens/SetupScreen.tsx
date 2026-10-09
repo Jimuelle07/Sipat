@@ -157,6 +157,7 @@ export function SetupScreen(): JSX.Element {
                 size={theme.space.xxxl}
                 pending={owner?.photoStatus === 'pending'}
                 pendingLabel={t.photoPending}
+                label={owner?.name}
               />
               <Txt role="bodySmall" tone="muted" style={styles.ownerName}>{owner?.name ?? ''}</Txt>
             </View>
@@ -185,6 +186,7 @@ export function SetupScreen(): JSX.Element {
                   size={theme.space.xxl}
                   pending={member.photoStatus === 'pending'}
                   pendingLabel={t.photoPending}
+                  label={member.name}
                 />
                 <Txt role="body" style={styles.memberName} numberOfLines={1}>{member.name}</Txt>
               </View>

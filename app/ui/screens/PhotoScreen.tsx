@@ -40,6 +40,18 @@ function CircularPreview({ uri, label }: { uri: string; label: string }): JSX.El
   );
 }
 
+/** Calm guidance line for a manual-crop hint; face detection is advice, not an error. */
+function GuidanceNotice({ message }: { message: string }): JSX.Element {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
+  return (
+    <View style={styles.guidance} accessibilityRole="alert">
+      <Ionicons name="information-circle-outline" size={t.type.roles.body.fontSize} color={t.colors.textMuted} />
+      <Txt role="bodySmall" tone="muted" style={styles.guidanceText}>{message}</Txt>
+    </View>
+  );
+}
+
 /**
  * Required member photo: a portrait-studio world (dark scrim stage, a circular face guide in the
  * highlight colour) that walks choose → crop → confirm → saving → done. There is no skip; "Mamaya na"
@@ -195,7 +207,11 @@ export function PhotoScreen(): JSX.Element {
       hideLanguage
       back={{ label: t.back, onPress: navigation.goBack }}
     >
-      {notice !== null ? <InlineError message={notice} /> : null}
+      {notice !== null ? (
+        flow.notice?.source === 'face_detection'
+          ? <GuidanceNotice message={notice} />
+          : <InlineError message={notice} />
+      ) : null}
       {renderStep(current)}
       {current.step !== 'done' ? (
         <Button label={t.later} variant="text" onPress={later} accessibilityLabel={t.later} />
@@ -235,6 +251,16 @@ const makeStyles = (t: Theme) => {
       borderColor: t.colors.highlight.fill,
     },
     copy: { gap: t.space.xs },
+    guidance: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: t.space.xs,
+      paddingHorizontal: t.space.md,
+      paddingVertical: t.space.sm,
+      borderRadius: t.radius.form,
+      backgroundColor: t.colors.surface,
+    },
+    guidanceText: { flexShrink: 1 },
     actions: { gap: t.space.sm },
     busy: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: t.space.md },
     previewCircle: {

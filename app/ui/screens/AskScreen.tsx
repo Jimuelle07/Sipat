@@ -77,6 +77,7 @@ export function AskScreen(): JSX.Element {
   const mounted = useRef(true);
   const runId = useRef(0);
   const scrollRef = useRef<ScrollView>(null);
+  const emergencyPinned = useRef(false);
   const maxLength = engine.ask.maxLength;
   const canUndo = engine.context.get().undo !== undefined && !undoHidden;
 
@@ -96,6 +97,7 @@ export function AskScreen(): JSX.Element {
     Keyboard.dismiss();
     engine.ask.cancel();
     const id = ++runId.current;
+    emergencyPinned.current = false;
     setQuestion('');
     setUndoHidden(false);
     setSourceVisible(false);
@@ -342,7 +344,16 @@ export function AskScreen(): JSX.Element {
         style={styles.scroll}
         contentContainerStyle={asked ? styles.answerContent : styles.emptyContent}
         keyboardShouldPersistTaps="handled"
-        onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}
+        onContentSizeChange={() => {
+          if (plan.emergency) {
+            if (!emergencyPinned.current) {
+              emergencyPinned.current = true;
+              scrollRef.current?.scrollTo({ y: 0, animated: false });
+            }
+            return;
+          }
+          scrollRef.current?.scrollToEnd({ animated: false });
+        }}
       >
         {asked ? answer : empty}
       </ScrollView>
@@ -381,7 +392,7 @@ export function AskScreen(): JSX.Element {
 }
 
 const makeStyles = (t: Theme) => {
-  const inputMax = t.minTouch * 3;
+  const inputMax = t.border.control * 2 + t.space.md * 2 + t.type.roles.body.lineHeight * 4;
   return StyleSheet.create({
     scroll: { flex: 1 },
     answerContent: { gap: t.space.lg, paddingBottom: t.space.md },
@@ -399,10 +410,12 @@ const makeStyles = (t: Theme) => {
     },
     inputWrap: {
       flex: 1,
+      minWidth: 0,
       minHeight: t.minTouch,
       maxHeight: inputMax,
       flexDirection: 'row',
       alignItems: 'flex-end',
+      gap: t.space.sm,
     },
     input: {
       flex: 1,
@@ -419,6 +432,6 @@ const makeStyles = (t: Theme) => {
       borderWidth: t.border.control,
       borderRadius: t.radius.panel,
     },
-    counter: { alignSelf: 'flex-end', paddingBottom: t.space.sm, paddingRight: t.space.sm },
+    counter: { alignSelf: 'flex-end', paddingBottom: t.space.md },
   });
 };

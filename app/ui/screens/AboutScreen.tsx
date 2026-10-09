@@ -74,8 +74,8 @@ export function AboutScreen(): JSX.Element {
       <View style={styles.group}>
         <SectionHeader title={t.sourcesTitle} />
         <Tile>
-          {sources.length === 0 ? <Txt role="bodySmall" tone="muted">{t.noSources}</Txt> : sources.map((source) => (
-            <View key={source.id} style={styles.entry}>
+          {sources.length === 0 ? <Txt role="bodySmall" tone="muted">{t.noSources}</Txt> : sources.map((source, index) => (
+            <View key={source.id} style={[styles.entry, index === sources.length - 1 && styles.entryLast]}>
               <Txt role="body">{source.title}</Txt>
               <Txt role="bodySmall" tone="muted">{source.agency} · {source.date}</Txt>
             </View>
@@ -86,8 +86,8 @@ export function AboutScreen(): JSX.Element {
       <View style={styles.group}>
         <SectionHeader title={t.reviewersTitle} />
         <Tile>
-          {reviewers.length === 0 ? <Txt role="bodySmall" tone="muted">{t.noReviewers}</Txt> : reviewers.map((reviewer) => (
-            <View key={reviewer.name} style={styles.entry}>
+          {reviewers.length === 0 ? <Txt role="bodySmall" tone="muted">{t.noReviewers}</Txt> : reviewers.map((reviewer, index) => (
+            <View key={reviewer.name} style={[styles.entry, index === reviewers.length - 1 && styles.entryLast]}>
               <Txt role="body">{reviewer.name}</Txt>
               <Txt role="bodySmall" tone="muted">
                 {fill(t.reviewerPassages, { count: reviewer.passages })}
@@ -100,8 +100,8 @@ export function AboutScreen(): JSX.Element {
       <View style={styles.group}>
         <SectionHeader title={t.packsTitle} />
         <Tile>
-          {packs.length === 0 ? <Txt role="bodySmall" tone="muted">{t.noPacks}</Txt> : packs.map((pack) => (
-            <View key={pack.packId} style={styles.entry}>
+          {packs.length === 0 ? <Txt role="bodySmall" tone="muted">{t.noPacks}</Txt> : packs.map((pack, index) => (
+            <View key={pack.packId} style={[styles.entry, index === packs.length - 1 && styles.entryLast]}>
               <Txt role="body">{t[packKindKeys[pack.kind]]}</Txt>
               <Txt role="bodySmall" tone="muted">
                 {fill(t.packVersion, { version: pack.version })}
@@ -138,5 +138,9 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     paddingVertical: t.space.xs,
     borderBottomWidth: t.border.hairline,
     borderBottomColor: t.colors.hairline,
+  },
+  entryLast: {
+    borderBottomWidth: 0,
+    paddingBottom: 0,
   },
 });

@@ -13,6 +13,8 @@
     "validate:content": "tsx scripts/validate-content.ts"
   },
   "dependencies": {
+    "@expo-google-fonts/bowlby-one": "^0.4.1",
+    "@expo-google-fonts/inter": "^0.4.2",
     "@expo/metro-runtime": "~57.0.16",
     "@expo/vector-icons": "^15.0.2",
     "@react-navigation/bottom-tabs": "^7.20.0",

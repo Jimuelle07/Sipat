@@ -14,14 +14,16 @@ export interface MascotSlotProps {
   /** Optional art that replaces the phase mascot. */
   children?: ReactNode;
   accessibilityLabel?: string;
+  /** Overrides the theme size (hero poster). */
+  size?: number;
 }
 
 /**
  * Phase mascot sized by the theme, with an optional custom illustration.
  */
-export function MascotSlot({ children, accessibilityLabel }: MascotSlotProps): JSX.Element {
+export function MascotSlot({ children, accessibilityLabel, size }: MascotSlotProps): JSX.Element {
   const t = useTheme();
-  const styles = useThemedStyles(makeStyles);
+  const styles = useThemedStyles((th: Theme) => makeStyles(th, size ?? th.mascot.size));
   const copy = useT(commonStrings);
   const source = t.phase === 'before' ? beforeArt : t.phase === 'during' ? duringArt : afterArt;
   const label = t.phase === 'before' ? copy.mascot_before : t.phase === 'during' ? copy.mascot_during : copy.mascot_after;
@@ -36,7 +38,7 @@ export function MascotSlot({ children, accessibilityLabel }: MascotSlotProps): J
     >
       {children ?? (
         <>
-          {t.scheme === 'dark' ? <View style={styles.darkBackdrop} /> : null}
+          {t.scheme === 'dark' && size === undefined ? <View style={styles.darkBackdrop} /> : null}
           <Image source={source} resizeMode="contain" resizeMethod="resize" style={styles.art} />
         </>
       )}
@@ -44,22 +46,22 @@ export function MascotSlot({ children, accessibilityLabel }: MascotSlotProps): J
   );
 }
 
-const makeStyles = (t: Theme) => StyleSheet.create({
+const makeStyles = (t: Theme, box: number) => StyleSheet.create({
   slot: {
-    width: t.mascot.size,
-    height: t.mascot.size,
+    width: box,
+    height: box,
     alignItems: 'center',
     justifyContent: 'center',
   },
   darkBackdrop: {
     position: 'absolute',
-    width: t.mascot.size,
-    height: t.mascot.size,
+    width: box,
+    height: box,
     borderRadius: t.radius.pill,
     backgroundColor: t.colors.surface,
   },
   art: {
-    width: t.mascot.size * 0.75,
-    height: t.mascot.size,
+    width: box * 0.75,
+    height: box,
   },
 });

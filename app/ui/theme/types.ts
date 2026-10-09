@@ -9,6 +9,8 @@ export interface Palette {
   phase: Record<Phase, { tint: string; soft: string; main: string; deep: string }>;
   gray: Record<'0' | '50' | '100' | '200' | '300' | '400' | '500' | '600' | '700' | '800' | '900', string>;
   alert: { tint: string; soft: string; main: string; deep: string };
+  /** design/design-v2 sticker set: the shared confetti palette. */
+  sticker: Record<'carbon' | 'paper' | 'skyWash' | 'concrete' | 'mist' | 'blue' | 'mint' | 'lavender' | 'ember' | 'sunburst' | 'violet', string>;
   dark: { bg: string; surface: string; border: string; primary: string; text: string };
 }
 
@@ -46,6 +48,8 @@ export interface ColorRoles {
   dangerSurface: Tone;     // calm alert surface: tinted fill with alert ink
   scrim: string;           // overlay behind sheets and the crop frame; applied with scrimOpacity
   mascot: { original: string; refresh: string }; // reserved for the mascot slot only
+  wash: string;            // the phase's big sticker colour: hero blob, selected segment, decorations
+  stickers: Palette['sticker']; // the shared sticker set for decorations only
 }
 
 export type WarningTone = Tone;
@@ -59,7 +63,7 @@ export interface WarningTones {
 export interface TextStyleToken {
   fontSize: number;      // sp
   lineHeight: number;    // sp
-  fontWeight: '400' | '500' | '700';
+  fontWeight: '400' | '500' | '700' | '800';
   letterSpacing: number; // sp (design/ em tracking × fontSize)
 }
 
@@ -67,7 +71,8 @@ export type TypeRole =
   | 'display' | 'headline' | 'title' | 'lead' | 'body' | 'bodySmall' | 'label' | 'caption';
 
 export interface Typography {
-  fontFamily: undefined; // system face (Roboto); see PR findings
+  /** Bundled faces: heavy display for headings, Inter for reading. Loaded once at the app root. */
+  families: { display: string; medium: string; bold: string };
   roles: Record<TypeRole, TextStyleToken>;
   maxFontSizeMultiplier: number;
 }
@@ -128,7 +133,17 @@ export interface MascotSlotSpec {
   placement: 'heroEnd' | 'headerEnd' | 'heroBelow';
 }
 
+export interface ShadowSpec {
+  offsetX: number;
+  offsetY: number;
+  blurRadius: number;
+  spreadRadius: number;
+  color: string;
+}
+
 export interface Theme {
+  /** Soft lift under outlined stickers: a tight contact shadow plus a long ambient one. */
+  shadow: { sticker: ShadowSpec[]; float: ShadowSpec[] };
   phase: Phase;
   scheme: Scheme;
   largeText: boolean;

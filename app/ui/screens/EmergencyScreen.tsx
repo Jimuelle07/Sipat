@@ -58,7 +58,7 @@ export function EmergencyScreen(): JSX.Element {
       </View>
 
       <ScrollView contentContainerStyle={styles.body}>
-        <Txt role="display" color={ink} accessibilityRole="header">{card.title}</Txt>
+        <Txt role="display" color={ink} accessibilityRole="header" style={styles.title}>{card.title}</Txt>
 
         <View style={styles.steps}>
           {card.steps.map((step, index) => (
@@ -134,6 +134,10 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: t.space.lg,
+  },
+  title: {
+    fontSize: 40,
+    lineHeight: 44,
   },
   stepNumber: {
     minWidth: t.space.xxxl,

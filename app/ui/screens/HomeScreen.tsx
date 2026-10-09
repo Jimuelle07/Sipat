@@ -1,5 +1,5 @@
 import type { JSX } from 'react';
-import { Fragment, useState } from 'react';
+import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -7,12 +7,13 @@ import type { RootNavigation } from '../navigation/types';
 import type { ColorLevel, Phase, TcwsLevel, WarningEntry, WarningInput } from '../../engine';
 import { useEngine, useEngineChange } from '../context/useEngine';
 import { AppBanners, StatusBadges } from '../context/AppChrome';
-import { Button, CenterTile, MascotSlot, OptionGrid, PendingReminder, PhaseSelector, Screen, Tile, ToggleRow, Txt, WarningChip, WarningOption } from '../components';
+import { Button, CenterTile, MascotSlot, Marquee, Sticker, OptionGrid, PendingReminder, PhaseSelector, Screen, Tile, ToggleRow, Txt, WarningChip, WarningOption } from '../components';
 import { useLang, useT } from '../i18n';
 import { commonStrings } from '../strings/common';
 import { errorMessage } from '../strings/errors';
 import { fill } from '../strings/format';
 import { homeStrings } from '../strings/home';
+import { Float, Pop, SpringIn } from '../motion/spring';
 import { useTheme, useThemedStyles } from '../theme';
 import type { HomeSection, Theme } from '../theme';
 import { cardLevel, homeSections, isOptionActive, pickerGroups, warningTone } from './home/homeModel';
@@ -49,6 +50,13 @@ export function warningInput(warning: WarningEntry): WarningInput {
   }
 }
 
+/** Display size that keeps the longest word inside the poster (heavy caps run ~0.72em per letter). */
+function posterFont(name: string): { fontSize: number; lineHeight: number } {
+  const longest = Math.max(...name.split(' ').map((word) => word.length));
+  const fontSize = Math.min(64, Math.floor(290 / (longest * 0.92)));
+  return { fontSize, lineHeight: Math.round(fontSize * 0.98) };
+}
+
 export function HomeScreen(): JSX.Element {
   const engine = useEngine();
   const navigation = useNavigation<RootNavigation>();
@@ -77,22 +85,35 @@ export function HomeScreen(): JSX.Element {
   const aiStatus = status.ai.allowed
     ? t.aiAvailable
     : errorMessage(lang, 'ai', status.ai.reason) ?? '';
+  const recommendation = context.recommended !== null && context.recommended.phase !== context.phase
+    ? context.recommended
+    : null;
+  // The user always sees why the app is in this phase: the recommendation's reason while one is pending,
+  // otherwise the engine's reason for the current phase.
+  const reasonText = recommendation ? recommendation.reason.text : context.reason.text;
 
+  const st = theme.colors.stickers;
+  const phaseName = engine.copy(phaseNameKeys[context.phase]);
   const hero = (
     <View style={styles.hero}>
-      <View style={styles.heroMain}>
-        <View style={styles.heroCopy}>
-          <Txt role="display" tone="accent" accessibilityRole="header">
-            {engine.copy(phaseNameKeys[context.phase])}
-          </Txt>
-          <Txt role="body" tone="muted">{common[moodKeys[context.phase]]}</Txt>
+      <View style={styles.posterStack}>
+        <View style={[styles.posterBack, { backgroundColor: context.phase === 'before' ? st.lavender : context.phase === 'during' ? st.ember : st.sunburst }]} />
+        <SpringIn rise={46}>
+        <View style={styles.poster}>
+        <Sticker kind="ring" color={context.phase === 'before' ? st.skyWash : st.paper} size={260} style={styles.ribbon} />
+        <Pop delay={380} rotate={-12} style={styles.coin}><Sticker kind="coin" color={st.sunburst} size={54} style={styles.flow} /></Pop>
+        <Pop delay={520} rotate={10} style={styles.check}><Sticker kind="check" color={st.mint} size={50} style={styles.flow} /></Pop>
+        <Pop delay={650} rotate={18} style={styles.burst}><Sticker kind="burst" color={st.ember} size={40} style={styles.flow} /></Pop>
+        <Txt role="display" color={st.carbon} accessibilityRole="header" style={[styles.posterTitle, posterFont(phaseName)]}>{phaseName}</Txt>
+        <Txt role="lead" color={st.carbon} style={styles.posterMood}>{common[moodKeys[context.phase]]}</Txt>
+        <Float style={styles.posterMascot}><MascotSlot size={230} /></Float>
         </View>
-        {theme.mascot.placement === 'heroEnd' ? <MascotSlot /> : null}
+        </SpringIn>
       </View>
       <PhaseSelector
         value={context.phase}
-        recommended={context.recommended?.phase}
-        reasonText={context.recommended ? context.recommended.reason.text : context.reason.text}
+        recommended={recommendation?.phase}
+        reasonText={reasonText}
         labels={phaseLabels}
         recommendedLabel={common.recommended}
         onSelect={(phase) => engine.context.setPhase(phase)}
@@ -107,7 +128,6 @@ export function HomeScreen(): JSX.Element {
           }}
         />
       ) : null}
-      {theme.mascot.placement === 'heroBelow' ? <View style={styles.heroMascot}><MascotSlot /></View> : null}
     </View>
   );
 
@@ -200,19 +220,23 @@ export function HomeScreen(): JSX.Element {
   );
 
   const checklist = (
-    <Tile title={t.checklistTitle} onPress={() => navigation.navigate('Checklist')}>
+    <Tile title={t.checklistTitle} onPress={() => navigation.navigate('Checklist')} wash={st.sunburst} tilt={0.8}>
       <View style={styles.shortcutBody}>
-        <Txt role="bodySmall" tone="muted">{t.checklistHint}</Txt>
-        <Ionicons name="arrow-forward" size={theme.type.roles.title.fontSize} color={theme.colors.accentText} />
+        <Txt role="bodySmall" style={styles.hint}>{t.checklistHint}</Txt>
+        <View style={styles.iconDisc}>
+          <Ionicons name="arrow-forward" size={theme.type.roles.title.fontSize} color={st.carbon} />
+        </View>
       </View>
     </Tile>
   );
 
-  const shortcuts = (title: string, hint: string, icon: 'chatbubble-ellipses-outline' | 'book-outline' | 'call-outline', onPress: () => void): JSX.Element => (
-    <Tile title={title} onPress={onPress}>
+  const shortcuts = (title: string, hint: string, icon: 'chatbubble-ellipses-outline' | 'book-outline' | 'call-outline', onPress: () => void, wash: string, tilt: number): JSX.Element => (
+    <Tile title={title} onPress={onPress} wash={wash} tilt={tilt}>
       <View style={styles.shortcutBody}>
-        <Txt role="bodySmall" tone="muted">{hint}</Txt>
-        <Ionicons name={icon} size={theme.type.roles.title.fontSize} color={theme.colors.accentText} />
+        <Txt role="bodySmall" style={styles.hint}>{hint}</Txt>
+        <View style={styles.iconDisc}>
+          <Ionicons name={icon} size={theme.type.roles.title.fontSize} color={st.carbon} />
+        </View>
       </View>
     </Tile>
   );
@@ -239,17 +263,18 @@ export function HomeScreen(): JSX.Element {
     center: centerSection,
     pendingPhotos,
     checklist,
-    ask: shortcuts(t.askTitle, t.askHint, 'chatbubble-ellipses-outline', () => navigation.navigate('Tabs', { screen: 'Ask' })),
-    guide: shortcuts(t.guideTitle, t.guideHint, 'book-outline', () => navigation.navigate('Tabs', { screen: 'Guide' })),
-    hotlines: shortcuts(t.hotlinesTitle, t.hotlinesHint, 'call-outline', () => navigation.navigate('Tabs', { screen: 'Hotlines' })),
+    ask: shortcuts(t.askTitle, t.askHint, 'chatbubble-ellipses-outline', () => navigation.navigate('Tabs', { screen: 'Ask' }), st.blue, -1.2),
+    guide: shortcuts(t.guideTitle, t.guideHint, 'book-outline', () => navigation.navigate('Tabs', { screen: 'Guide' }), st.lavender, 1),
+    hotlines: shortcuts(t.hotlinesTitle, t.hotlinesHint, 'call-outline', () => navigation.navigate('Tabs', { screen: 'Hotlines' }), st.mint, -0.8),
     battery,
   };
 
   return (
     <Screen title={t.title} banner={<AppBanners />} right={<StatusBadges />} mascot={theme.mascot.placement === 'headerEnd' ? <MascotSlot /> : undefined}>
+      <View style={styles.marquee}><Marquee text={`${phaseName} · ${common[moodKeys[context.phase]]}`} /></View>
       <View style={styles.sections}>
-        {homeSections(theme.home.order, availableSections).map((section) => (
-          <Fragment key={section}>{sections[section] ?? null}</Fragment>
+        {homeSections(theme.home.order, availableSections).map((section, index) => (
+          <SpringIn key={section} index={index + 1}>{sections[section] ?? null}</SpringIn>
         ))}
       </View>
     </Screen>
@@ -263,19 +288,55 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   hero: {
     gap: t.space.lg,
   },
-  heroMain: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: t.space.gutter,
+  marquee: {
+    marginHorizontal: -t.space.gutter,
+    marginTop: -t.space.gutter,
+    marginBottom: t.space.xs,
   },
-  heroCopy: {
-    flex: 1,
-    gap: t.space.xs,
+  posterStack: {
+    paddingBottom: t.space.xl,
   },
-  heroMascot: {
-    alignItems: 'center',
+  posterBack: {
+    position: 'absolute',
+    left: t.space.xs,
+    right: t.space.xs,
+    top: t.space.xxl,
+    bottom: -t.space.md,
+    borderRadius: t.radius.capsule,
+    borderWidth: t.border.emphasis,
+    borderColor: t.colors.stickers.carbon,
+    transform: [{ rotate: '3.2deg' }],
   },
+  flow: {
+    position: 'relative',
+  },
+  poster: {
+    minHeight: 400,
+    boxShadow: t.shadow.float,
+    overflow: 'hidden',
+    padding: t.space.tile,
+    borderRadius: t.radius.capsule,
+    borderWidth: t.border.emphasis,
+    borderColor: t.colors.stickers.carbon,
+    backgroundColor: t.colors.wash,
+  },
+  posterTitle: {
+    textTransform: 'uppercase',
+    maxWidth: '85%',
+  },
+  posterMood: {
+    marginTop: t.space.lg,
+    maxWidth: '52%',
+  },
+  posterMascot: {
+    position: 'absolute',
+    right: -t.space.md,
+    bottom: -t.space.xxl,
+  },
+  ribbon: { right: -70, top: 70 },
+  coin: { position: 'absolute', right: 22, top: 20 },
+  check: { position: 'absolute', left: 22, bottom: 24 },
+  burst: { position: 'absolute', right: 40, top: 150 },
   section: {
     gap: t.space.gutter,
   },
@@ -287,6 +348,21 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   },
   pickerGroup: {
     gap: t.space.xs,
+  },
+  hint: {
+    flex: 1,
+    color: t.colors.stickers.carbon,
+  },
+  iconDisc: {
+    width: 52,
+    height: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: t.radius.pill,
+    borderWidth: t.border.control,
+    borderColor: t.colors.stickers.carbon,
+    backgroundColor: t.colors.stickers.paper,
+    boxShadow: t.shadow.sticker,
   },
   shortcutBody: {
     flexDirection: 'row',

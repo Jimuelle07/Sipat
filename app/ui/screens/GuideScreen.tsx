@@ -10,7 +10,8 @@ import { useLang, useT } from '../i18n';
 import { useTheme, useThemedStyles } from '../theme';
 import type { Theme } from '../theme';
 import { guideStrings, guideTopicLabels } from '../strings/guide';
-import { Button, EmptyState, Screen, SectionHeader, Tag, Tile, Txt } from '../components';
+import { fill } from '../strings/format';
+import { Button, EmptyState, Screen, Tag, Tile, Txt } from '../components';
 import type { RootNavigation, RootTabParamList } from '../navigation/types';
 
 export type GuideView =
@@ -60,7 +61,6 @@ export function GuideScreen(): JSX.Element {
   if (view.kind === 'topics') {
     return (
       <Screen title={t.title} banner={<AppBanners />} right={<StatusBadges />}>
-        <SectionHeader title={t.topicsTitle} />
         {topics.length === 0 ? (
           <EmptyState icon="book-outline" title={t.noTopics} />
         ) : (
@@ -75,7 +75,7 @@ export function GuideScreen(): JSX.Element {
                     accessibilityLabel={hasCritical ? `${labels[topic]}, ${count}, ${t.critical}` : `${labels[topic]}, ${count}`}
                   >
                     <View style={styles.tileMeta}>
-                      <Tag label={String(count)} />
+                      <Tag label={fill(t.countLabel, { count })} />
                       {hasCritical ? (
                         <Tag label={t.critical} tone={theme.colors.dangerSurface} icon="alert-circle-outline" />
                       ) : null}
@@ -122,7 +122,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     gap: t.space.gutter,
   },
   gridCell: {
-    width: '48%',
+    width: t.largeText ? '100%' : '48%',
   },
   tileMeta: {
     flexDirection: 'row',

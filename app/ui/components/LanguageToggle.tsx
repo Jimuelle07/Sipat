@@ -50,7 +50,9 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     alignItems: 'center',
     padding: t.space.hair,
     borderRadius: t.radius.pill,
-    backgroundColor: t.colors.surfaceSunken,
+    backgroundColor: t.colors.surface,
+    borderWidth: t.border.control,
+    borderColor: t.colors.stickers.carbon,
   },
   choice: {
     minHeight: t.minTouch,

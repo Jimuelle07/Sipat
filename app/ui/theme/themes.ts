@@ -21,51 +21,32 @@ function tone([fill, ink]: TonePair): Tone {
   return { fill, ink };
 }
 
-function calmLightColors(p: PhasePalette): ColorRoles {
-  const { gray: g, dark: d, alert: a, blue: b } = palette;
+function stickerLightColors(phase: Phase): ColorRoles {
+  const { gray: g, alert: a, sticker: s } = palette;
+  const canvas = phase === 'before' ? s.skyWash : phase === 'during' ? s.paper : s.lavender;
+  const wash = phase === 'before' ? s.blue : phase === 'during' ? s.sunburst : s.mint;
+  const accent = phase === 'during' ? s.carbon : phase === 'after' ? palette.phase.after.deep : s.violet;
   return {
-    canvas: p.tint,
-    surface: g['0'],
-    surfaceSunken: g['50'],
-    hairline: g['200'],
-    controlBorder: g['500'],
-    text: g['900'],
-    textMuted: g['600'],
-    accentText: p.deep,
-    highlight: tone([p.main, g['900']]),
-    primary: tone([p.deep, g['0']]),
-    capsule: tone([p.soft, g['900']]),
-    selected: tone([p.soft, g['900']]),
-    brand: b['700'],
-    focus: b['700'],
-    danger: tone([a.main, g['0']]),
-    dangerSurface: tone([a.tint, a.deep]),
-    scrim: g['900'],
-    mascot: palette.mascot,
-  };
-}
-
-function duringLightColors(p: PhasePalette): ColorRoles {
-  const { gray: g, alert: a, blue: b } = palette;
-  return {
-    canvas: g['0'],
-    surface: g['0'],
-    surfaceSunken: g['100'],
-    hairline: g['900'],
-    controlBorder: g['900'],
-    text: g['900'],
+    canvas,
+    surface: s.paper,
+    surfaceSunken: s.mist,
+    hairline: s.carbon,
+    controlBorder: s.carbon,
+    text: s.carbon,
     textMuted: g['700'],
-    accentText: p.deep,
-    highlight: tone([p.deep, g['0']]),
-    primary: tone([g['900'], g['0']]),
-    capsule: tone([p.tint, g['900']]),
-    selected: tone([g['900'], g['0']]),
-    brand: b['800'],
-    focus: b['800'],
-    danger: tone([a.deep, g['0']]),
+    accentText: accent,
+    highlight: tone([phase === 'during' ? s.ember : wash, s.carbon]),
+    primary: tone([s.carbon, s.paper]),
+    capsule: tone([s.paper, s.carbon]),
+    selected: tone([wash, s.carbon]),
+    brand: accent,
+    focus: accent,
+    danger: tone([phase === 'during' ? a.deep : a.main, g['0']]),
     dangerSurface: tone([a.tint, a.deep]),
-    scrim: g['900'],
+    scrim: s.carbon,
     mascot: palette.mascot,
+    wash,
+    stickers: s,
   };
 }
 
@@ -90,6 +71,8 @@ function calmDarkColors(p: PhasePalette): ColorRoles {
     dangerSurface: tone([d.surface, a.soft]),
     scrim: g['900'],
     mascot: palette.mascot,
+    wash: p.main,
+    stickers: palette.sticker,
   };
 }
 
@@ -114,43 +97,46 @@ function duringDarkColors(p: PhasePalette): ColorRoles {
     dangerSurface: tone([d.surface, a.soft]),
     scrim: g['900'],
     mascot: palette.mascot,
+    wash: p.main,
+    stickers: palette.sticker,
   };
 }
 
 function buildColors(phase: Phase, scheme: Scheme): ColorRoles {
   const p = palette.phase[phase];
   const calm = phase !== 'during';
-  if (scheme === 'light') return calm ? calmLightColors(p) : duringLightColors(p);
+  if (scheme === 'light') return stickerLightColors(phase);
   return calm ? calmDarkColors(p) : duringDarkColors(p);
 }
 
 const REGULAR_TYPE: Record<'calm' | 'during', Record<TypeRole, Omit<Theme['type']['roles'][TypeRole], 'letterSpacing'>>> = {
+  // Sticker-book scale: crushed heavy display, bold headings, medium body.
   calm: {
-    display: { fontSize: 38, lineHeight: 42, fontWeight: '500' },
-    headline: { fontSize: 28, lineHeight: 32, fontWeight: '500' },
-    title: { fontSize: 22, lineHeight: 28, fontWeight: '500' },
-    lead: { fontSize: 19, lineHeight: 26, fontWeight: '500' },
-    body: { fontSize: 18, lineHeight: 26, fontWeight: '400' },
-    bodySmall: { fontSize: 15, lineHeight: 22, fontWeight: '400' },
-    label: { fontSize: 15, lineHeight: 18, fontWeight: '500' },
-    caption: { fontSize: 13, lineHeight: 18, fontWeight: '400' },
+    display: { fontSize: 56, lineHeight: 54, fontWeight: '800' },
+    headline: { fontSize: 26, lineHeight: 32, fontWeight: '800' },
+    title: { fontSize: 16, lineHeight: 22, fontWeight: '800' },
+    lead: { fontSize: 19, lineHeight: 25, fontWeight: '700' },
+    body: { fontSize: 17, lineHeight: 24, fontWeight: '500' },
+    bodySmall: { fontSize: 15, lineHeight: 21, fontWeight: '500' },
+    label: { fontSize: 15, lineHeight: 18, fontWeight: '700' },
+    caption: { fontSize: 13, lineHeight: 17, fontWeight: '700' },
   },
   during: {
-    display: { fontSize: 46, lineHeight: 50, fontWeight: '700' },
-    headline: { fontSize: 32, lineHeight: 36, fontWeight: '700' },
-    title: { fontSize: 28, lineHeight: 32, fontWeight: '700' },
-    lead: { fontSize: 22, lineHeight: 28, fontWeight: '500' },
-    body: { fontSize: 19, lineHeight: 27, fontWeight: '400' },
-    bodySmall: { fontSize: 18, lineHeight: 26, fontWeight: '400' },
+    display: { fontSize: 52, lineHeight: 52, fontWeight: '800' },
+    headline: { fontSize: 28, lineHeight: 34, fontWeight: '800' },
+    title: { fontSize: 22, lineHeight: 28, fontWeight: '800' },
+    lead: { fontSize: 22, lineHeight: 28, fontWeight: '700' },
+    body: { fontSize: 19, lineHeight: 27, fontWeight: '500' },
+    bodySmall: { fontSize: 18, lineHeight: 26, fontWeight: '500' },
     label: { fontSize: 18, lineHeight: 22, fontWeight: '700' },
-    caption: { fontSize: 15, lineHeight: 20, fontWeight: '400' },
+    caption: { fontSize: 15, lineHeight: 20, fontWeight: '700' },
   },
 };
 
 const TYPE_EM: Record<TypeRole, number> = {
-  display: -0.03,
-  headline: -0.04,
-  title: -0.03,
+  display: -0.02,
+  headline: -0.01,
+  title: 0,
   lead: -0.03,
   body: -0.01,
   bodySmall: -0.01,
@@ -173,7 +159,7 @@ function buildType(phase: Phase, largeText: boolean): Theme['type'] {
     }),
   ) as Theme['type']['roles'];
 
-  return { fontFamily: undefined, roles, maxFontSizeMultiplier: largeText ? 1.3 : 1.6 };
+  return { families: { display: 'BowlbyOne_400Regular', medium: 'Inter_500Medium', bold: 'Inter_700Bold' }, roles, maxFontSizeMultiplier: largeText ? 1.3 : 1.6 };
 }
 
 function buildWarningTones(): WarningTones {
@@ -181,9 +167,9 @@ function buildWarningTones(): WarningTones {
   const during = phase.during;
   return {
     tcws: {
-      1: tone([during.soft, g['900']]),
+      1: tone([palette.sticker.sunburst, g['900']]),
       2: tone([during.main, g['900']]),
-      3: tone([during.deep, g['0']]),
+      3: tone([palette.sticker.ember, g['900']]),
       4: tone([a.main, g['0']]),
       5: tone([a.deep, g['0']]),
     },
@@ -218,6 +204,23 @@ const HOME_ORDER: Record<Phase, HomeSection[]> = {
   after: ['switchBanner', 'hero', 'checklist', 'pendingPhotos', 'hotlines', 'guide', 'ask', 'battery'],
 };
 
+function buildShadow(scheme: Scheme): Theme['shadow'] {
+  // Dark canvases swallow carbon shadows, so they run deeper there.
+  const ink = palette.sticker.carbon;
+  const k = scheme === 'dark' ? 1.8 : 1;
+  const a = (alpha: number): string => `${ink}${Math.round(Math.min(alpha * k, 1) * 255).toString(16).padStart(2, '0')}`;
+  return {
+    sticker: [
+      { offsetX: 0, offsetY: 2, blurRadius: 3, spreadRadius: 0, color: a(0.22) },
+      { offsetX: 0, offsetY: 10, blurRadius: 22, spreadRadius: -4, color: a(0.24) },
+    ],
+    float: [
+      { offsetX: 0, offsetY: 4, blurRadius: 6, spreadRadius: 0, color: a(0.2) },
+      { offsetX: 0, offsetY: 20, blurRadius: 36, spreadRadius: -6, color: a(0.32) },
+    ],
+  };
+}
+
 export function buildTheme(opts: ThemeOptions): Theme {
   const key = `${opts.phase}:${opts.scheme}:${opts.largeText}`;
   const existing = cache.get(key);
@@ -230,23 +233,24 @@ export function buildTheme(opts: ThemeOptions): Theme {
     largeText: opts.largeText,
     mood: opts.phase === 'before' ? 'prepare' : opts.phase === 'during' ? 'essentials' : 'recover',
     colors: buildColors(opts.phase, opts.scheme),
+    shadow: buildShadow(opts.scheme),
     warning: buildWarningTones(),
     type: buildType(opts.phase, opts.largeText),
     space: {
       hair: 2, xs: 4, sm: 6, md: 8, gutter: 10, lg: 14, xl: 16,
       tile: 20, xxl: 24, section: opts.phase === 'before' ? 30 : opts.phase === 'during' ? 20 : 40, xxxl: 40,
     },
-    radius: { form: 10, media: 14, menu: 16, panel: 20, capsule: 36, pill: 999 },
-    border: calm ? { hairline: 1, control: 1, emphasis: 2 } : { hairline: 2, control: 2, emphasis: 3 },
+    radius: { form: 16, media: 16, menu: 20, panel: 24, capsule: 40, pill: 999 },
+    border: calm ? { hairline: 2, control: 2, emphasis: 3 } : { hairline: 3, control: 3, emphasis: 4 },
     minTouch: opts.largeText ? (calm ? 56 : 64) : (calm ? 48 : 56),
     scrimOpacity: 0.72,
     motion: buildMotion(opts.phase),
     home: { order: [...HOME_ORDER[opts.phase]] },
     mascot: opts.phase === 'before'
-      ? { size: 96, placement: 'heroEnd' }
+      ? { size: 168, placement: 'heroEnd' }
       : opts.phase === 'during'
-        ? { size: 40, placement: 'headerEnd' }
-        : { size: 120, placement: 'heroBelow' },
+        ? { size: 48, placement: 'headerEnd' }
+        : { size: 168, placement: 'heroBelow' },
   };
 
   cache.set(key, theme);

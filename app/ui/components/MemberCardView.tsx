@@ -50,7 +50,7 @@ export const MemberCardView = forwardRef<View, MemberCardViewProps>(function Mem
           <Ionicons name="person" size={t.minTouch} color={t.colors.textMuted} />
         )}
       </View>
-      <Txt role="display" tone="text" align="center">{name}</Txt>
+      <Txt role="display" tone="text" align="center" adjustsFontSizeToFit numberOfLines={2}>{name}</Txt>
       {note ? <Txt role="body" tone="muted" align="center">{note}</Txt> : null}
       <View style={styles.lines}>
         {lines.map((line, index) => (

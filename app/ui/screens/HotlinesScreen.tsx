@@ -14,8 +14,6 @@ import { useThemedStyles } from '../theme';
 import type { Theme } from '../theme';
 import type { RootNavigation } from '../navigation/types';
 
-const MAX_CONTACTS_TO_CHECK = 6;
-
 export interface PlanDraft {
   evacuationCenter: string;
   meetingPlace: string;
@@ -187,15 +185,13 @@ export function HotlinesScreen(): JSX.Element {
           />
         </View>
       ))}
-      {draft.contacts.length < MAX_CONTACTS_TO_CHECK ? (
-        <Button
-          label={t.addContact}
-          variant="tonal"
-          icon="add"
-          onPress={() => setDraft({ ...draft, contacts: [...draft.contacts, { name: '', phone: '' }] })}
-        />
-      ) : null}
-      {saved ? <Txt role="bodySmall" tone="muted">{t.saved}</Txt> : null}
+      {/* The limit is the engine's: saving more than it allows returns too_many_contacts (shown below). */}
+      <Button
+        label={t.addContact}
+        variant="tonal"
+        icon="add"
+        onPress={() => setDraft({ ...draft, contacts: [...draft.contacts, { name: '', phone: '' }] })}
+      />
       {hasContactsError(errors) ? (
         <InlineError message={errorMessage(lang, 'validation', 'too_many_contacts') ?? ''} />
       ) : null}
@@ -216,11 +212,19 @@ export function HotlinesScreen(): JSX.Element {
     <Tile>
       <View style={styles.summaryRow}>
         <Txt role="label" tone="muted">{t.evacuationCenter}</Txt>
-        <Txt role="lead">{profile.plan.evacuationCenter ?? t.notSet}</Txt>
+        {profile.plan.evacuationCenter ? (
+          <Txt role="lead">{profile.plan.evacuationCenter}</Txt>
+        ) : (
+          <Txt role="bodySmall" tone="muted">{t.notSet}</Txt>
+        )}
       </View>
       <View style={styles.summaryRow}>
         <Txt role="label" tone="muted">{t.meetingPlace}</Txt>
-        <Txt role="lead">{profile.plan.meetingPlace ?? t.notSet}</Txt>
+        {profile.plan.meetingPlace ? (
+          <Txt role="lead">{profile.plan.meetingPlace}</Txt>
+        ) : (
+          <Txt role="bodySmall" tone="muted">{t.notSet}</Txt>
+        )}
       </View>
       <Txt role="label" tone="muted">{t.contacts}</Txt>
       {profile.plan.contacts.length === 0 ? (
@@ -268,6 +272,7 @@ export function HotlinesScreen(): JSX.Element {
       />
       {!editing ? <Txt role="bodySmall" tone="muted">{t.planHint}</Txt> : null}
       {planTile}
+      {!editing && saved ? <Txt role="bodySmall" tone="muted">{t.saved}</Txt> : null}
 
       <SectionHeader title={t.hotlines} />
       {hotlines.length === 0 ? (
@@ -304,6 +309,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   contactRow: {
     minHeight: t.minTouch,
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: t.space.md,
     paddingVertical: t.space.md,
@@ -312,6 +318,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   },
   contactInfo: {
     flex: 1,
+    minWidth: t.minTouch * 3,
     gap: t.space.xs,
   },
   summaryRow: {

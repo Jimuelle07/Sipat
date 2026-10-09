@@ -47,7 +47,7 @@ export const photoStrings = defineStrings({
     later: 'Later',
     starting: 'Opening…',
     use: 'Use this',
-    cropHint: 'Crop the face straight.',
+    cropHint: 'Keep the face straight in the frame.',
     zoomIn: 'Zoom in',
     zoomOut: 'Zoom out',
     confirmYes: 'Yes, this is them',

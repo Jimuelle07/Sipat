@@ -13,6 +13,8 @@ export interface MemberAvatarProps {
   size: number;
   pending?: boolean;
   pendingLabel: string;
+  /** Screen-reader name for the avatar; falls back to the initials when omitted. */
+  label?: string;
   /** Called when the photo cannot be decoded (fixture URIs, missing files). */
   onError?: () => void;
 }
@@ -22,21 +24,21 @@ export interface MemberAvatarProps {
  * shows a dashed camera ring instead (member list, Profile and Photo screens). A photo
  * that cannot load falls back to the initials on a sunken circle.
  */
-export function MemberAvatar({ photoUri, initials, size, pending = false, pendingLabel, onError }: MemberAvatarProps): JSX.Element {
+export function MemberAvatar({ photoUri, initials, size, pending = false, pendingLabel, label, onError }: MemberAvatarProps): JSX.Element {
   const t = useTheme();
   const styles = useThemedStyles(makeStyles);
   const [failed, setFailed] = useState(false);
   useEffect(() => { setFailed(false); }, [photoUri]);
   const circle = { width: size, height: size, borderRadius: size / 2 };
   const showPhoto = !pending && photoUri !== undefined && photoUri.length > 0 && !failed;
-  const label = pending ? pendingLabel : initials;
+  const a11yLabel = pending ? pendingLabel : label !== undefined && label.length > 0 ? label : initials;
 
   return (
     <View
       style={[styles.base, circle, pending ? styles.pending : showPhoto ? styles.filled : styles.sunken]}
       accessible
       accessibilityRole="image"
-      accessibilityLabel={label}
+      accessibilityLabel={a11yLabel}
     >
       {pending ? (
         <Ionicons name="camera" size={size * 0.42} color={t.colors.textMuted} />

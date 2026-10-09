@@ -4,16 +4,12 @@ import { defineStrings } from '../i18n';
 export const emergencyStrings = defineStrings({
   tl: {
     back: 'Bumalik',
-    stepsTitle: 'Mga hakbang',
     callTo: 'Tumawag sa {name}',
-    call: 'Tumawag',
     sourceTitle: 'Pinagmulan',
   },
   en: {
     back: 'Back',
-    stepsTitle: 'Steps',
     callTo: 'Call {name}',
-    call: 'Call',
     sourceTitle: 'Source',
   },
 });

@@ -55,14 +55,17 @@ export function ChecklistScreen(): JSX.Element {
 
       {view.warningCards.length > 0 ? (
         <View style={styles.warnings}>
-          {view.warningCards.map((card) => (
-            <Tag
-              key={card.warningId}
-              label={card.label}
-              icon="warning"
-              tone={card.stale ? theme.colors.dangerSurface : undefined}
-            />
-          ))}
+          <Txt role="label" tone="muted">{t.warningsLabel}</Txt>
+          <View style={styles.warningTags}>
+            {view.warningCards.map((card) => (
+              <Tag
+                key={card.warningId}
+                label={card.label}
+                icon="warning"
+                tone={card.stale ? theme.colors.dangerSurface : undefined}
+              />
+            ))}
+          </View>
         </View>
       ) : null}
 
@@ -78,12 +81,11 @@ export function ChecklistScreen(): JSX.Element {
           <EmptyState icon="checkmark-done-outline" title={t.emptyTitle} body={t.emptyBody} />
         </Tile>
       ) : view.groups.map((group) => (
-        <Tile
-          key={group.id}
-          title={t[GROUP_LABELS[group.id]]}
-          tone={group.recommended ? 'accent' : 'default'}
-          tag={group.recommended ? { label: common.recommended } : undefined}
-        >
+        <Tile key={group.id} tone={group.recommended ? 'accent' : 'default'}>
+          <View style={styles.groupHeader}>
+            <Txt role="title">{t[GROUP_LABELS[group.id]]}</Txt>
+            {group.recommended ? <Tag label={common.recommended} icon="sparkles" /> : null}
+          </View>
           {group.items.map((item) => (
             <ChecklistRow
               key={item.id}
@@ -130,7 +132,16 @@ export function ChecklistScreen(): JSX.Element {
 
 const makeStyles = (t: Theme) => StyleSheet.create({
   warnings: {
+    gap: t.space.sm,
+  },
+  warningTags: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: t.space.sm,
+  },
+  groupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
     flexWrap: 'wrap',
     gap: t.space.sm,
   },

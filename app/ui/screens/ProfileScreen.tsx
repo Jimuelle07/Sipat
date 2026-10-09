@@ -64,6 +64,7 @@ function HouseholdTile({ engine, profile }: { engine: EngineContextValue; profil
   const t = useT(profileStrings);
   const common = useT(commonStrings);
   const { lang } = useLang();
+  const theme = useTheme();
   const styles = useThemedStyles(makeStyles);
 
   const [draft, setDraft] = useState<HouseholdDraft>(() => householdDraftFrom(profile));
@@ -101,22 +102,24 @@ function HouseholdTile({ engine, profile }: { engine: EngineContextValue; profil
         error={messages['name']}
       />
       <Txt role="label">{common.petsCount}</Txt>
-      <View style={styles.stepper}>
-        <Button
-          label={common.decrease}
-          variant="tonal"
-          icon="remove"
+      <View style={styles.stepperControls}>
+        <Pressable
+          accessibilityRole="button"
           accessibilityLabel={`${common.decrease} ${common.petsCount}`}
           onPress={() => patch({ petsCount: clampNumber(draft.petsCount - 1, MIN_PETS, MAX_PETS) })}
-        />
+          style={({ pressed }) => [styles.stepperButton, pressed && styles.pressed]}
+        >
+          <Ionicons name="remove" size={theme.type.roles.title.fontSize} color={theme.colors.capsule.ink} />
+        </Pressable>
         <Txt role="title" align="center" accessibilityLiveRegion="polite" style={styles.stepperValue}>{draft.petsCount}</Txt>
-        <Button
-          label={common.increase}
-          variant="tonal"
-          icon="add"
+        <Pressable
+          accessibilityRole="button"
           accessibilityLabel={`${common.increase} ${common.petsCount}`}
           onPress={() => patch({ petsCount: clampNumber(draft.petsCount + 1, MIN_PETS, MAX_PETS) })}
-        />
+          style={({ pressed }) => [styles.stepperButton, pressed && styles.pressed]}
+        >
+          <Ionicons name="add" size={theme.type.roles.title.fontSize} color={theme.colors.capsule.ink} />
+        </Pressable>
       </View>
       {messages['petsCount'] ? <InlineError message={messages['petsCount']} /> : null}
       <Txt role="label">{common.homeTags}</Txt>
@@ -163,6 +166,7 @@ function MembersTile({ engine, navigation }: { engine: EngineContextValue; navig
                 size={theme.space.xxxl}
                 pending={pending}
                 pendingLabel={t.memberAvatar}
+                label={member.name}
               />
               <View style={styles.memberInfo}>
                 <Txt role="title" numberOfLines={1}>{member.name}</Txt>
@@ -251,8 +255,16 @@ function IconButton({ label, icon, onPress }: { label: string; icon: IconName; o
 const makeStyles = (t: Theme) => StyleSheet.create({
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.sm },
   actions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: t.space.sm },
-  stepper: { minHeight: t.minTouch, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: t.space.sm },
-  stepperValue: { minWidth: t.space.xxxl + t.space.xl },
+  stepperControls: { flexDirection: 'row', alignItems: 'center', gap: t.space.md },
+  stepperButton: {
+    minWidth: t.minTouch,
+    minHeight: t.minTouch,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: t.radius.pill,
+    backgroundColor: t.colors.capsule.fill,
+  },
+  stepperValue: { flex: 1 },
   memberRow: {
     minHeight: t.minTouch,
     flexDirection: 'row',

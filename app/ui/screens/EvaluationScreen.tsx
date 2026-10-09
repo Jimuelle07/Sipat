@@ -32,6 +32,13 @@ function TableRow({ label, value }: { label: string; value: string }): JSX.Eleme
   );
 }
 
+/** Tidies an ISO 8601 stamp for reading, without parsing it: "2026-10-10T05:54:29+08:00" -> "2026-10-10 05:54". */
+function shortTime(iso: string): string {
+  const [date, rest] = iso.split('T');
+  if (date === undefined || rest === undefined || rest.length < 5) return iso;
+  return `${date} ${rest.slice(0, 5)}`;
+}
+
 /**
  * Evaluation: the laptop report bundled at build time (retrieval, answers, phase cases and the
  * on-phone timings) as a quiet table, then the question history newest first. Every number is
@@ -54,7 +61,7 @@ export function EvaluationScreen(): JSX.Element {
         <EmptyState icon="stats-chart-outline" title={t.empty} />
       ) : (
         <>
-          <Txt role="bodySmall" tone="muted">{fill(t.generatedAt, { at: summary.generatedAt })}</Txt>
+          <Txt role="bodySmall" tone="muted">{fill(t.generatedAt, { at: shortTime(summary.generatedAt) })}</Txt>
 
           <View style={styles.group}>
             <SectionHeader title={t.retrievalTitle} />
@@ -86,7 +93,7 @@ export function EvaluationScreen(): JSX.Element {
                 label={t.wrongDirection}
                 value={String(summary.phase.wrongDirection)}
               />
-              {summary.phase.wrongDirection > 0 ? <Tag label={t.wrongDirectionAlert} tone={theme.colors.dangerSurface} /> : null}
+              {summary.phase.wrongDirection > 0 ? <Tag label={t.wrongDirectionAlert} tone={theme.colors.dangerSurface} icon="alert-circle-outline" /> : null}
             </Tile>
           </View>
 
@@ -122,7 +129,7 @@ export function EvaluationScreen(): JSX.Element {
               <Txt role="body">{entry.question}</Txt>
               <View style={styles.historyMeta}>
                 <Txt role="caption" tone="muted" style={styles.historyOutcome}>{t[outcomeKeys[entry.outcome]]}</Txt>
-                <Txt role="caption" tone="muted">{entry.at}</Txt>
+                <Txt role="caption" tone="muted">{shortTime(entry.at)}</Txt>
               </View>
             </View>
           ))}

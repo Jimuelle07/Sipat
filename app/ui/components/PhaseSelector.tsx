@@ -77,7 +77,9 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     gap: t.space.xs,
     padding: t.space.xs,
     borderRadius: t.radius.pill,
-    backgroundColor: t.colors.surfaceSunken,
+    backgroundColor: t.colors.surface,
+    borderWidth: t.border.control,
+    borderColor: t.colors.stickers.carbon,
   },
   segment: {
     flex: 1,
@@ -89,7 +91,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   },
   segmentFill: {
     alignSelf: 'stretch',
-    flexDirection: 'column',
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: t.space.xs,
@@ -99,6 +101,8 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   },
   segmentSelected: {
     backgroundColor: t.colors.selected.fill,
+    borderWidth: t.border.control,
+    borderColor: t.colors.stickers.carbon,
   },
   recommendation: {
     flexDirection: 'row',
