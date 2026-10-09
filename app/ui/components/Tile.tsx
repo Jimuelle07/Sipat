@@ -82,8 +82,8 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   tile: {
     alignSelf: 'stretch',
     backgroundColor: t.colors.surface,
-    borderColor: t.colors.hairline,
-    borderWidth: t.border.hairline,
+    borderColor: t.colors.controlBorder,
+    borderWidth: t.border.control,
     borderRadius: t.radius.panel,
     boxShadow: t.shadow.sticker,
     padding: t.space.tile,

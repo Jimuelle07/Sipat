@@ -46,16 +46,17 @@ export function LanguageToggle(): JSX.Element {
 
 const makeStyles = (t: Theme) => StyleSheet.create({
   wrap: {
+    height: t.minTouch,
     flexDirection: 'row',
     alignItems: 'center',
     padding: t.space.hair,
     borderRadius: t.radius.pill,
     backgroundColor: t.colors.surface,
     borderWidth: t.border.control,
-    borderColor: t.colors.stickers.carbon,
+    borderColor: t.colors.stroke,
   },
   choice: {
-    minHeight: t.minTouch,
+    alignSelf: 'stretch',
     minWidth: t.minTouch,
     flexDirection: 'row',
     alignItems: 'center',

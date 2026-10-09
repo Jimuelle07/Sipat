@@ -41,7 +41,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     borderRadius: t.radius.pill,
     backgroundColor: t.colors.surfaceSunken,
     borderWidth: t.border.control,
-    borderColor: t.colors.stickers.carbon,
+    borderColor: t.colors.stroke,
     overflow: 'hidden',
   },
   fill: {

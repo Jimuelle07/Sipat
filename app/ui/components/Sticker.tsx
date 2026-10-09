@@ -20,7 +20,7 @@ export interface StickerProps {
  */
 export function Sticker({ kind, color, size = 56, rotate = 0, style }: StickerProps): JSX.Element {
   const t = useTheme();
-  const carbon = t.colors.stickers.carbon;
+  const carbon = t.colors.ink;
   const frame: ViewStyle = {
     width: kind === 'pill' ? size * 1.9 : size,
     height: size,

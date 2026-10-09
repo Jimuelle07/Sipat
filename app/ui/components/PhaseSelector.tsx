@@ -79,7 +79,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     borderRadius: t.radius.pill,
     backgroundColor: t.colors.surface,
     borderWidth: t.border.control,
-    borderColor: t.colors.stickers.carbon,
+    borderColor: t.colors.stroke,
   },
   segment: {
     flex: 1,
@@ -102,7 +102,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   segmentSelected: {
     backgroundColor: t.colors.selected.fill,
     borderWidth: t.border.control,
-    borderColor: t.colors.stickers.carbon,
+    borderColor: t.colors.stroke,
   },
   recommendation: {
     flexDirection: 'row',

@@ -22,29 +22,32 @@ function tone([fill, ink]: TonePair): Tone {
 }
 
 function stickerLightColors(phase: Phase): ColorRoles {
-  const { gray: g, alert: a, sticker: s } = palette;
-  const canvas = phase === 'before' ? s.skyWash : phase === 'during' ? s.paper : s.lavender;
-  const wash = phase === 'before' ? s.blue : phase === 'during' ? s.sunburst : s.mint;
-  const accent = phase === 'during' ? s.carbon : phase === 'after' ? palette.phase.after.deep : s.violet;
+  const { gray: g, alert: a, sticker: s, blue: b, phase: ph } = palette;
+  // Phase hue lives on the canvas and the hero: green before, orange-yellow during, purple after.
+  // Blue is the UI: strokes, actions, links, selection.
+  const canvas = ph[phase].soft;
+  const wash = phase === 'before' ? s.mint : phase === 'during' ? s.sunburst : ph.after.main;
   return {
     canvas,
     surface: s.paper,
-    surfaceSunken: s.mist,
-    hairline: s.carbon,
-    controlBorder: s.carbon,
-    text: s.carbon,
-    textMuted: g['700'],
-    accentText: accent,
-    highlight: tone([phase === 'during' ? s.ember : wash, s.carbon]),
-    primary: tone([s.carbon, s.paper]),
-    capsule: tone([s.paper, s.carbon]),
-    selected: tone([wash, s.carbon]),
-    brand: accent,
-    focus: accent,
+    surfaceSunken: b['50'],
+    hairline: b['300'],
+    controlBorder: b['700'],
+    text: b['900'],
+    textMuted: b['800'],
+    accentText: b['800'],
+    highlight: tone([b['400'], b['900']]),
+    primary: tone([b['800'], s.paper]),
+    capsule: tone([s.paper, b['900']]),
+    selected: tone([b['300'], b['900']]),
+    brand: b['800'],
+    focus: b['800'],
     danger: tone([phase === 'during' ? a.deep : a.main, g['0']]),
     dangerSurface: tone([a.tint, a.deep]),
-    scrim: s.carbon,
+    scrim: b['900'],
     mascot: palette.mascot,
+    stroke: b['800'],
+    ink: b['900'],
     wash,
     stickers: s,
   };
@@ -71,6 +74,8 @@ function calmDarkColors(p: PhasePalette): ColorRoles {
     dangerSurface: tone([d.surface, a.soft]),
     scrim: g['900'],
     mascot: palette.mascot,
+    stroke: g['400'],
+    ink: d.text,
     wash: p.main,
     stickers: palette.sticker,
   };
@@ -97,6 +102,8 @@ function duringDarkColors(p: PhasePalette): ColorRoles {
     dangerSurface: tone([d.surface, a.soft]),
     scrim: g['900'],
     mascot: palette.mascot,
+    stroke: g['400'],
+    ink: d.text,
     wash: p.main,
     stickers: palette.sticker,
   };
@@ -241,7 +248,7 @@ export function buildTheme(opts: ThemeOptions): Theme {
       tile: 20, xxl: 24, section: opts.phase === 'before' ? 30 : opts.phase === 'during' ? 20 : 40, xxxl: 40,
     },
     radius: { form: 16, media: 16, menu: 20, panel: 24, capsule: 40, pill: 999 },
-    border: calm ? { hairline: 2, control: 2, emphasis: 3 } : { hairline: 3, control: 3, emphasis: 4 },
+    border: calm ? { hairline: 1, control: 1.5, emphasis: 2 } : { hairline: 1.5, control: 2, emphasis: 2.5 },
     minTouch: opts.largeText ? (calm ? 56 : 64) : (calm ? 48 : 56),
     scrimOpacity: 0.72,
     motion: buildMotion(opts.phase),

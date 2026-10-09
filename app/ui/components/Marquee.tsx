@@ -27,7 +27,7 @@ export function Marquee({ text }: { text: string }): JSX.Element {
     <View
       accessibilityRole="text"
       accessibilityLabel={text}
-      style={[styles.strip, { backgroundColor: t.colors.stickers.carbon, paddingVertical: t.space.sm }]}
+      style={[styles.strip, { backgroundColor: t.colors.ink, paddingVertical: t.space.sm }]}
     >
       <Animated.View style={[styles.row, { transform: [{ translateX: x }] }]}>
         {[0, 1, 2, 3].map((i) => (

@@ -80,7 +80,7 @@ export function Button({
         disabled && styles.disabled,
         disabled && variant === 'outline' && styles.disabledOutline,
         disabled && variant === 'text' && styles.disabledText,
-        !disabled && variant !== 'text' && variant !== 'outline' && styles.lift,
+        !disabled && variant !== 'text' && styles.lift,
       ]}
     >
       {icon !== undefined ? <Ionicons name={icon} size={t.type.roles.label.fontSize} color={ink} /> : null}
@@ -114,8 +114,8 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     borderColor: t.colors.capsule.fill,
   },
   outline: {
-    backgroundColor: 'transparent',
-    borderColor: t.colors.controlBorder,
+    backgroundColor: t.colors.surface,
+    borderColor: t.colors.stroke,
   },
   text: {
     backgroundColor: 'transparent',
@@ -137,7 +137,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     borderColor: t.colors.controlBorder,
   },
   disabledOutline: {
-    backgroundColor: 'transparent',
+    backgroundColor: t.colors.surfaceSunken,
     borderColor: t.colors.controlBorder,
   },
   disabledText: {

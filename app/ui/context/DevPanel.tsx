@@ -41,7 +41,7 @@ export function DevPanelEntry(): JSX.Element | null {
       onPress={() => setExpanded(true)}
       style={styles.entry}
     >
-      <Ionicons name="construct-outline" size={theme.type.roles.title.fontSize} color={theme.colors.accentText} />
+      <Ionicons name="construct-outline" size={theme.type.roles.title.fontSize} color={theme.colors.ink} />
     </Pressable>
   );
 }
@@ -213,7 +213,16 @@ export function DevPanel({ global = false }: { global?: boolean }): JSX.Element 
 
 const makeStyles = (t: Theme) => StyleSheet.create({
   anchor: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, zIndex: 20, justifyContent: 'flex-end' },
-  entry: { minWidth: t.minTouch, minHeight: t.minTouch, alignItems: 'center', justifyContent: 'center' },
+  entry: {
+    width: t.minTouch,
+    height: t.minTouch,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: t.radius.pill,
+    borderWidth: t.border.control,
+    borderColor: t.colors.stroke,
+    backgroundColor: t.colors.surface,
+  },
   panel: {
     height: '78%',
     padding: t.space.gutter,

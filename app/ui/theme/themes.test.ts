@@ -192,18 +192,18 @@ describe('buildTheme palette traceability', () => {
 });
 
 describe('buildTheme role spot checks', () => {
-  it('before light canvas is the sky wash', () => {
-    expect(themeFor('before', 'light').colors.canvas).toBe(paletteJson.sticker.skyWash);
+  it('before light canvas is the soft phase green', () => {
+    expect(themeFor('before', 'light').colors.canvas).toBe(paletteJson.phase.before.soft);
   });
 
-  it('during light canvas is gray[0]', () => {
-    expect(themeFor('during', 'light').colors.canvas).toBe(paletteJson.gray['0']);
+  it('during light canvas is the soft phase orange', () => {
+    expect(themeFor('during', 'light').colors.canvas).toBe(paletteJson.phase.during.soft);
   });
 
-  it('during light highlight is the ember sticker with carbon ink', () => {
+  it('light highlight is blue[400] with blue[900] ink', () => {
     expect(themeFor('during', 'light').colors.highlight).toEqual({
-      fill: paletteJson.sticker.ember,
-      ink: paletteJson.sticker.carbon,
+      fill: paletteJson.blue['400'],
+      ink: paletteJson.blue['900'],
     });
   });
 

@@ -1,6 +1,6 @@
 import type { JSX } from 'react';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import type { RootNavigation } from '../navigation/types';
@@ -14,7 +14,7 @@ import { errorMessage } from '../strings/errors';
 import { fill } from '../strings/format';
 import { homeStrings } from '../strings/home';
 import { Float, Pop, SpringIn } from '../motion/spring';
-import { useTheme, useThemedStyles } from '../theme';
+import { palette, useTheme, useThemedStyles } from '../theme';
 import type { HomeSection, Theme } from '../theme';
 import { cardLevel, homeSections, isOptionActive, pickerGroups, warningTone } from './home/homeModel';
 
@@ -68,6 +68,7 @@ export function HomeScreen(): JSX.Element {
   useEngineChange(['phase', 'context', 'family', 'profiles', 'status', 'settings']);
 
   const [undoHidden, setUndoHidden] = useState(false);
+  const [openKind, setOpenKind] = useState<string | null>(null);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const context = engine.context.get();
   const options = engine.context.options();
@@ -97,15 +98,15 @@ export function HomeScreen(): JSX.Element {
   const hero = (
     <View style={styles.hero}>
       <View style={styles.posterStack}>
-        <View style={[styles.posterBack, { backgroundColor: context.phase === 'before' ? st.lavender : context.phase === 'during' ? st.ember : st.sunburst }]} />
+        <View style={[styles.posterBack, { backgroundColor: theme.colors.highlight.fill }]} />
         <SpringIn rise={46}>
         <View style={styles.poster}>
-        <Sticker kind="ring" color={context.phase === 'before' ? st.skyWash : st.paper} size={260} style={styles.ribbon} />
+        <Sticker kind="ring" color={st.paper} size={260} style={styles.ribbon} />
         <Pop delay={380} rotate={-12} style={styles.coin}><Sticker kind="coin" color={st.sunburst} size={54} style={styles.flow} /></Pop>
         <Pop delay={520} rotate={10} style={styles.check}><Sticker kind="check" color={st.mint} size={50} style={styles.flow} /></Pop>
         <Pop delay={650} rotate={18} style={styles.burst}><Sticker kind="burst" color={st.ember} size={40} style={styles.flow} /></Pop>
-        <Txt role="display" color={st.carbon} accessibilityRole="header" style={[styles.posterTitle, posterFont(phaseName)]}>{phaseName}</Txt>
-        <Txt role="lead" color={st.carbon} style={styles.posterMood}>{common[moodKeys[context.phase]]}</Txt>
+        <Txt role="display" color={theme.colors.ink} accessibilityRole="header" style={[styles.posterTitle, posterFont(phaseName)]}>{phaseName}</Txt>
+        <Txt role="lead" color={theme.colors.ink} style={styles.posterMood}>{common[moodKeys[context.phase]]}</Txt>
         <Float style={styles.posterMascot}><MascotSlot size={230} /></Float>
         </View>
         </SpringIn>
@@ -171,28 +172,50 @@ export function HomeScreen(): JSX.Element {
       </Tile>
       <Tile title={t.chooseWarning}>
         {options.length === 0 ? <Txt role="bodySmall" tone="muted">{t.noWarningOptions}</Txt> : null}
-        {pickerGroups(options).map(({ kind, entries }) => (
-          <View key={kind} style={styles.pickerGroup}>
-            <Txt role="label" tone="muted">{t[`kind_${kind}`]}</Txt>
-            <OptionGrid columns={2}>
-              {entries.map((entry) => {
-                const selected = isOptionActive(context, entry);
-                return (
-                  <WarningOption
-                    key={entry.id}
-                    label={entry.label}
-                    tone={warningTone(theme, entry.kind, entry.level)}
-                    selected={selected}
-                    onPress={() => {
-                      if (selected) engine.context.clearWarning(entry.kind);
-                      else engine.context.setWarning(warningInput(entry));
-                    }}
-                  />
-                );
-              })}
-            </OptionGrid>
-          </View>
-        ))}
+        {pickerGroups(options).map(({ kind, entries }) => {
+          const open = openKind === kind;
+          const chosen = entries.find((entry) => isOptionActive(context, entry));
+          return (
+            <View key={kind} style={styles.pickerGroup}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ expanded: open }}
+                accessibilityLabel={chosen ? `${t[`kind_${kind}`]}: ${chosen.label}` : t[`kind_${kind}`]}
+                onPress={() => setOpenKind(open ? null : kind)}
+                style={[styles.menuHead, open && styles.menuHeadOpen]}
+              >
+                <View style={styles.menuText}>
+                  <Txt role="label">{t[`kind_${kind}`]}</Txt>
+                  {chosen ? <Txt role="caption" tone="muted" numberOfLines={1}>{chosen.label}</Txt> : null}
+                </View>
+                {chosen ? <Ionicons name="checkmark-circle" size={theme.type.roles.title.fontSize} color={theme.colors.accentText} /> : null}
+                <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={theme.type.roles.title.fontSize} color={theme.colors.ink} />
+              </Pressable>
+              {open ? (
+                <SpringIn rise={10}>
+                  <OptionGrid columns={2}>
+                    {entries.map((entry) => {
+                      const selected = isOptionActive(context, entry);
+                      return (
+                        <WarningOption
+                          key={entry.id}
+                          label={entry.label}
+                          tone={warningTone(theme, entry.kind, entry.level)}
+                          selected={selected}
+                          onPress={() => {
+                            if (selected) engine.context.clearWarning(entry.kind);
+                            else engine.context.setWarning(warningInput(entry));
+                            setOpenKind(null);
+                          }}
+                        />
+                      );
+                    })}
+                  </OptionGrid>
+                </SpringIn>
+              ) : null}
+            </View>
+          );
+        })}
       </Tile>
     </View>
   );
@@ -220,11 +243,11 @@ export function HomeScreen(): JSX.Element {
   );
 
   const checklist = (
-    <Tile title={t.checklistTitle} onPress={() => navigation.navigate('Checklist')} wash={st.sunburst} tilt={0.8}>
+    <Tile title={t.checklistTitle} onPress={() => navigation.navigate('Checklist')} wash={palette.blue['200']} tilt={0.8}>
       <View style={styles.shortcutBody}>
         <Txt role="bodySmall" style={styles.hint}>{t.checklistHint}</Txt>
         <View style={styles.iconDisc}>
-          <Ionicons name="arrow-forward" size={theme.type.roles.title.fontSize} color={st.carbon} />
+          <Ionicons name="arrow-forward" size={theme.type.roles.title.fontSize} color={theme.colors.ink} />
         </View>
       </View>
     </Tile>
@@ -235,7 +258,7 @@ export function HomeScreen(): JSX.Element {
       <View style={styles.shortcutBody}>
         <Txt role="bodySmall" style={styles.hint}>{hint}</Txt>
         <View style={styles.iconDisc}>
-          <Ionicons name={icon} size={theme.type.roles.title.fontSize} color={st.carbon} />
+          <Ionicons name={icon} size={theme.type.roles.title.fontSize} color={theme.colors.ink} />
         </View>
       </View>
     </Tile>
@@ -263,9 +286,9 @@ export function HomeScreen(): JSX.Element {
     center: centerSection,
     pendingPhotos,
     checklist,
-    ask: shortcuts(t.askTitle, t.askHint, 'chatbubble-ellipses-outline', () => navigation.navigate('Tabs', { screen: 'Ask' }), st.blue, -1.2),
-    guide: shortcuts(t.guideTitle, t.guideHint, 'book-outline', () => navigation.navigate('Tabs', { screen: 'Guide' }), st.lavender, 1),
-    hotlines: shortcuts(t.hotlinesTitle, t.hotlinesHint, 'call-outline', () => navigation.navigate('Tabs', { screen: 'Hotlines' }), st.mint, -0.8),
+    ask: shortcuts(t.askTitle, t.askHint, 'chatbubble-ellipses-outline', () => navigation.navigate('Tabs', { screen: 'Ask' }), palette.blue['400'], -1.2),
+    guide: shortcuts(t.guideTitle, t.guideHint, 'book-outline', () => navigation.navigate('Tabs', { screen: 'Guide' }), palette.blue['300'], 1),
+    hotlines: shortcuts(t.hotlinesTitle, t.hotlinesHint, 'call-outline', () => navigation.navigate('Tabs', { screen: 'Hotlines' }), palette.blue['200'], -0.8),
     battery,
   };
 
@@ -290,7 +313,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   },
   marquee: {
     marginHorizontal: -t.space.gutter,
-    marginTop: -t.space.gutter,
+    marginTop: t.space.sm,
     marginBottom: t.space.xs,
   },
   posterStack: {
@@ -304,7 +327,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     bottom: -t.space.md,
     borderRadius: t.radius.capsule,
     borderWidth: t.border.emphasis,
-    borderColor: t.colors.stickers.carbon,
+    borderColor: t.colors.stroke,
     transform: [{ rotate: '3.2deg' }],
   },
   flow: {
@@ -317,7 +340,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     padding: t.space.tile,
     borderRadius: t.radius.capsule,
     borderWidth: t.border.emphasis,
-    borderColor: t.colors.stickers.carbon,
+    borderColor: t.colors.stroke,
     backgroundColor: t.colors.wash,
   },
   posterTitle: {
@@ -346,12 +369,30 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   warningCard: {
     gap: t.space.xs,
   },
+  menuHead: {
+    minHeight: t.minTouch,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: t.space.md,
+    paddingHorizontal: t.space.xl,
+    borderRadius: t.radius.pill,
+    borderWidth: t.border.control,
+    borderColor: t.colors.stroke,
+    backgroundColor: t.colors.surface,
+    boxShadow: t.shadow.sticker,
+  },
+  menuHeadOpen: {
+    backgroundColor: t.colors.selected.fill,
+  },
+  menuText: {
+    flex: 1,
+  },
   pickerGroup: {
     gap: t.space.xs,
   },
   hint: {
     flex: 1,
-    color: t.colors.stickers.carbon,
+    color: t.colors.ink,
   },
   iconDisc: {
     width: 52,
@@ -360,7 +401,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     justifyContent: 'center',
     borderRadius: t.radius.pill,
     borderWidth: t.border.control,
-    borderColor: t.colors.stickers.carbon,
+    borderColor: t.colors.stroke,
     backgroundColor: t.colors.stickers.paper,
     boxShadow: t.shadow.sticker,
   },

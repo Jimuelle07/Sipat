@@ -1,7 +1,9 @@
 import type { JSX, ReactNode } from 'react';
+import { useState } from 'react';
 import { Pressable, ScrollView, View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useDockInset } from '../context/DockInset';
 import { useTheme, useThemedStyles } from '../theme';
 import type { Theme } from '../theme';
 import { LanguageToggle } from './LanguageToggle';
@@ -32,21 +34,27 @@ export interface ScreenProps {
 export function Screen({ title, children, scroll = true, right, mascot, back, banner, hideLanguage = false }: ScreenProps): JSX.Element {
   const t = useTheme();
   const styles = useThemedStyles(makeStyles);
+  // The tab dock floats over the screen, so tab screens reserve its height at the end of the body.
+  const dockHeight = useDockInset();
+  // The header floats over the body (no bar behind it), so the body starts below its measured height.
+  const [overlayHeight, setOverlayHeight] = useState(0);
   const headerMascot = t.mascot.placement === 'headerEnd' ? mascot : null;
-  const hasActions = !hideLanguage || headerMascot !== null || right !== undefined;
+  const hasActions = !hideLanguage;
 
   const body = scroll ? (
-    <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+    <ScrollView contentContainerStyle={[styles.body, { paddingTop: styles.body.padding + overlayHeight, paddingBottom: styles.body.padding + dockHeight + (dockHeight > 0 ? 24 : 0) }]} keyboardShouldPersistTaps="handled">
       {children}
     </ScrollView>
   ) : (
-    <View style={styles.bodyFlex}>{children}</View>
+    <View style={[styles.bodyFlex, { paddingTop: styles.bodyFlex.padding + overlayHeight, paddingBottom: styles.bodyFlex.padding + dockHeight + (dockHeight > 0 ? 24 : 0) }]}>{children}</View>
   );
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-      <View style={styles.header}>
-        <View style={styles.titleGroup}>
+      {body}
+      <View pointerEvents="box-none" style={styles.overlay} onLayout={(e) => setOverlayHeight(e.nativeEvent.layout.height)}>
+      <View pointerEvents="box-none" style={styles.header}>
+        <View pointerEvents="box-none" style={styles.titleGroup}>
           {back ? (
             <Pressable
               accessibilityRole="button"
@@ -61,17 +69,20 @@ export function Screen({ title, children, scroll = true, right, mascot, back, ba
           <Txt role="headline" accessibilityRole="header" numberOfLines={2} style={styles.title}>
             {title}
           </Txt>
+          {headerMascot !== null && headerMascot !== undefined ? <View style={styles.headerMascot}>{headerMascot}</View> : null}
+          {hideLanguage && right !== undefined ? <View style={styles.headerMascot}>{right}</View> : null}
         </View>
         {hasActions ? (
-          <View style={styles.actions}>
+          <View pointerEvents="box-none" style={styles.actions}>
             {hideLanguage ? null : <LanguageToggle />}
-            {headerMascot}
-            {right}
+            <View style={styles.actionsEnd}>
+              {right}
+            </View>
           </View>
         ) : null}
       </View>
       {banner ? <View style={styles.banner}>{banner}</View> : null}
-      {body}
+      </View>
     </SafeAreaView>
   );
 }
@@ -80,6 +91,13 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: t.colors.canvas,
+  },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'transparent',
   },
   header: {
     minHeight: t.minTouch,
@@ -108,7 +126,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     justifyContent: 'center',
     borderRadius: t.radius.pill,
     borderWidth: t.border.control,
-    borderColor: t.colors.stickers.carbon,
+    borderColor: t.colors.stroke,
     backgroundColor: t.colors.wash,
   },
   banner: {
@@ -116,14 +134,18 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     gap: t.space.sm,
   },
   actions: {
-    flexGrow: 0,
-    flexShrink: 1,
-    flexBasis: 'auto',
-    maxWidth: '100%',
+    flexBasis: '100%',
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-end',
-    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: t.space.sm,
+  },
+  headerMascot: {
+    marginLeft: 'auto',
+  },
+  actionsEnd: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: t.space.sm,
     marginLeft: 'auto',
   },

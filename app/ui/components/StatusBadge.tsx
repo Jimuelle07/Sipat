@@ -46,12 +46,14 @@ export function StatusBadge({ label, state, icon }: {
 
 const makeStyles = (t: Theme) => StyleSheet.create({
   badge: {
+    height: t.minTouch,
+    borderWidth: t.border.control,
+    borderColor: t.colors.stroke,
     alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
     gap: t.space.xs,
-    paddingVertical: t.space.xs,
-    paddingHorizontal: t.space.md,
+    paddingHorizontal: t.space.lg,
     borderRadius: t.radius.pill,
   },
 })
