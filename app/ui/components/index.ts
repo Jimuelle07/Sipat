@@ -41,3 +41,5 @@ export { CropFrame } from './crop/CropFrame';
 export { MemberAvatar } from './MemberAvatar';
 export { MemberCardView } from './MemberCardView';
 export { ChecklistRow } from './ChecklistRow';
+export { Sticker } from './Sticker';
+export { Marquee } from './Marquee';

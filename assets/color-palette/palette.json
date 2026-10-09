@@ -60,5 +60,18 @@
     "border": "#2C3A4F",
     "primary": "#A9CDF2",
     "text": "#E3EFFB"
+  },
+  "sticker": {
+    "carbon": "#000000",
+    "paper": "#FFFFFF",
+    "skyWash": "#DCEEFF",
+    "concrete": "#CCCCCC",
+    "mist": "#E9E9E9",
+    "blue": "#4DA2FF",
+    "mint": "#55DB9C",
+    "lavender": "#E9CCFF",
+    "ember": "#FB4903",
+    "sunburst": "#FFD731",
+    "violet": "#5C4ADE"
   }
 }

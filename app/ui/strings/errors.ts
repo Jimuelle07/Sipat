@@ -267,6 +267,10 @@ export const errorStrings = defineStrings({
   },
 });
 
+export function genericMessage(lang: 'tl' | 'en'): string {
+  return errorStrings[lang].generic;
+}
+
 /**
  * Looks up the copy for an error code. Returns the message, `null` when the
  * contract says the UI shows nothing, or the generic message otherwise.
@@ -275,5 +279,5 @@ export function errorMessage(lang: 'tl' | 'en', source: ErrorSource, code: strin
   const key = `${source}.${code}`;
   if (SILENT.has(key)) return null;
   const table: Record<string, string> = errorStrings[lang];
-  return table[key] ?? table.generic ?? null;
+  return table[key] ?? genericMessage(lang);
 }

@@ -1,349 +1,363 @@
-import type { JSX } from 'react';
+import type { JSX, ReactNode } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons';
-import { FlatList, Keyboard, KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
-import type { AccessibilityState } from 'react-native';
-import type { AnswerEvent, TopicGroup } from '../../engine';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import {
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
+} from 'react-native';
+import type { BulletinCardView, TopicGroup } from '../../engine';
 import { useEngine, useEngineChange } from '../context/useEngine';
+import { AppBanners, StatusBadges } from '../context/AppChrome';
 import { useLang, useT } from '../i18n';
 import { useTheme, useThemedStyles } from '../theme';
 import type { Theme } from '../theme';
 import {
   AiBlock,
   AiStatusLine,
+  BulletinCard,
   Button,
   Chip,
   ClosingLine,
   EmergencyCard,
   EmptyState,
   FixedReplyCard,
+  PhaseChangeLine,
   PlanAnswerCard,
   RefusalCard,
   Screen,
   SummaryCard,
   Txt,
 } from '../components';
+import type { RootNavigation } from '../navigation/types';
 import { askStrings } from '../strings/ask';
-import { cancelEvents, canSubmitQuestion, chatReducer, sourceLine } from './ask/chat';
-import type { ChatMessage } from './ask/chat';
+import { errorMessage, genericMessage } from '../strings/errors';
+import { fill } from '../strings/format';
+import { guideTopicLabels } from '../strings/guide';
+import { canSend, counterText, usedIds } from './ask/chat';
+import { EMPTY_PLAN, applyEvent, canStop, failPlan } from './ask/answerPlan';
+import type { AnswerPlan, MainCard } from './ask/answerPlan';
 
 const EXAMPLES = ['example_go_bag', 'example_flood', 'example_evacuation'] as const;
-let sessionMessages: ChatMessage[] = [];
-let nextMessageId = 1;
 
-function IconButton({ icon, label, onPress, accessibilityState }: { icon: 'trash-outline' | 'time-outline'; label: string; onPress: () => void; accessibilityState?: AccessibilityState }): JSX.Element {
-  const theme = useTheme();
-  const styles = useThemedStyles(makeStyles);
-  return (
-    <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={accessibilityState} onPress={onPress} style={styles.iconButton}>
-      <Ionicons name={icon} size={theme.type.roles.label.fontSize} color={theme.colors.text} />
-    </Pressable>
-  );
+interface Line {
+  label: string;
+  value: string;
 }
 
-function AssistantAvatar(): JSX.Element {
-  const theme = useTheme();
-  const styles = useThemedStyles(makeStyles);
-  return (
-    <View style={styles.avatar}>
-      <Ionicons name="shield-checkmark" size={theme.type.roles.label.fontSize} color={theme.colors.accentText} />
-    </View>
-  );
+interface Call {
+  id: string;
+  label: string;
 }
 
+/**
+ * Ask (the assistant tab). One question at a time against `ask.run()`: the event stream is folded
+ * into one {@link AnswerPlan}, then stacked top to bottom — emergency card, one main card, the AI
+ * block, the phase line and the closing line. History lives in Settings/Evaluation, not here.
+ */
 export function AskScreen(): JSX.Element {
   const engine = useEngine();
+  const navigation = useNavigation<RootNavigation>();
   const theme = useTheme();
   const t = useT(askStrings);
-  const styles = useThemedStyles(makeStyles);
+  const labels = useT(guideTopicLabels);
   const { lang } = useLang();
-  useEngineChange(['history', 'status']);
+  const styles = useThemedStyles(makeStyles);
+  useEngineChange(['status', 'phase']);
+
   const [question, setQuestion] = useState('');
-  const [messages, setMessages] = useState<ChatMessage[]>(sessionMessages);
-  const [running, setRunning] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [openSources, setOpenSources] = useState<Record<string, boolean>>({});
-  const [composerFocused, setComposerFocused] = useState(false);
-  const listRef = useRef<FlatList<ChatMessage>>(null);
+  const [asked, setAsked] = useState<string | null>(null);
+  const [plan, setPlan] = useState<AnswerPlan>(EMPTY_PLAN);
+  const [sourceVisible, setSourceVisible] = useState(false);
+  const [undoHidden, setUndoHidden] = useState(false);
   const mounted = useRef(true);
   const runId = useRef(0);
-  const activeId = useRef<string | null>(null);
+  const scrollRef = useRef<ScrollView>(null);
+  const emergencyPinned = useRef(false);
   const maxLength = engine.ask.maxLength;
-  const history = engine.history.list(10);
-
-  const commit = (next: ChatMessage[]): void => {
-    sessionMessages = next;
-    setMessages(next);
-  };
+  const canUndo = engine.context.get().undo !== undefined && !undoHidden;
 
   useEffect(() => {
     mounted.current = true;
-    return () => { mounted.current = false; engine.ask.cancel(); };
+    return () => {
+      mounted.current = false;
+      engine.ask.cancel();
+    };
   }, [engine]);
 
   useFocusEffect(useCallback(() => { engine.ask.warm(); }, [engine]));
 
-  const sendQuestion = async (rawQuestion: string): Promise<void> => {
-    const text = rawQuestion.trim().slice(0, maxLength);
-    if (!canSubmitQuestion(text) || running) return;
+  const send = (raw: string): void => {
+    const text = raw.trim().slice(0, maxLength);
+    if (!canSend(text, maxLength)) return;
     Keyboard.dismiss();
-    setQuestion('');
-    setHistoryOpen(false);
-    setOpenSources({});
-    const questionId = `q-${nextMessageId++}`;
-    const answerId = `a-${nextMessageId++}`;
-    activeId.current = answerId;
-    commit([...sessionMessages,
-      { id: questionId, kind: 'question', text },
-      { id: answerId, kind: 'answer', question: text, events: [] },
-    ]);
+    engine.ask.cancel();
     const id = ++runId.current;
-    setRunning(true);
-    try {
-      for await (const event of engine.ask.run(text)) {
-        if (!mounted.current || id !== runId.current) return;
-        commit(chatReducer(sessionMessages, event));
+    emergencyPinned.current = false;
+    setQuestion('');
+    setUndoHidden(false);
+    setSourceVisible(false);
+    setAsked(text);
+    setPlan(EMPTY_PLAN);
+    void (async () => {
+      try {
+        for await (const event of engine.ask.run(text)) {
+          if (!mounted.current || id !== runId.current) return;
+          setPlan((current) => applyEvent(current, event));
+        }
+      } catch {
+        if (mounted.current && id === runId.current) setPlan((current) => failPlan(current));
       }
-    } catch {
-      if (mounted.current && id === runId.current) {
-        commit(sessionMessages.map((message) => message.id === answerId && message.kind === 'answer' ? { ...message, error: true } : message));
+    })();
+  };
+
+  const bulletinLines = (view: BulletinCardView): Line[] => {
+    const { bulletin } = view;
+    const lines: Line[] = [
+      { label: t.bulletinName, value: bulletin.storm.name },
+      { label: t.bulletinCategory, value: bulletin.storm.category },
+      { label: t.bulletinPosition, value: bulletin.position.text },
+    ];
+    if (bulletin.movement) lines.push({ label: t.bulletinMovement, value: bulletin.movement.text });
+    for (const area of bulletin.signalAreas) {
+      lines.push({ label: fill(t.bulletinSignal, { level: area.level }), value: area.psgc.join(', ') });
+    }
+    return lines;
+  };
+
+  const planContent = (main: Extract<MainCard, { kind: 'plan_answer' }>): { lines: Line[]; calls: Call[] } => {
+    switch (main.field) {
+      case 'evacuation_center': {
+        const value = main.center ?? main.text;
+        return { lines: value ? [{ label: t.planCenter, value }] : [], calls: [] };
       }
-    } finally {
-      if (mounted.current && id === runId.current) setRunning(false);
+      case 'meeting_place':
+        return { lines: main.text ? [{ label: t.planMeeting, value: main.text }] : [], calls: [] };
+      case 'contacts': {
+        const contacts = main.contacts ?? [];
+        return {
+          lines: contacts.map((contact) => ({
+            label: contact.relation ? `${contact.name} · ${contact.relation}` : contact.name,
+            value: contact.phone,
+          })),
+          calls: contacts.map((contact) => ({ id: contact.phone, label: contact.name })),
+        };
+      }
+      case 'hotlines': {
+        const hotlines = main.hotlines ?? [];
+        return { lines: [], calls: hotlines.map((hotline) => ({ id: hotline.id, label: `${hotline.name} · ${hotline.number}` })) };
+      }
+      default:
+        return { lines: [], calls: [] };
     }
   };
 
-  const cancel = (): void => {
-    runId.current += 1;
-    engine.ask.cancel();
-    const id = activeId.current;
-    if (id) commit(sessionMessages.map((message) => message.id === id && message.kind === 'answer' ? { ...message, events: cancelEvents(message.events) } : message));
-    setRunning(false);
-  };
+  const callHotline = (id: string): void => { void engine.plan.call(id); };
 
-  const clearChat = (): void => {
-    runId.current += 1;
-    engine.ask.cancel();
-    activeId.current = null;
-    setRunning(false);
-    commit([]);
-    setOpenSources({});
-  };
-
-  const retry = (text: string): void => {
-    const failed = sessionMessages.at(-1);
-    if (failed?.kind === 'answer' && failed.error) commit(sessionMessages.slice(0, -2));
-    void sendQuestion(text);
-  };
-
-  const toggleSource = (id: string): void => setOpenSources((current) => ({ ...current, [id]: !current[id] }));
-
-  const topicLabel = (topic: string): string => t[`topic_${topic as TopicGroup}`];
-
-  const renderSourceDetail = (passageId: string): JSX.Element => {
-    const detail = engine.guide.passage(passageId);
-    if (detail === null) return <Txt role="bodySmall" tone="muted">{t.sourceUnavailable}</Txt>;
-    return (
-      <View style={styles.sourceDetail}>
-        <Txt role="bodySmall" tone="muted">{detail.source.agency} · {detail.source.title} · {detail.source.date}</Txt>
-        <Txt role="bodySmall" tone="brand" selectable>{detail.source.url}</Txt>
-        <Txt role="bodySmall" tone="muted">{t.reviewedBy}: {detail.reviewedBy} · {t.reviewedAt}: {detail.reviewedAt}</Txt>
-      </View>
-    );
-  };
-
-  const planLines = (event: Extract<AnswerEvent, { type: 'plan_answer' }>): { label: string; value: string }[] => {
-    if (event.field === 'evacuation_center') {
-      const value = event.center ?? event.text;
-      return value ? [{ label: t.planLabel_evacuation_center, value }] : [];
-    }
-    if (event.field === 'meeting_place') {
-      return event.text ? [{ label: t.planLabel_meeting_place, value: event.text }] : [];
-    }
-    if (event.field === 'contacts') {
-      return event.text ? [{ label: t.planLabel_contacts, value: event.text }] : [];
-    }
-    return [];
-  };
-
-  const renderEvent = (event: AnswerEvent, index: number): JSX.Element | null => {
-    const key = `event-${index}`;
-    switch (event.type) {
-      case 'emergency_card':
+  const mainNode = (main: MainCard): ReactNode => {
+    switch (main.kind) {
+      case 'fixed_reply':
+        return <FixedReplyCard text={main.text} />;
+      case 'bulletin_card':
         return (
-          <View key={key} style={styles.eventBlock}>
-            <EmergencyCard
-              title={event.card.title}
-              steps={event.card.steps}
-              hotlines={event.card.hotlines}
-              callLabel={t.call}
-              onCall={(id) => { void engine.plan.call(id); }}
+          <View style={styles.bulletinSourceGroup}>
+            <BulletinCard
+              title={main.card.bulletin.source.title}
+              lines={bulletinLines(main.card)}
+              ageText={main.card.ageText}
+              staleText={main.card.stale ? engine.copy('stale_warning', { lang }) : undefined}
+              sourceLabel={sourceVisible ? t.hideSource : engine.copy('source_link', { lang })}
+              onSource={() => setSourceVisible((visible) => !visible)}
             />
-            <Txt role="bodySmall" tone="muted" style={styles.sourceLine}>{sourceLine(event.card.source)}</Txt>
+            {sourceVisible ? (
+              <Txt role="bodySmall" tone="muted" selectable>
+                {main.card.bulletin.source.agency} · {main.card.bulletin.source.title} · {main.card.bulletin.source.url}
+              </Txt>
+            ) : null}
           </View>
         );
-      case 'fixed_reply':
-        return <FixedReplyCard key={key} text={event.text} />;
-      case 'plan_answer':
+      case 'plan_answer': {
+        const content = planContent(main);
         return (
           <PlanAnswerCard
-            key={key}
-            title={t.planAnswerTitle}
-            lines={planLines(event)}
-            calls={event.hotlines?.map((hotline) => ({ id: hotline.id, label: `${hotline.name} · ${hotline.number}` }))}
-            onCall={(id) => { void engine.plan.call(id); }}
-            empty={event.empty}
+            title={t.planTitle}
+            lines={content.lines}
+            calls={content.calls}
+            onCall={callHotline}
+            empty={main.empty}
             emptyText={t.planEmpty}
+            fillLabel={main.empty ? t.planFill : undefined}
+            onFill={main.empty ? () => navigation.navigate('Tabs', { screen: 'Hotlines' }) : undefined}
           />
         );
+      }
       case 'refusal':
         return (
           <RefusalCard
-            key={key}
-            text={event.text}
-            suggestions={event.suggestions.map((topic) => ({ topic, label: topicLabel(topic) }))}
-            onSuggestion={(topic) => { void sendQuestion(`${t.askAbout} ${topicLabel(topic)}?`); }}
+            text={main.text}
+            suggestions={main.suggestions.map((topic) => ({ topic, label: labels[topic] }))}
+            onSuggestion={(topic) => navigation.navigate('Tabs', { screen: 'Guide', params: { topic: topic as TopicGroup } })}
           />
         );
-      case 'summary': {
-        const open = openSources[event.passageId] === true;
+      case 'summary':
         return (
-          <View key={key} style={styles.eventBlock}>
-            <SummaryCard
-              title={event.title}
-              text={event.text}
-              pinned={event.pinned}
-              pinnedLabel={t.fromGuide}
-              sourceLinkLabel={open ? t.hideSource : engine.copy('source_link')}
-              onSource={() => toggleSource(event.passageId)}
-            />
-            {open ? renderSourceDetail(event.passageId) : null}
-          </View>
-        );
-      }
-      case 'ai_status':
-        return event.status === 'skipped'
-          ? <AiStatusLine key={key} text={event.reason ? t[`aiReason_${event.reason}`] : t.aiSkipped} />
-          : <AiStatusLine key={key} text={event.status === 'loading_model' ? t.aiLoading : t.aiThinking} busy />;
-      case 'ai_partial':
-        return (
-          <AiBlock
-            key={key}
-            state="partial"
-            text={event.text}
-            checkingLabel={t.checking}
-            stopLabel={t.cancel}
-            onStop={cancel}
-            onSource={toggleSource}
+          <SummaryCard
+            title={main.title}
+            text={main.text}
+            pinned={main.pinned}
+            pinnedLabel={t.fromGuide}
+            sourceLinkLabel={engine.copy('source_link', { lang })}
+            onSource={() => navigation.navigate('Passage', { passageId: main.passageId })}
           />
         );
-      case 'ai_final':
-        return (
-          <View key={key} style={styles.eventBlock}>
-            <AiBlock
-              state="final"
-              text={event.text}
-              checkingLabel={t.checking}
-              sourceLinks={event.used.map((passageId) => ({ id: passageId, label: engine.copy('source_link') }))}
-              onSource={toggleSource}
-            />
-            {event.used.filter((passageId) => openSources[passageId] === true).map((passageId) => (
-              <View key={passageId}>{renderSourceDetail(passageId)}</View>
-            ))}
-          </View>
-        );
-      case 'ai_rejected':
-        return (
-          <AiBlock
-            key={key}
-            state="rejected"
-            rejectedText={t.aiRejected}
-            checkingLabel={t.checking}
-            onSource={toggleSource}
-          />
-        );
-      case 'closing':
-        return <ClosingLine key={key} text={event.text} />;
-      case 'done':
-        return null;
       default:
         return null;
     }
   };
 
-  const renderMessage = ({ item }: { item: ChatMessage }): JSX.Element => item.kind === 'question' ? (
-    <View style={styles.questionRow}>
-      <View style={styles.questionBubble}>
-        <Txt role="body" color={theme.colors.selected.ink}>{item.text}</Txt>
-      </View>
-    </View>
-  ) : (
-    <View style={styles.assistantRow}>
-      <AssistantAvatar />
-      <View style={styles.answerColumn}>
-        <Txt role="caption" tone="muted" style={styles.assistantName}>{t.assistantName}</Txt>
-        {item.events.map(renderEvent)}
-        {lang === 'en' && item.events.some((event) => event.type === 'summary') ? <Txt role="bodySmall" tone="muted">{t.filipinoNote}</Txt> : null}
-        {item.error ? (
-          <View style={styles.errorTile}>
-            <Txt role="body" tone="muted">{t.failed}</Txt>
-            <Button label={t.retry} icon="refresh-outline" variant="tonal" onPress={() => retry(item.question)} />
-          </View>
-        ) : null}
-      </View>
-    </View>
+  const aiNode = (ai: AnswerPlan['ai']): ReactNode => {
+    switch (ai.state) {
+      case 'loading_model':
+        return (
+          <AiStatusLine
+            busy
+            text={errorMessage(lang, 'model_state', 'loading') ?? t.aiSkipped}
+            stopLabel={canStop(plan) ? t.stop : undefined}
+            onStop={() => engine.ask.cancel()}
+          />
+        );
+      case 'thinking':
+        return (
+          <AiStatusLine
+            busy
+            text={errorMessage(lang, 'model_state', 'generating') ?? t.aiSkipped}
+            stopLabel={canStop(plan) ? t.stop : undefined}
+            onStop={() => engine.ask.cancel()}
+          />
+        );
+      case 'skipped':
+        return (
+          <AiStatusLine
+            text={ai.reason ? errorMessage(lang, 'ai', ai.reason) ?? t.aiSkipped : t.aiSkipped}
+          />
+        );
+      case 'partial':
+        return (
+          <AiBlock
+            state="partial"
+            text={ai.text}
+            checkingLabel={t.checking}
+            stopLabel={canStop(plan) ? t.stop : undefined}
+            onStop={() => engine.ask.cancel()}
+            onSource={() => undefined}
+          />
+        );
+      case 'final':
+        return (
+          <AiBlock
+            state="final"
+            text={ai.text}
+            checkingLabel={t.checking}
+            sourceLinks={usedIds(ai.used).map((id) => ({ id, label: engine.copy('source_link', { lang }) }))}
+            onSource={(id) => navigation.navigate('Passage', { passageId: id })}
+          />
+        );
+      case 'rejected':
+        return (
+          <AiBlock
+            state="rejected"
+            rejectedText={errorMessage(lang, 'verifier', ai.code) ?? t.aiSkipped}
+            checkingLabel={t.checking}
+            onSource={() => undefined}
+          />
+        );
+      default:
+        return null;
+    }
+  };
+
+  const phaseNode = (phase: AnswerPlan['phase']): ReactNode => {
+    if (!phase) return null;
+    if (phase.kind === 'recommended') {
+      return (
+        <PhaseChangeLine
+          kind="recommended"
+          text={phase.text}
+          actionLabel={engine.copy(`phase_${phase.to}`, { lang })}
+          onAction={() => engine.context.setPhase(phase.to)}
+        />
+      );
+    }
+    if (!canUndo) return null;
+    return (
+      <PhaseChangeLine
+        kind="switched"
+        text={phase.text}
+        actionLabel={t.undo}
+        onAction={() => {
+          const result = engine.context.undoPhase();
+          if (!result.ok && result.error.code === 'nothing_to_undo') setUndoHidden(true);
+        }}
+      />
+    );
+  };
+
+  const answer = (
+    <>
+      {plan.emergency ? (
+        <EmergencyCard
+          title={plan.emergency.title}
+          steps={plan.emergency.steps}
+          hotlines={plan.emergency.hotlines}
+          callLabel={t.call}
+          onCall={callHotline}
+        />
+      ) : null}
+      {plan.main ? mainNode(plan.main) : null}
+      {aiNode(plan.ai)}
+      {plan.failed ? <Txt role="bodySmall" tone="muted">{genericMessage(lang)}</Txt> : null}
+      {phaseNode(plan.phase)}
+      {plan.closing ? <ClosingLine text={plan.closing} /> : null}
+    </>
   );
 
-  const emptyThread = (
-    <View style={styles.welcomeWrap}>
-      <EmptyState icon="chatbubbles-outline" title={t.assistantName} body={t.welcome} />
-      <Txt role="bodySmall" tone="muted" align="center">{t.suggestionTitle}</Txt>
+  const empty = (
+    <View style={styles.empty}>
+      <EmptyState icon="chatbubbles-outline" title={t.emptyTitle} body={t.emptyBody} />
+      <Txt role="bodySmall" tone="muted" align="center">{t.examplesTitle}</Txt>
       <View style={styles.chips}>
-        {EXAMPLES.map((key) => <Chip key={key} label={t[key]} onPress={() => { void sendQuestion(t[key]); }} />)}
+        {EXAMPLES.map((key) => (
+          <Chip key={key} label={t[key]} onPress={() => send(t[key])} />
+        ))}
       </View>
     </View>
   );
-
-  const headerRight = (
-    <View style={styles.headerActions}>
-      <IconButton icon="time-outline" label={t.historyTitle} accessibilityState={{ expanded: historyOpen }} onPress={() => setHistoryOpen((open) => !open)} />
-      <IconButton icon="trash-outline" label={t.clearChat} onPress={clearChat} />
-    </View>
-  );
-
-  const disabled = !running && !canSubmitQuestion(question);
 
   return (
-    <Screen title={t.title} scroll={false} right={headerRight}>
-      {historyOpen ? (
-        <View style={styles.historyPanel}>
-          <View style={styles.historyHeader}>
-            <Txt role="title">{t.historyTitle}</Txt>
-            <Pressable accessibilityRole="button" accessibilityLabel={t.clearHistory} onPress={() => { engine.history.clear(); }} style={styles.clearHistory}>
-              <Txt role="label" tone="brand">{t.clearHistory}</Txt>
-            </Pressable>
-          </View>
-          {history.length === 0 ? <Txt role="bodySmall" tone="muted">{t.historyEmpty}</Txt> : history.map((entry) => (
-            <Pressable key={entry.id} accessibilityRole="button" accessibilityLabel={entry.question} onPress={() => { void sendQuestion(entry.question); }} style={styles.historyRow}>
-              <Txt role="body" numberOfLines={1}>{entry.question}</Txt>
-              <Txt role="bodySmall" tone="muted">{t[`outcome_${entry.outcome}`]} · {entry.at}</Txt>
-            </Pressable>
-          ))}
-        </View>
-      ) : null}
-      <FlatList
-        ref={listRef}
-        style={styles.thread}
-        contentContainerStyle={messages.length === 0 ? styles.emptyContent : styles.threadContent}
-        data={messages}
-        keyExtractor={(item) => item.id}
-        renderItem={renderMessage}
-        ListEmptyComponent={emptyThread}
+    <Screen title={t.title} scroll={false} banner={<AppBanners />} right={<StatusBadges />}>
+      <ScrollView
+        ref={scrollRef}
+        style={styles.scroll}
+        contentContainerStyle={asked ? styles.answerContent : styles.emptyContent}
         keyboardShouldPersistTaps="handled"
-        onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
-      />
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={0}>
+        onContentSizeChange={() => {
+          if (plan.emergency) {
+            if (!emergencyPinned.current) {
+              emergencyPinned.current = true;
+              scrollRef.current?.scrollTo({ y: 0, animated: false });
+            }
+            return;
+          }
+          scrollRef.current?.scrollToEnd({ animated: false });
+        }}
+      >
+        {asked ? answer : empty}
+      </ScrollView>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <View style={styles.composer}>
           <View style={styles.inputWrap}>
             <TextInput
@@ -356,20 +370,20 @@ export function AskScreen(): JSX.Element {
               maxFontSizeMultiplier={theme.type.maxFontSizeMultiplier}
               multiline
               returnKeyType={Platform.OS === 'web' ? 'send' : 'default'}
-              onSubmitEditing={Platform.OS === 'web' ? () => { void sendQuestion(question); } : undefined}
-              onFocus={() => setComposerFocused(true)}
-              onBlur={() => setComposerFocused(false)}
-              style={[styles.input, composerFocused && styles.inputFocused]}
+              onSubmitEditing={Platform.OS === 'web' ? () => send(question) : undefined}
+              style={styles.input}
             />
-            {question.length > 0 ? <Txt role="caption" tone="muted" style={styles.counter}>{question.length}/{maxLength}</Txt> : null}
+            {question.length > 0 ? (
+              <Txt role="caption" tone="muted" style={styles.counter}>{counterText(t.counter, question.length, maxLength)}</Txt>
+            ) : null}
           </View>
           <Button
-            label={running ? t.cancel : t.ask}
-            accessibilityLabel={running ? t.cancel : t.ask}
-            icon={running ? 'stop' : 'send'}
-            variant={running ? 'outline' : 'highlight'}
-            disabled={disabled}
-            onPress={running ? cancel : () => { void sendQuestion(question); }}
+            label={t.send}
+            accessibilityLabel={t.send}
+            icon="send"
+            variant="highlight"
+            disabled={!canSend(question, maxLength)}
+            onPress={() => send(question)}
           />
         </View>
       </KeyboardAvoidingView>
@@ -378,63 +392,14 @@ export function AskScreen(): JSX.Element {
 }
 
 const makeStyles = (t: Theme) => {
-  const avatar = t.type.roles.title.lineHeight + t.space.md;
-  const inputMax = t.minTouch * 3;
+  const inputMax = t.border.control * 2 + t.space.md * 2 + t.type.roles.body.lineHeight * 4;
   return StyleSheet.create({
-    headerActions: { flexDirection: 'row', alignItems: 'center', gap: t.space.xs },
-    iconButton: {
-      width: t.minTouch,
-      height: t.minTouch,
-      justifyContent: 'center',
-      alignItems: 'center',
-      borderRadius: t.radius.pill,
-      backgroundColor: t.colors.surface,
-      borderColor: t.colors.hairline,
-      borderWidth: t.border.hairline,
-    },
-    thread: { flex: 1 },
-    threadContent: { gap: t.space.lg, paddingBottom: t.space.md },
+    scroll: { flex: 1 },
+    answerContent: { gap: t.space.lg, paddingBottom: t.space.md },
+    bulletinSourceGroup: { gap: t.space.sm },
     emptyContent: { flexGrow: 1, justifyContent: 'center' },
-    welcomeWrap: { alignItems: 'center', gap: t.space.md, paddingVertical: t.space.xl },
+    empty: { gap: t.space.md },
     chips: { flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap', gap: t.space.sm },
-    questionRow: { alignItems: 'flex-end' },
-    questionBubble: {
-      maxWidth: '84%',
-      backgroundColor: t.colors.selected.fill,
-      borderRadius: t.radius.panel,
-      padding: t.space.md,
-      gap: t.space.xs,
-    },
-    assistantRow: { flexDirection: 'row', alignItems: 'flex-start', gap: t.space.sm },
-    avatar: {
-      width: avatar,
-      height: avatar,
-      borderRadius: t.radius.pill,
-      backgroundColor: t.colors.surface,
-      borderColor: t.colors.hairline,
-      borderWidth: t.border.hairline,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    answerColumn: { flex: 1, gap: t.space.sm, alignItems: 'flex-start' },
-    assistantName: { marginLeft: t.space.xs },
-    eventBlock: { alignSelf: 'stretch', gap: t.space.sm },
-    sourceLine: { paddingHorizontal: t.space.xs },
-    sourceDetail: {
-      gap: t.space.xs,
-      padding: t.space.md,
-      backgroundColor: t.colors.surfaceSunken,
-      borderRadius: t.radius.form,
-    },
-    errorTile: {
-      alignSelf: 'stretch',
-      gap: t.space.md,
-      padding: t.space.tile,
-      backgroundColor: t.colors.surface,
-      borderColor: t.colors.danger.fill,
-      borderWidth: t.border.hairline,
-      borderRadius: t.radius.panel,
-    },
     composer: {
       flexDirection: 'row',
       alignItems: 'flex-end',
@@ -445,10 +410,12 @@ const makeStyles = (t: Theme) => {
     },
     inputWrap: {
       flex: 1,
+      minWidth: 0,
       minHeight: t.minTouch,
       maxHeight: inputMax,
       flexDirection: 'row',
       alignItems: 'flex-end',
+      gap: t.space.sm,
     },
     input: {
       flex: 1,
@@ -465,27 +432,6 @@ const makeStyles = (t: Theme) => {
       borderWidth: t.border.control,
       borderRadius: t.radius.panel,
     },
-    inputFocused: {
-      borderColor: t.colors.focus,
-    },
-    counter: { alignSelf: 'flex-end', paddingBottom: t.space.sm, paddingRight: t.space.sm },
-    historyPanel: {
-      maxHeight: t.minTouch * 4,
-      gap: t.space.sm,
-      backgroundColor: t.colors.surface,
-      borderColor: t.colors.hairline,
-      borderWidth: t.border.hairline,
-      borderRadius: t.radius.panel,
-      padding: t.space.md,
-    },
-    historyHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    clearHistory: { minHeight: t.minTouch, justifyContent: 'center', paddingHorizontal: t.space.sm },
-    historyRow: {
-      minHeight: t.minTouch,
-      justifyContent: 'center',
-      borderTopWidth: t.border.hairline,
-      borderTopColor: t.colors.hairline,
-      paddingTop: t.space.xs,
-    },
+    counter: { alignSelf: 'flex-end', paddingBottom: t.space.md },
   });
 };

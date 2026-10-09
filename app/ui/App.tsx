@@ -2,10 +2,12 @@ import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/
 import type { JSX } from 'react';
 import { StatusBar } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { RootTabs } from './navigation/RootTabs';
+import { RootStack } from './navigation/RootStack';
 import { EngineProvider } from './context/EngineProvider';
 import { LanguageProvider } from './i18n';
 import { PhaseTheme } from './context/PhaseTheme';
+import { DevOverridesProvider } from './context/AppChrome';
+import { DevPanel, DevPanelProvider } from './context/DevPanel';
 import { useTheme } from './theme';
 
 function ThemedNavigation(): JSX.Element {
@@ -30,7 +32,8 @@ function ThemedNavigation(): JSX.Element {
         barStyle={theme.scheme === 'light' ? 'dark-content' : 'light-content'}
         backgroundColor={theme.colors.canvas}
       />
-      <RootTabs />
+      <RootStack />
+      <DevPanel global />
     </NavigationContainer>
   );
 }
@@ -40,9 +43,13 @@ export default function App(): JSX.Element {
     <SafeAreaProvider>
       <EngineProvider>
         <LanguageProvider>
-          <PhaseTheme>
-            <ThemedNavigation />
-          </PhaseTheme>
+          <DevOverridesProvider>
+            <PhaseTheme>
+              <DevPanelProvider>
+                <ThemedNavigation />
+              </DevPanelProvider>
+            </PhaseTheme>
+          </DevOverridesProvider>
         </LanguageProvider>
       </EngineProvider>
     </SafeAreaProvider>

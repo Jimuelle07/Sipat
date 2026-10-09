@@ -55,7 +55,7 @@ export function WarningOption({ label, tone, selected, onPress, levelGlyph }: {
         </View>
       ) : null}
       {levelGlyph !== undefined ? <LevelBars count={levelGlyph} color={tone.ink} /> : null}
-      <Txt role="label" align="center" color={tone.ink}>{label}</Txt>
+      <Txt role="label" align="center" color={tone.ink} style={styles.label}>{label}</Txt>
     </Pressable>
   );
 }
@@ -64,12 +64,14 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   option: {
     alignSelf: 'stretch',
     minHeight: t.minTouch * 2,
+    minWidth: 0,
     alignItems: 'center',
     justifyContent: 'center',
     gap: t.space.sm,
-    padding: t.space.lg,
+    padding: t.space.sm,
     borderRadius: t.radius.menu,
   },
+  label: { flexShrink: 1 },
   check: {
     position: 'absolute',
     top: t.space.md,
