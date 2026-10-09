@@ -33,4 +33,6 @@ console.log(`synonyms.json: ${c.synonyms.length} entries`);
 console.log(`intents.json: ${c.rules.emergency_cards.length} emergency cards`);
 console.log(`sources.json: ${c.sources.length} sources`);
 console.log(`hotlines.json: ${c.hotlines.length} hotlines`);
+console.log(`phase_rules.json: ${c.phaseRules ? 'present' : 'missing'}`);
+console.log(`places.json: ${c.places?.items.length ?? 0} places`);
 console.log('Content OK');

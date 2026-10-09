@@ -1,13 +1,13 @@
 import type {
-  AiDecision, AiSkipReason, AnswerEvent, AskOptions, BulletinCardView, Context,
-  EmergencyCardView, EvacuationCenter, GuideIndex, Hotline, ModelManager, Outcome, PhaseRules, Profile,
-  QuestionLogEntry, SourceRef, Timings,
+  AiDecision, AiSkipReason, AnswerEvent, AskOptions, Bulletin, BulletinCardView, Context,
+  EmergencyCardView, EvacuationCenter, GuideIndex, Hotline, ModelError, ModelManager, Outcome, PhaseRules, Profile,
+  QuestionLogEntry, SourceRef, StormMeasure, Timings,
 } from '../types/index.ts';
 import { DEFAULT_SEARCH_CONFIG } from '../core/config.ts';
 import { normalize } from '../core/normalize.ts';
 import { route } from '../core/route.ts';
 import { search } from '../core/search.ts';
-import { buildPrompt } from '../core/prompt.ts';
+import { buildPrompt, promptTokens, redactQuestion } from '../core/prompt.ts';
 import { verify } from '../core/verify.ts';
 import { toManilaIso } from '../core/time.ts';
 import { decidePhase } from '../core/decidePhase.ts';
@@ -27,6 +27,7 @@ export interface AskDeps {
   hotlines: () => Hotline[];
   evacuationCenters: () => EvacuationCenter[];
   latestBulletin: () => BulletinCardView | null;
+  storm?: () => { bulletin: Bulletin; measure: StormMeasure } | null;
   log: (entry: QuestionLogEntry) => void;
   now?: () => number;
   newId?: () => string;
@@ -50,20 +51,37 @@ function phaseKey(phase: 'before' | 'during' | 'after') {
   return `phase_${phase}` as const;
 }
 
-function redactProfileText(question: string, profile: Profile | null): string {
-  let redacted = question;
-  const privateValues = (profile?.people ?? [])
-    .flatMap((member) => [member.name, member.note, member.phone])
-    .filter((value): value is string => Boolean(value?.trim()));
-  for (const value of privateValues) {
-    const escaped = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    redacted = redacted.replace(new RegExp(escaped, 'gi'), '[redacted]');
+function privateQuestionValues(deps: AskDeps, profile: Profile | null, bulletinCard: BulletinCardView | null): string[] {
+  const values: string[] = [];
+  const places = deps.content.places?.items ?? [];
+  let psgc = profile?.location?.psgc;
+  const seen = new Set<string>();
+  while (psgc && !seen.has(psgc)) {
+    seen.add(psgc);
+    const place = places.find((item) => item.psgc === psgc);
+    if (!place) break;
+    values.push(place.name, place.psgc);
+    psgc = place.parent ?? undefined;
   }
-  return redacted;
+  const bulletin = bulletinCard?.bulletin;
+  if (bulletin) {
+    values.push(bulletin.text, bulletin.source.title, bulletin.storm.name, bulletin.storm.internationalName ?? '',
+      bulletin.position.text, bulletin.movement?.text ?? '');
+  }
+  return values;
 }
 
 function modelSettings(nPredict: number) {
-  return { nPredict, temperature: 0.2, topP: 0.9, stop: [] as string[] };
+  return { nPredict, temperature: 0.2, topP: 0.9, stop: ['<|eot_id|>'], seed: 7 };
+}
+
+async function modelSkipReason(error: ModelError, power: AskDeps['power']): Promise<AiSkipReason> {
+  if (error === 'tier') return 'tier';
+  if (error === 'not_allowed') {
+    const decision = await power.aiAllowed().catch(() => ({ allowed: true as const }));
+    if (!decision.allowed) return decision.reason;
+  }
+  return 'no_model';
 }
 
 export async function* runAskPipeline(
@@ -76,12 +94,16 @@ export async function* runAskPipeline(
   const startedAt = now();
   const normalized = normalize(question.slice(0, 200), deps.content.synonyms);
   const profile = deps.profile();
+  const bulletinCard = deps.latestBulletin();
+  const privateValues = privateQuestionValues(deps, profile, bulletinCard);
+  const redactedQuestion = redactQuestion(normalized.raw, profile, privateValues);
+  const safeQuestion = redactedQuestion;
   const initialContext = deps.context();
   const routeStarted = now();
   const routed = route(normalized, deps.content.rules);
   const routeMs = Math.max(0, now() - routeStarted);
   const logEntry: QuestionLogEntry = {
-    id: newId(), at: toManilaIso(new Date(startedAt)), question: redactProfileText(normalized.raw, profile),
+    id: newId(), at: toManilaIso(new Date(startedAt)), question: safeQuestion,
     route: routed.primary, emergency: routed.emergency, phaseCue: routed.phaseCue?.phase ?? null,
     phaseHint: null, hint: 'none', topIds: [], topScore: 0, gatePassed: false,
     outcome: 'cancelled', failures: [], timings: { ...zeroTimings(), routeMs },
@@ -114,9 +136,8 @@ export async function* runAskPipeline(
   let phaseHint: 'before' | 'during' | 'after' | null = null;
   const field = routed.planField;
   if (routed.primary === 'live_data') {
-    const bulletin = deps.latestBulletin();
-    if (bulletin) {
-      yield { type: 'bulletin_card', card: bulletin };
+    if (bulletinCard) {
+      yield { type: 'bulletin_card', card: bulletinCard };
       outcome = 'bulletin_card';
     } else {
       yield { type: 'fixed_reply', route: 'live_data', copyKey: 'no_live_data', text: copyText('no_live_data') };
@@ -191,62 +212,89 @@ export async function* runAskPipeline(
         }
         if (!decision.allowed) {
           logEntry.aiSkipReason = decision.reason;
-          yield { type: 'ai_status', status: 'skipped', reason: decision.reason as AiSkipReason };
+          yield { type: 'ai_status', status: 'skipped', reason: decision.reason };
         } else {
-          yield { type: 'ai_status', status: 'loading_model' };
-          yield { type: 'ai_status', status: 'thinking' };
-          const tier = await deps.model.tier().catch(() => 'lite' as const);
-          const prompt = buildPrompt({
-            question: normalized.raw,
-            profile,
-            context: initialContext,
-            passages: selected,
-          });
-          const pending: string[] = [];
-          const request = deps.model.generate(
-            { prompt, settings: modelSettings(tier === 'full' ? 110 : 80) },
-            (text) => pending.push(text),
-            opts.signal,
-          );
-          let requestDone = false;
-          void request.then(
-            () => { requestDone = true; },
-            () => { requestDone = true; },
-          );
-          let emitted = 0;
-          while (!requestDone || emitted < pending.length) {
-            if (cancelled()) {
-              await deps.model.stop().catch(() => undefined);
-              yield doneCancelled();
-              return;
+          let loadFailure: ModelError | null = null;
+          const modelState = deps.model.state();
+          if (modelState === 'absent' || modelState === 'generating') {
+            loadFailure = modelState === 'absent' ? 'no_model' : 'busy';
+          } else if (modelState !== 'ready') {
+            yield { type: 'ai_status', status: 'loading_model' };
+            const loadStarted = now();
+            try {
+              const loaded = await deps.model.warm();
+              if (!loaded.ok) loadFailure = loaded.error.code;
+            } catch {
+              loadFailure = 'load_failed';
             }
-            while (emitted < pending.length) yield { type: 'ai_partial', text: pending[emitted++]! };
-            if (!requestDone) await new Promise((resolve) => setTimeout(resolve, 0));
+            logEntry.timings.loadMs = Math.max(0, now() - loadStarted);
           }
-          const generated = await request;
-          if (cancelled() || (!generated.ok && generated.error.code === 'cancelled')) {
+          if (cancelled()) {
             yield doneCancelled();
             return;
           }
-          if (!generated.ok) {
-            logEntry.failures = ['schema'];
-            yield { type: 'ai_rejected', code: 'schema', fallbackPassageId: fallback.id };
+          if (loadFailure) {
+            const reason = await modelSkipReason(loadFailure, deps.power);
+            logEntry.aiSkipReason = reason;
+            yield { type: 'ai_status', status: 'skipped', reason };
           } else {
-            const verification = verify(generated.value.raw, selected);
-            if (!verification.ok || !verification.output) {
-              const failure = verification.failures[0]?.code ?? 'schema';
-              logEntry.failures = verification.failures.map((item) => item.code);
-              yield { type: 'ai_rejected', code: failure, fallbackPassageId: fallback.id };
+            yield { type: 'ai_status', status: 'thinking' };
+            const tier = await deps.model.tier().catch(() => 'lite' as const);
+            const prompt = buildPrompt({
+              question: safeQuestion,
+              profile,
+              context: initialContext,
+              passages: selected,
+            });
+            logEntry.timings.promptTokens = promptTokens(prompt);
+            const pending: string[] = [];
+            const request = Promise.resolve().then(() => deps.model.generate(
+              { prompt, settings: modelSettings(tier === 'lite' ? 80 : 110) },
+              (text) => pending.push(text),
+              opts.signal,
+            )).catch(() => ({ ok: false as const, error: { code: 'native' as const } }));
+            let requestDone = false;
+            void request.then(
+              () => { requestDone = true; },
+              () => { requestDone = true; },
+            );
+            let emitted = 0;
+            while (!requestDone || emitted < pending.length) {
+              if (cancelled()) {
+                await deps.model.stop().catch(() => undefined);
+                yield doneCancelled();
+                return;
+              }
+              while (emitted < pending.length) yield { type: 'ai_partial', text: pending[emitted++]! };
+              if (!requestDone) await new Promise((resolve) => setTimeout(resolve, 0));
+            }
+            const generated = await request;
+            if (cancelled() || (!generated.ok && generated.error.code === 'cancelled')) {
+              yield doneCancelled();
+              return;
+            }
+            if (!generated.ok) {
+              const reason = await modelSkipReason(generated.error.code, deps.power);
+              logEntry.aiSkipReason = reason;
+              yield { type: 'ai_status', status: 'skipped', reason };
             } else {
-              phaseHint = verification.output.phase_hint;
-              outcome = 'answered_ai';
-              yield { type: 'ai_final', text: verification.output.answer, used: verification.output.used,
-                timings: {
-                  routeMs,
-                  searchMs: logEntry.timings.searchMs,
-                  ...generated.value.timings,
-                  totalMs: Math.max(0, now() - startedAt),
-                } };
+              Object.assign(logEntry.timings, generated.value.timings);
+              const verification = verify(generated.value.raw, selected);
+              if (!verification.ok || !verification.output) {
+                const failure = verification.failures[0]?.code ?? 'schema';
+                logEntry.failures = verification.failures.map((item) => item.code);
+                yield { type: 'ai_rejected', code: failure, fallbackPassageId: fallback.id };
+              } else {
+                phaseHint = verification.output.phase_hint;
+                outcome = 'answered_ai';
+                yield { type: 'ai_final', text: verification.output.answer, used: verification.output.used,
+                  timings: {
+                    routeMs,
+                    searchMs: logEntry.timings.searchMs,
+                    ...generated.value.timings,
+                    totalMs: Math.max(0, now() - startedAt),
+                  } };
+              }
             }
           }
         }
@@ -259,10 +307,12 @@ export async function* runAskPipeline(
     return;
   }
   logEntry.phaseHint = phaseHint;
+  let storm: { bulletin: Bulletin; measure: StormMeasure } | null = null;
+  try { storm = deps.storm?.() ?? null; } catch { /* A cached bulletin cannot block the answer. */ }
   const phaseDecision = decidePhase({
     context: initialContext,
     ask: { questionId: logEntry.id, cue: routed.phaseCue, hint: phaseHint },
-    storm: null,
+    storm,
     rules: deps.phaseRules,
     now: toManilaIso(new Date(now())),
   });
@@ -276,7 +326,8 @@ export async function* runAskPipeline(
     yield { type: 'phase_change', kind: 'switched', from: switched.from, to: switched.to, source: 'ask',
       copyKey: 'phase_switched', text: copyText('phase_switched', { vars: { phase: label } }) };
     logEntry.phaseChange = { kind: 'switched', from: switched.from, to: switched.to };
-  } else if (recommendation && recommendation.phase !== initialContext.phase) {
+  } else if (recommendation && recommendation.phase !== initialContext.phase &&
+    JSON.stringify(recommendation) !== JSON.stringify(initialContext.recommended)) {
     yield { type: 'phase_change', kind: 'recommended', from: initialContext.phase, to: recommendation.phase,
       source: 'ask', copyKey: phaseKey(recommendation.phase), text: copyText(phaseKey(recommendation.phase)) };
     logEntry.phaseChange = { kind: 'recommended', from: initialContext.phase, to: recommendation.phase };

@@ -411,6 +411,13 @@ const FIXTURE_PLACE_ITEMS: Place[] = [
     centroid: { lat: 14.0, lon: 122.0 },
   },
   {
+    psgc: 'SAMPLE-PROVINCE-2',
+    name: 'SAMPLE Province Two (placeholder)',
+    level: 'province',
+    parent: 'SAMPLE-REGION-1',
+    centroid: { lat: 13.0, lon: 121.0 },
+  },
+  {
     psgc: 'SAMPLE-MUNICIPALITY-1',
     name: 'SAMPLE Municipality (placeholder)',
     level: 'municipality',

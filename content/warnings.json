@@ -124,6 +124,12 @@
       "meaning": "(placeholder: walang nakuhang paliwanag ng gale warning mula sa PAGASA; ang pahina ng Gale Warning ay nagpapakita lang ng kasalukuyang babala)",
       "actions": ["(placeholder: walang nakuhang aksyon mula sa PAGASA gale warning page)"],
       "source_id": "pagasa-tcws", "confirmed": false
+    },
+    {
+      "id": "barangay-order", "kind": "barangay_order", "level": "on", "label": "Pinapalikas na kami ng barangay",
+      "meaning": "(fill in)",
+      "actions": ["(fill in)"],
+      "source_id": "barangay-order-wording", "confirmed": false
     }
   ]
 }

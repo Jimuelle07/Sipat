@@ -14,8 +14,44 @@ const config: ExpoConfig = {
   },
   android: {
     package: 'ph.bagyobuddy.app',
+    // Camera only for member photos, asked when the user taps "Kunan ng litrato". Coarse location only.
+    permissions: ['android.permission.CAMERA'],
+    // The system photo picker and the document picker (SAF) need no storage permission.
+    // Location is coarse only: the one-shot reading never runs in the background (AGENTS rule 6).
+    blockedPermissions: [
+      'android.permission.READ_EXTERNAL_STORAGE',
+      'android.permission.WRITE_EXTERNAL_STORAGE',
+      'android.permission.RECORD_AUDIO',
+      'android.permission.ACCESS_FINE_LOCATION',
+      'android.permission.ACCESS_BACKGROUND_LOCATION',
+    ],
   },
-  plugins: ['expo-status-bar', 'llama.rn', withReleaseNoInternet, withSecureScreen],
+  plugins: [
+    'expo-status-bar',
+    'llama.rn',
+    'expo-sharing',
+    'react-native-quick-crypto',
+    [
+      'expo-image-picker',
+      {
+        cameraPermission: 'Kailangan ng camera para makunan ng litrato ang bawat kasapi ng pamilya.',
+        photosPermission: 'Pumili ng litrato ng kasapi ng pamilya mula sa gallery.',
+        microphonePermission: false,
+      },
+    ],
+    [
+      'expo-location',
+      {
+        locationWhenInUsePermission:
+          'Gagamitin ang lokasyon ng telepono para mahanap ang pinakamalapit na evacuation center. Isang beses lang ito kukunin.',
+        locationAlwaysAndWhenInUsePermission: false,
+        locationAlwaysPermission: false,
+        isAndroidBackgroundLocationEnabled: false,
+      },
+    ],
+    withReleaseNoInternet,
+    withSecureScreen,
+  ],
 };
 
 export default config;

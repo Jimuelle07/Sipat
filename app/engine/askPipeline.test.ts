@@ -3,7 +3,7 @@ import type { AiDecision, Context, GenerateResult, ModelManager, ModelError, Que
 import { bundledContent } from '../content/index.ts';
 import { createIndex } from '../core/search.ts';
 import { fixtureProfile } from './fixtures/households.ts';
-import { FIXTURE_PHASE_RULES } from './fixtures/content.ts';
+import { FIXTURE_PHASE_RULES, FIXTURE_PLACES, FIXTURE_INTENTS } from './fixtures/content.ts';
 import { COPY } from './copy.ts';
 import { runAskPipeline, type AskDeps } from './askPipeline.ts';
 
@@ -60,14 +60,150 @@ describe('runAskPipeline', () => {
     expect(generate).not.toHaveBeenCalled();
   });
 
+  it.each(['ai_off', 'no_model', 'tier', 'battery_saver', 'low_battery'] as const)(
+    'keeps the vetted answer when AI is skipped for %s', async (reason) => {
+      const { deps, generate, logs } = harness({ allowed: { allowed: false, reason } });
+      const result = await events('Ano ang ilalagay sa go bag?', deps);
+      expect(result.map((event) => event.type)).toEqual(['summary', 'ai_status', 'closing', 'done']);
+      expect(result[1]).toMatchObject({ type: 'ai_status', status: 'skipped', reason });
+      expect(result.at(-1)).toMatchObject({ type: 'done', outcome: 'answered_summary' });
+      expect(logs[0]?.aiSkipReason).toBe(reason);
+      expect(generate).not.toHaveBeenCalled();
+    },
+  );
+
+  it('redacts household and area values from the prompt and the question log', async () => {
+    const { deps, generate, logs } = harness();
+    const profile = fixtureProfile();
+    profile.plan.contacts = [{ name: 'Tita Rosa', phone: '09990000000' }];
+    profile.plan.meetingPlace = 'SAMPLE Plaza';
+    deps.profile = () => profile;
+    deps.content = { ...deps.content, places: FIXTURE_PLACES };
+    const area = FIXTURE_PLACES.items.find((place) => place.psgc === profile.location?.psgc);
+    const question = `Nena, Lola Ising, gamot sa presyon, 0000000000, Tita Rosa, 09990000000, SAMPLE Plaza, ${area?.name}, ${profile.location?.psgc}: ano ang ilalagay sa go bag?`;
+    await events(question, deps);
+    expect(generate).toHaveBeenCalledOnce();
+    const prompt = generate.mock.calls[0]?.[0].prompt.messages.map((message) => message.content).join('\n') ?? '';
+    const logged = logs[0]?.question ?? '';
+    for (const value of ['Nena', 'Lola Ising', 'gamot sa presyon', '0000000000', 'Tita Rosa', '09990000000', 'SAMPLE Plaza', area?.name, profile.location?.psgc]) {
+      if (value) {
+        expect(prompt).not.toContain(value);
+        expect(logged).not.toContain(value);
+      }
+    }
+    expect(prompt).toContain('[pribado]');
+    expect(logged).toContain('[pribado]');
+    expect(Object.keys(logs[0] ?? {}).sort()).toEqual([
+      'at', 'emergency', 'failures', 'gatePassed', 'hint', 'id', 'outcome', 'phaseCue', 'phaseHint',
+      'question', 'route', 'timings', 'topIds', 'topScore',
+    ].sort());
+  });
+
   it('shows a cached bulletin for live data and never invokes the model', async () => {
     const { deps, generate } = harness();
-    const card = { bulletin: { id: 'fixture', stormId: 'fixture', source: { agency: 'PAGASA' as const, title: 'SAMPLE', url: 'https://example.invalid' }, issuedAt: '', scrapedAt: '', fetchedAt: '', storm: { name: 'SAMPLE', category: 'TD' as const }, position: { lat: 0, lon: 0, at: '', text: '' }, forecast: [], signalAreas: [], final: false, text: 'SAMPLE' }, issuedHoursAgo: 0, fetchedHoursAgo: 0, stale: false, ageText: '' };
+    const card = { bulletin: { id: 'fixture', stormId: 'fixture', source: { agency: 'PAGASA' as const, title: 'SAMPLE – hindi totoong bulletin', url: 'https://example.invalid' }, issuedAt: '', scrapedAt: '', fetchedAt: '', storm: { name: 'SAMPLE', category: 'TD' as const }, position: { lat: 0, lon: 0, at: '', text: '' }, forecast: [], signalAreas: [], final: false, text: 'SAMPLE – hindi totoong bulletin' }, issuedHoursAgo: 0, fetchedHoursAgo: 0, stale: false, ageText: '' };
     deps.latestBulletin = () => card;
     const result = await events('Nasaan na ang bagyo?', deps);
     expect(result.map((event) => event.type)).toEqual(['bulletin_card', 'closing', 'done']);
     expect(result[0]).toMatchObject({ type: 'bulletin_card', card });
     expect(generate).not.toHaveBeenCalled();
+  });
+
+  it('keeps cached bulletin text out of a guide prompt', async () => {
+    const { deps, generate } = harness();
+    const bulletinText = 'SAMPLE – hindi totoong bulletin: 9999 km ang layo.';
+    deps.latestBulletin = () => ({
+      bulletin: { id: 'sample', stormId: 'sample', source: { agency: 'PAGASA', title: 'SAMPLE – hindi totoong bulletin', url: 'https://example.invalid' },
+        issuedAt: '', scrapedAt: '', fetchedAt: '', storm: { name: 'SAMPLE Bagyo', category: 'TD' },
+        position: { lat: 0, lon: 0, at: '', text: 'SAMPLE position' }, forecast: [], signalAreas: [], final: false, text: bulletinText },
+      issuedHoursAgo: 0, fetchedHoursAgo: 0, stale: false, ageText: '',
+    });
+    await events(`Ano ang ilalagay sa go bag? ${bulletinText}`, deps);
+    const messages = generate.mock.calls[0]?.[0].prompt.messages.map((message) => message.content).join('\n') ?? '';
+    expect(messages).not.toContain(bulletinText);
+    expect(messages).not.toContain('9999');
+    expect(messages).not.toContain('SAMPLE Bagyo');
+  });
+
+  it('keeps a number the user typed even when a bulletin is cached', async () => {
+    const { deps, generate, logs } = harness();
+    deps.latestBulletin = () => ({
+      bulletin: { id: 'sample', stormId: 'sample', source: { agency: 'PAGASA', title: 'SAMPLE – hindi totoong bulletin', url: 'https://example.invalid' },
+        issuedAt: '', scrapedAt: '', fetchedAt: '', storm: { name: 'Bagyong SAMPLE', category: 'TD' },
+        position: { lat: 0, lon: 0, at: '', text: 'SAMPLE' }, forecast: [], signalAreas: [], final: false, text: 'SAMPLE' },
+      issuedHoursAgo: 0, fetchedHoursAgo: 0, stale: false, ageText: '',
+    });
+    await events('Signal 3 na dito, ano ang ilalagay sa go bag?', deps);
+    const messages = generate.mock.calls[0]?.[0].prompt.messages.map((message) => message.content).join('\n') ?? '';
+    expect(messages).toContain('Signal 3');
+    expect(logs[0]?.question).toContain('3');
+  });
+
+  it('emits loading only while warming, then thinking and a terminal AI event', async () => {
+    const { deps, generate } = harness();
+    let ready = false;
+    deps.model.state = () => ready ? 'ready' : 'unloaded';
+    const warm = vi.fn(async () => { ready = true; return { ok: true as const, value: undefined }; });
+    deps.model.warm = warm;
+    const first = await events('Ano ang ilalagay sa go bag?', deps);
+    expect(first.map((event) => event.type === 'ai_status' ? `${event.type}:${event.status}` : event.type)).toEqual([
+      'summary', 'ai_status:loading_model', 'ai_status:thinking', 'ai_partial', 'ai_final', 'closing', 'done',
+    ]);
+    expect(warm).toHaveBeenCalledOnce();
+    expect(generate.mock.calls[0]?.[0].settings).toEqual({ nPredict: 110, temperature: 0.2, topP: 0.9, stop: ['<|eot_id|>'], seed: 7 });
+    const second = await events('Ano ang ilalagay sa go bag?', deps);
+    expect(second.map((event) => event.type === 'ai_status' ? `${event.type}:${event.status}` : event.type)).not.toContain('ai_status:loading_model');
+  });
+
+  it('keeps the summary when the model is absent or loading fails', async () => {
+    for (const modelState of ['absent', 'unloaded'] as const) {
+      const { deps, generate, logs } = harness();
+      deps.model.state = () => modelState;
+      const warm = vi.fn(async () => ({ ok: false as const, error: { code: 'load_failed' as const, message: 'SAMPLE load failure' } }));
+      deps.model.warm = warm;
+      const result = await events('Ano ang ilalagay sa go bag?', deps);
+      expect(result.map((event) => event.type === 'ai_status' ? `${event.type}:${event.status}` : event.type)).toEqual(
+        modelState === 'absent'
+          ? ['summary', 'ai_status:skipped', 'closing', 'done']
+          : ['summary', 'ai_status:loading_model', 'ai_status:skipped', 'closing', 'done'],
+      );
+      expect(result.at(-1)).toMatchObject({ outcome: 'answered_summary' });
+      expect(logs[0]?.aiSkipReason).toBe('no_model');
+      expect(warm).toHaveBeenCalledTimes(modelState === 'absent' ? 0 : 1);
+      expect(generate).not.toHaveBeenCalled();
+    }
+  });
+
+  it('places a phase change between the AI part and closing', async () => {
+    const { deps, logs } = harness();
+    deps.content = { ...deps.content, rules: FIXTURE_INTENTS };
+    const result = await events('Nandito na ang bagyo, ano ang ilalagay sa go bag?', deps);
+    const types = result.map((event) => event.type);
+    expect(types.filter((type) => type === 'phase_change')).toHaveLength(1);
+    expect(types.indexOf('phase_change')).toBe(types.indexOf('closing') - 1);
+    expect(types.at(-1)).toBe('done');
+    expect(logs[0]?.phaseChange).toMatchObject({ kind: 'switched', from: 'before', to: 'during' });
+  });
+
+  it('rejects an invalid answer, drops its phase hint, and keeps the summary', async () => {
+    const raw = JSON.stringify({ used: ['missing-passage'], in_guide: true, phase_hint: 'during', answer: 'Ihanda ang go bag.' });
+    const { deps, logs } = harness({ raw });
+    const result = await events('Ano ang ilalagay sa go bag?', deps);
+    expect(result.map((event) => event.type)).toEqual([
+      'summary', 'ai_status', 'ai_partial', 'ai_rejected', 'closing', 'done',
+    ]);
+    expect(result.find((event) => event.type === 'ai_rejected')).toMatchObject({ code: 'bad_citation' });
+    expect(result.at(-1)).toMatchObject({ outcome: 'answered_summary' });
+    expect(logs[0]).toMatchObject({ phaseHint: null, failures: ['bad_citation'] });
+  });
+
+  it('puts an emergency card before the primary card', async () => {
+    const { deps } = harness({ allowed: { allowed: false, reason: 'ai_off' } });
+    deps.content = { ...deps.content, rules: FIXTURE_INTENTS };
+    const result = await events('Lumulubog, ano ang ilalagay sa go bag?', deps);
+    expect(result.map((event) => event.type)).toEqual([
+      'emergency_card', 'summary', 'ai_status', 'closing', 'done',
+    ]);
   });
 
   it('emits phase changes before closing and cancellation skips phase processing', async () => {

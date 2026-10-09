@@ -1,0 +1,36 @@
+{
+  "summary": {
+    "generatedAt": "2026-10-10T07:07:14+08:00",
+    "retrieval": {
+      "hitAt2": 1,
+      "correctRefusal": 1,
+      "emergencyTrigger": 1,
+      "liveDataReply": 1
+    },
+    "answers": {
+      "faithfulness": null,
+      "numberCheckPass": 0
+    },
+    "phase": {
+      "casesPassed": 14,
+      "casesTotal": 14,
+      "wrongDirection": 0
+    },
+    "device": {}
+  },
+  "retrieval": {
+    "hitAt2": 1,
+    "correctRefusal": 1,
+    "emergencyTrigger": 1,
+    "routeAccuracy": 1,
+    "phaseCueAccuracy": 1,
+    "failures": []
+  },
+  "answers": null,
+  "phase": {
+    "passed": 14,
+    "total": 14,
+    "wrongDirection": 0,
+    "failures": []
+  }
+}

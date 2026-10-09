@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "content_version": 1,
+  "generated_at": "2026-10-09T09:00:00+08:00",
+  "rules": {
+    "warning_to_phase": { "any_active_warning": "during", "basis": "product_rule" },
+    "bands": {
+      "near": { "max_km": null, "placeholder": true, "source_id": null, "reviewed_by": null, "reviewed_at": null },
+      "approach": { "max_km": null, "placeholder": true, "source_id": null, "reviewed_by": null, "reviewed_at": null }
+    },
+    "evacuation_threshold": {
+      "category_min": null,
+      "tcws_min": null,
+      "placeholder": true,
+      "source_id": null,
+      "reviewed_by": null,
+      "reviewed_at": null
+    }
+  }
+}
