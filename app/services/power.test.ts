@@ -15,7 +15,9 @@ function settings(over: Partial<Settings> = {}): Settings {
     language: 'tl',
     lowBatteryThreshold: 15,
     aiEnabled: true,
+    lowBatteryMode: false,
     staleWarningHours: 3,
+    feedEnabled: true,
     autoCheckUpdates: true,
     wifiOnly: true,
     topicReportsOptIn: false,
@@ -53,9 +55,9 @@ describe('decideAi precedence', () => {
     expect(decision).toEqual(denied('ai_off'));
   });
 
-  it('reports tier before no_model when both fail', () => {
+  it('reports no_model before tier when both fail', () => {
     expect(decideAi({ settings: settings(), battery: battery(), tier: 'none', modelPresent: false }))
-      .toEqual(denied('tier'));
+      .toEqual(denied('no_model'));
   });
 
   it('reports no_model when the model file is missing', () => {
@@ -84,6 +86,35 @@ describe('decideAi precedence', () => {
   it('allows AI when the battery is unknown (null)', () => {
     expect(decideAi({ settings: settings(), battery: null, tier: 'full', modelPresent: true }))
       .toEqual(allowed);
+  });
+
+  it('reports no_model before low_battery', () => {
+    expect(decideAi({
+      settings: settings({ lowBatteryMode: true }), battery: battery({ level: 5 }), tier: 'full', modelPresent: false,
+    })).toEqual(denied('no_model'));
+  });
+});
+
+describe('decideAi manual low-battery mode', () => {
+  it('denies at any level when lowBatteryMode is on', () => {
+    expect(decideAi({
+      settings: settings({ lowBatteryMode: true }), battery: battery({ level: 90 }), tier: 'full', modelPresent: true,
+    })).toEqual(denied('low_battery'));
+  });
+
+  it('denies when lowBatteryMode is on even while charging or without a reading', () => {
+    expect(decideAi({
+      settings: settings({ lowBatteryMode: true }), battery: battery({ level: 90, charging: true }), tier: 'full', modelPresent: true,
+    })).toEqual(denied('low_battery'));
+    expect(decideAi({
+      settings: settings({ lowBatteryMode: true }), battery: null, tier: 'full', modelPresent: true,
+    })).toEqual(denied('low_battery'));
+  });
+
+  it('reports battery_saver before low_battery from the switch', () => {
+    expect(decideAi({
+      settings: settings({ lowBatteryMode: true }), battery: battery({ level: 90, saver: true }), tier: 'full', modelPresent: true,
+    })).toEqual(denied('battery_saver'));
   });
 });
 

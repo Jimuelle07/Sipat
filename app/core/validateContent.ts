@@ -1,16 +1,30 @@
 import type {
-  BundledContent,
-  ContentFileName,
-  Result,
-  Passage,
   ChecklistItem,
-  WarningEntry,
-  SynonymEntry,
-  IntentRules,
-  Source,
+  ContentFileName,
   Hotline,
+  IntentRules,
+  Passage,
+  PhaseRules,
+  PlacesFile,
+  Result,
+  Source,
+  SynonymEntry,
+  WarningEntry,
 } from '../types/index.ts';
 
+export interface BundledContent {
+  passages: Passage[];
+  checklist: ChecklistItem[];
+  warnings: WarningEntry[];
+  synonyms: SynonymEntry[];
+  rules: IntentRules;
+  sources: Source[];
+  hotlines: Hotline[];
+  phaseRules?: PhaseRules;
+  places?: PlacesFile;
+}
+
+// phase_rules.json and places.json are part of the v2 contract but not bundled yet; session 2 adds them.
 export const REQUIRED_CONTENT_FILES = [
   'guide.tl.json',
   'checklist.json',
@@ -23,10 +37,13 @@ export const REQUIRED_CONTENT_FILES = [
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const NUMBER_RE = /^\+?\d+$/;
+const CHECKLIST_GROUPS = ['now', 'go_bag', 'home', 'evacuate', 'after'] as const;
+const WARNING_KINDS = ['tcws', 'rainfall', 'surge', 'gale', 'barangay_order'] as const;
 
 type Rec = Record<string, unknown>;
 const isRec = (v: unknown): v is Rec => typeof v === 'object' && v !== null && !Array.isArray(v);
 const nonEmpty = (v: unknown): v is string => typeof v === 'string' && v.trim().length > 0;
+const oneOf = (v: unknown, allowed: readonly string[]): boolean => typeof v === 'string' && allowed.includes(v);
 
 /** Validates raw parsed content JSON; collects every problem into one message joined by "; ". */
 export function validateContent(
@@ -96,23 +113,30 @@ export function validateContent(
   passages.forEach((p, i) => {
     const where = label('guide.tl.json', p, i);
     checkSource(where, p);
+    if (p.lang !== 'tl') problems.push(`${where}: lang must be 'tl'`);
     if (!nonEmpty(p.reviewed_by)) problems.push(`${where}: missing reviewed_by`);
     if (typeof p.reviewed_at !== 'string' || !DATE_RE.test(p.reviewed_at))
       problems.push(`${where}: reviewed_at must be YYYY-MM-DD`);
+    if (isRec(p.warnings) && p.warnings.barangay_order !== undefined && typeof p.warnings.barangay_order !== 'boolean')
+      problems.push(`${where}: warnings.barangay_order must be a boolean`);
   });
 
   const checklist = items('checklist.json', true);
   checklist.forEach((c, i) => {
     const where = label('checklist.json', c, i);
     checkSource(where, c);
-    if (c.quantity !== undefined) {
-      const amount = isRec(c.quantity) ? c.quantity.amount : undefined;
-      if (typeof amount !== 'number' || !(amount > 0)) problems.push(`${where}: quantity.amount must be > 0`);
-    }
+    if (!oneOf(c.group, CHECKLIST_GROUPS)) problems.push(`${where}: group must be one of ${CHECKLIST_GROUPS.join(', ')}`);
+    if (!(c.priority === 1 || c.priority === 2 || c.priority === 3)) problems.push(`${where}: priority must be 1, 2 or 3`);
+    if (typeof c.critical !== 'boolean') problems.push(`${where}: critical must be a boolean`);
   });
 
   const warnings = items('warnings.json', true);
-  warnings.forEach((w, i) => checkSource(label('warnings.json', w, i), w));
+  warnings.forEach((w, i) => {
+    const where = label('warnings.json', w, i);
+    checkSource(where, w);
+    if (!oneOf(w.kind, WARNING_KINDS)) problems.push(`${where}: kind must be one of ${WARNING_KINDS.join(', ')}`);
+    if (typeof w.confirmed !== 'boolean') problems.push(`${where}: confirmed must be a boolean`);
+  });
 
   const synonyms = items('synonyms.json', false);
 
@@ -128,8 +152,8 @@ export function validateContent(
 
   const rules = envelope('intents.json', 'rules');
   if (isRec(rules)) {
-    const cards = Array.isArray(rules.emergency_cards) ? rules.emergency_cards.filter(isRec) : [];
     if (!Array.isArray(rules.emergency_cards)) problems.push('intents.json: rules.emergency_cards must be an array');
+    const cards = Array.isArray(rules.emergency_cards) ? rules.emergency_cards.filter(isRec) : [];
     uniqueIds('intents.json emergency_cards', cards);
     cards.forEach((card, i) => {
       const where = label('intents.json card', card, i);
@@ -139,6 +163,34 @@ export function validateContent(
         if (typeof id !== 'string' || !hotlineIds.has(id)) problems.push(`${where}: unknown hotline_id ${String(id)}`);
       }
     });
+    const phaseCues = rules.phase_cues;
+    if (phaseCues !== undefined) {
+      if (!isRec(phaseCues)) problems.push('intents.json: rules.phase_cues must be an object');
+      else {
+        for (const phase of ['before', 'during', 'after'] as const) {
+          const list = phaseCues[phase];
+          if (list === undefined) continue;
+          if (!isRec(list) || !Array.isArray(list.strong) || !Array.isArray(list.weak))
+            problems.push(`intents.json: rules.phase_cues.${phase} must have strong and weak arrays`);
+        }
+      }
+    }
+  }
+
+  const phaseRulesRaw = raw['phase_rules.json'];
+  if (phaseRulesRaw !== undefined) {
+    const phaseRules = envelope('phase_rules.json', 'rules');
+    if (isRec(phaseRules)) validateSourcedRules(phaseRules, problems);
+  }
+
+  const placesRaw = raw['places.json'];
+  if (placesRaw !== undefined) {
+    if (!isRec(placesRaw)) problems.push('places.json: not an object');
+    else {
+      if (placesRaw.schema_version !== 1) problems.push('places.json: schema_version must be 1');
+      if (!Array.isArray(placesRaw.items)) problems.push('places.json: items must be an array');
+      if (!nonEmpty(placesRaw.names_source_id)) problems.push('places.json: missing names_source_id');
+    }
   }
 
   if (problems.length > 0) {
@@ -154,6 +206,37 @@ export function validateContent(
       rules: rules as unknown as IntentRules,
       sources: sources as unknown as Source[],
       hotlines: hotlines as unknown as Hotline[],
+      ...(isRec(phaseRulesRaw) && isRec(phaseRulesRaw.rules)
+        ? { phaseRules: phaseRulesRaw.rules as unknown as PhaseRules } : {}),
+      ...(isRec(placesRaw) ? { places: placesRaw as unknown as PlacesFile } : {}),
     },
   };
+}
+
+/** A sourced rule is either a placeholder or must carry a value, a source and a reviewer. */
+function validateSourcedRules(rules: Rec, problems: string[]): void {
+  const bands = isRec(rules.bands) ? rules.bands : undefined;
+  const near = bands && isRec(bands.near) ? bands.near : undefined;
+  const approach = bands && isRec(bands.approach) ? bands.approach : undefined;
+  checkSourcedRule('phase_rules.json near', near, 'max_km', problems);
+  checkSourcedRule('phase_rules.json approach', approach, 'max_km', problems);
+  checkSourcedRule('phase_rules.json evacuation_threshold', isRec(rules.evacuation_threshold) ? rules.evacuation_threshold : undefined, null, problems);
+  if (near && approach && typeof near.max_km === 'number' && typeof approach.max_km === 'number' && !(approach.max_km > near.max_km)) {
+    problems.push('phase_rules.json: approach.max_km must be larger than near.max_km');
+  }
+}
+
+function checkSourcedRule(where: string, rule: Rec | undefined, valueKey: string | null, problems: string[]): void {
+  if (!rule || typeof rule.placeholder !== 'boolean') {
+    problems.push(`${where}: placeholder must be a boolean`);
+    return;
+  }
+  if (rule.placeholder) return;
+  if (valueKey === null) {
+    if (!nonEmpty(rule.source_id) || !nonEmpty(rule.reviewed_by)) problems.push(`${where}: a sourced rule needs source_id and reviewed_by`);
+    return;
+  }
+  if (typeof rule[valueKey] !== 'number' || !nonEmpty(rule.source_id) || !nonEmpty(rule.reviewed_by)) {
+    problems.push(`${where}: a sourced rule needs ${valueKey}, source_id and reviewed_by`);
+  }
 }

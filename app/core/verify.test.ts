@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { Passage } from '../types/index.ts';
-import { CLOSING_TL, extractNumbers, verify, withClosing } from './verify.ts';
+import { extractNumbers, verify } from './verify.ts';
 
 function passage(id: string, text: string, summary = 'Maghanda bago dumating ang bagyo.'): Passage {
   return {
     id, lang: 'tl', title: id, topic: 'go_bag' as Passage['topic'], phase: ['before'],
-    warnings: { tcws: [], rainfall: [], surge: [], gale: false },
+    warnings: { tcws: [], rainfall: [], surge: [], gale: false, barangay_order: false },
     profile_tags: [], hazards: [], critical: false, text, summary,
     source_id: 'src', locator: 'p1', reviewed_by: 'test', reviewed_at: '2026-01-01', version: 1,
   };
@@ -13,22 +13,25 @@ function passage(id: string, text: string, summary = 'Maghanda bago dumating ang
 
 const GOBAG = passage('before-gobag-01', 'Ilagay sa go bag ang tubig, pagkain, gamot at flashlight. Dalhin ito kapag lumikas.');
 const SIGNAL = passage('signal-2', 'Sa Signal No. 2, ang hangin ay 62 hanggang 88 km bawat oras. Sa Signal No. 3, 89 hanggang 117 km.');
-const out = (answer: string, used: string[] = ['before-gobag-01'], in_guide = true): string =>
-  JSON.stringify({ used, in_guide, answer });
+const out = (
+  answer: string, used: string[] = ['before-gobag-01'], in_guide = true, phase_hint: 'before' | 'during' | 'after' | null = null,
+): string => JSON.stringify({ used, in_guide, phase_hint, answer });
 const code = (raw: string, ps: Passage[] = [GOBAG]): string | undefined => verify(raw, ps).failures[0]?.code;
 
 describe('verify', () => {
-  it('accepts a valid cited answer and appends the closing line', () => {
+  it('accepts a valid cited answer without a closing line', () => {
     const r = verify(out('Ilagay sa go bag ang tubig at pagkain. Dalhin ito sa paglikas.'), [GOBAG]);
     expect(r.ok).toBe(true);
     expect(r.failures).toEqual([]);
-    expect(r.text?.endsWith(CLOSING_TL)).toBe(true);
+    expect(r.output?.answer).toBe('Ilagay sa go bag ang tubig at pagkain. Dalhin ito sa paglikas.');
+    expect(r).not.toHaveProperty('text');
   });
 
   it('rejects non-JSON and malformed objects as schema', () => {
     expect(code('not json')).toBe('schema');
-    expect(code(JSON.stringify({ used: ['before-gobag-01'], in_guide: true, answer: 'x', extra: 1 }))).toBe('schema');
-    expect(code(JSON.stringify({ used: 'before-gobag-01', in_guide: true, answer: 'x' }))).toBe('schema');
+    expect(code(JSON.stringify({ used: ['before-gobag-01'], in_guide: true, phase_hint: null, answer: 'x', extra: 1 }))).toBe('schema');
+    expect(code(JSON.stringify({ used: 'before-gobag-01', in_guide: true, phase_hint: null, answer: 'x' }))).toBe('schema');
+    expect(code(JSON.stringify({ used: ['before-gobag-01'], in_guide: true, answer: 'x' }))).toBe('schema');
   });
 
   it('reports not_in_guide', () => {
@@ -70,11 +73,10 @@ describe('verify', () => {
   it('rejects English-only answers', () => {
     expect(code(out('Put water, food, and medicine in your go bag before leaving.'))).toBe('wrong_language');
   });
-});
 
-describe('withClosing', () => {
-  it('trims and appends the closing line', () => {
-    expect(withClosing('Lumikas na.  \n')).toBe(`Lumikas na.\n\n${CLOSING_TL}`);
+  it('parses a valid phase_hint and rejects an invalid one as schema', () => {
+    expect(verify(out('Ilagay sa go bag ang tubig.', ['before-gobag-01'], true, 'during'), [GOBAG]).output?.phase_hint).toBe('during');
+    expect(code(JSON.stringify({ used: ['before-gobag-01'], in_guide: true, phase_hint: 'soon', answer: 'Ilagay sa go bag ang tubig.' }))).toBe('schema');
   });
 });
 

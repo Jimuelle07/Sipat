@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import type { ColorLevel, Engine, Phase, TcwsLevel, WarningEntry, WarningInput, WarningKind } from '../../engine';
+import type { ColorLevel, Phase, TcwsLevel, WarningEntry, WarningInput, WarningKind } from '../../engine';
 import { useEngine, useEngineChange } from '../context/useEngine';
 import type { RootTabParamList } from '../navigation/types';
 import { commonStrings } from '../strings/common';
@@ -47,6 +47,7 @@ const moodKeys: Record<Phase, 'mood_before' | 'mood_during' | 'mood_after'> = {
 
 export function warningInput(warning: WarningEntry): WarningInput {
   if (warning.kind === 'gale') return { kind: 'gale' };
+  if (warning.kind === 'barangay_order') return { kind: 'barangay_order' };
   if (warning.kind === 'tcws') return { kind: 'tcws', level: warning.level as TcwsLevel };
   return { kind: warning.kind, level: warning.level as ColorLevel };
 }
@@ -82,7 +83,6 @@ export function HomeScreen(): JSX.Element {
   const activeProfile = engine.profiles.active();
   const status = engine.status();
   const emergency = showEmergency ? engine.emergency.card() : null;
-  const checklistText = (engine as Engine & { exports?: { checklistText?: () => string } }).exports?.checklistText?.();
   const pickerGroups: { kind: WarningKind; title: string }[] = [
     { kind: 'tcws', title: t.wind },
     { kind: 'rainfall', title: t.rainfall },
@@ -187,7 +187,7 @@ export function HomeScreen(): JSX.Element {
       {status.stale ? (
         <StaleBanner
           text={engine.copy('stale_warning')}
-          translation={lang === 'en' ? engine.copy('stale_warning', 'en') : undefined}
+          translation={lang === 'en' ? engine.copy('stale_warning', { lang: 'en' }) : undefined}
           actionLabel={t.reconfirmWarning}
           onAction={() => engine.context.reconfirmWarning(status.stale!.kind)}
         />
@@ -199,9 +199,10 @@ export function HomeScreen(): JSX.Element {
         {pickerGroups.map(({ kind, title }) => {
           const entries = warnings.filter((warning) => warning.kind === kind);
           if (entries.length === 0) return null;
-          const isSelected = (warning: WarningEntry): boolean => kind === 'gale'
-            ? context.warnings.gale !== undefined
-            : context.warnings[kind]?.level === warning.level;
+          const isSelected = (warning: WarningEntry): boolean => {
+            const active = context.warnings[kind];
+            return active !== undefined && (!('level' in active) || active.level === warning.level);
+          };
           return (
             <View key={kind} style={styles.pickerGroup}>
               <Txt role="label" tone="muted">{title}</Txt>
@@ -246,7 +247,6 @@ export function HomeScreen(): JSX.Element {
                 ticked={item.ticked}
                 onToggle={() => engine.checklist.tick(item.id, !item.ticked)}
               />
-              {item.quantityText ? <Txt role="bodySmall" tone="muted">{item.quantityText}</Txt> : null}
               {item.forMembers?.map((member) => (
                 <Txt key={member.id} role="bodySmall" tone="muted">
                   {member.name}{member.note ? ` · ${member.note}` : ''}
@@ -294,12 +294,6 @@ export function HomeScreen(): JSX.Element {
                 variant="text"
               />
             </View>
-            {typeof checklistText === 'string' ? (
-              <View>
-                <Txt role="label">{t.copyChecklist}</Txt>
-                <Txt selectable role="body">{checklistText}</Txt>
-              </View>
-            ) : null}
           </Tile>
         ) : null}
       </View>

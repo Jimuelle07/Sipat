@@ -63,7 +63,8 @@ function activeWarningMatches(passage: Passage, ctx: Context): boolean {
     (active.tcws && warnings.tcws.length > 0 && warnings.tcws.includes(active.tcws.level)) ||
     (active.rainfall && warnings.rainfall.length > 0 && warnings.rainfall.includes(active.rainfall.level)) ||
     (active.surge && warnings.surge.length > 0 && warnings.surge.includes(active.surge.level)) ||
-    (active.gale && warnings.gale),
+    (active.gale && warnings.gale) ||
+    (active.barangay_order && warnings.barangay_order),
   );
 }
 
@@ -77,7 +78,7 @@ export function boostMultiplier(
   if (stored.phase.includes(ctx.phase)) multiplier *= boosts.phase;
   if (activeWarningMatches(stored as Passage, ctx)) multiplier *= boosts.warning;
   if (profile) {
-    const tags = new Set<string>([...profile.members, ...profile.home, ...profile.livelihood]);
+    const tags = new Set<string>([...profile.members, ...profile.home]);
     for (const tag of stored.profile_tags) if (tags.has(tag)) multiplier *= boosts.profileTag;
   }
   return Math.min(multiplier, boosts.cap);

@@ -1,36 +1,120 @@
-import type { AgeGroup, Context, CopyKey, DeviceTier, FaceCheck, HomeTag, LivelihoodTag, Member, MemberPhoto, NeedTag, Phase, Profile, Relation, Result, Settings, TcwsLevel, ColorLevel, TopicGroup, WarningKind, UiLanguage } from './common.ts';
-import type { EvacuationCenter, Hotline, QuestionLogEntry, Source, WarningEntry } from './content.ts';
-import type { ChecklistView } from './core.ts';
+import type {
+  AgeGroup,
+  BulletinCardView,
+  ColorLevel,
+  Context,
+  CopyKey,
+  DeviceTier,
+  FaceDetection,
+  HomeTag,
+  HouseholdLocation,
+  Member,
+  MemberPhoto,
+  NeedTag,
+  Phase,
+  PlaceLevel,
+  Profile,
+  Relation,
+  Result,
+  Settings,
+  StormMeasure,
+  RankedCenter,
+  TcwsLevel,
+  TopicGroup,
+  UiLanguage,
+  WarningKind,
+} from './common.ts';
+import type {
+  ContentFileName,
+  Hotline,
+  QuestionLogEntry,
+  Source,
+  WarningEntry,
+} from './content.ts';
+import type { ChecklistView, PackError, WarningCard } from './core.ts';
 import type { AnswerEvent, AskOptions, SourceRef } from './ask.ts';
-import type { AiDecision, ApplyResult, ImportPreview, InstalledPack, ModelState, NetworkLogEntry, PackError, TextKind, UpdateError, UpdatePlan } from './services.ts';
+import type {
+  AiDecision,
+  ApplyResult,
+  DamageDraft,
+  DamageSeverity,
+  DamageType,
+  FilePicker,
+  ImportPreview,
+  InstalledPack,
+  LocationService,
+  ModelManager,
+  NetworkLogEntry,
+  ModelState,
+  PhotoService,
+  PowerPolicy,
+  ScreenService,
+  ShareService,
+  Store,
+  UpdateClient,
+  UpdateError,
+  UpdatePlan,
+} from './services.ts';
 
-// src/engine/types.ts mirrors this section. Change both in the same commit.
-export const ENGINE_API_VERSION = 1;
+// Mirrors docs/api-layer.md section 3.2. Change both in the same commit.
+export const ENGINE_API_VERSION = 2; // product v3 decisions: phases, feed, evacuation, location, required photos
 
 export interface Engine {
   init(): Promise<Result<EngineInfo, 'content_invalid' | 'storage_failed'>>; // once, behind the splash screen
   info(): EngineInfo;
   status(): EngineStatus;
-  copy(key: CopyKey, lang?: UiLanguage): string; // 'tl' default; 'en' is a translation shown under the Tagalog
+  copy(key: CopyKey, opts?: { lang?: UiLanguage; vars?: Record<string, string> }): string; // 'tl' default
   onChange(listener: (change: EngineChange) => void): () => void; // returns unsubscribe
 
   profiles: ProfilesApi;
-  family: FamilyApi;   // members (MVP); photos, roll call and cards (MVP stretch)
-  context: ContextApi;
+  family: FamilyApi;         // members, required photos, pending list, location, "Hinahanap" card
+  context: ContextApi;       // phase (with automatic switching) and warnings
   checklist: ChecklistApi;
   ask: AskApi;
   guide: GuideApi;
   emergency: EmergencyApi;
-  plan: PlanApi;
+  plan: PlanApi;             // the Hotlines screen
+  feed: FeedApi;             // MVP stretch: cached PAGASA bulletins
+  evacuation: EvacuationApi; // household center (MVP core); bulletin card, track and ranked centers (MVP stretch)
+  account: AccountApi;       // MVP: static screens make no calls; Later: sign-in and profile sync
+  model: ModelApi;           // MVP: install the GGUF from a file, remove it
+  screen: ScreenApi;         // MVP stretch: the SOS light
+  damage: DamageApi;         // Pilot: damage reports to the LGU
   settings: SettingsApi;
   history: HistoryApi;
   evaluation: EvaluationApi;
-  packs: PacksApi;     // MVP stretch
-  updates: UpdatesApi; // Pilot
+  packs: PacksApi;           // MVP stretch
+  updates: UpdatesApi;       // MVP stretch
 }
 
+export interface EngineOverrides { // tests and the Node evaluation only
+  model?: ModelManager;       // a fake that scripts generate()
+  power?: PowerPolicy;        // a fixed battery state and tier
+  store?: Store;              // in-memory instead of MMKV
+  now?: () => Date;           // a fixed clock
+  content?: Partial<Record<ContentFileName, unknown>>; // fixture files instead of the bundled ones
+  updates?: UpdateClient;     // a fake that serves fixture feed and packs
+  location?: LocationService; // a fake that returns a fixed reading or an error
+  photos?: PhotoService;      // a fake picker and detector
+  share?: ShareService;       // a fake share sheet
+  files?: FilePicker;         // a fake document picker that returns fixture files
+  screen?: ScreenService;     // a no-op wake lock and brightness
+}
+
+export type AccountError = 'invalid_email' | 'weak_password' | 'offline' | 'http' | 'demo_only';
+export type ModelInstallError =
+  | 'tier' | 'no_space' | 'wrong_file' | 'hash_mismatch' | 'cancelled' | 'io';
+
 export type EngineChange =
-  | 'profiles' | 'family' | 'context' | 'checklist' | 'settings' | 'status' | 'history' | 'packs' | 'updates';
+  | 'profiles'  // household, plan fields, location
+  | 'family'    // members, photos, pending list
+  | 'phase'     // phase, phaseSource, reason, recommended, lastSwitch: re-theme and show the banner
+  | 'context'   // warnings
+  | 'checklist' | 'settings' | 'status' | 'history'
+  | 'feed'      // MVP stretch: feed state or cached bulletins changed
+  | 'packs' | 'updates'
+  | 'account'   // Later: sign-in state or sync changed
+  | 'damage';   // Pilot: a damage report was saved, changed or sent
 
 export interface EngineInfo {
   appVersion: string;
@@ -39,6 +123,7 @@ export interface EngineInfo {
   passagesCount: number;
   sourcesCount: number;
   packs: InstalledPack[];
+  online: boolean;   // false until the build ships the online stretch (no INTERNET permission)
   model: { fileName: string; sizeBytes: number; present: boolean; attribution: 'Built with Llama' };
 }
 
@@ -48,23 +133,18 @@ export interface EngineStatus {
   ai: AiDecision; // allowed, or the reason it is not
   battery: { level: number; charging: boolean; saver: boolean } | null; // null until the first reading
   stale?: { kind: WarningKind; hoursSinceSet: number };
-  updateAvailable?: { totalBytes: number; guideDate?: string }; // Pilot
+  updateAvailable?: { totalBytes: number; guideDate?: string }; // MVP stretch
 }
 
-// Profiles: family setup, Profile and Plan screens.
-// A household is created together with its main person; other members go through engine.family.
-// There is no online account: the household exists only on this phone.
 export interface NewHouseholdInput {
   name: string;       // "Bahay namin"
   owner: MemberInput; // the main person; relation is forced to 'self'
 }
-export interface ProfileInput { // household-level fields only
+export interface ProfileInput { // household-level fields only; location goes through family.location
   id: string;
   name: string;
-  petsCount: number;            // 0 to 20
+  petsCount: number; // 0 to 20
   home: HomeTag[];
-  livelihood?: LivelihoodTag[]; // Later
-  area?: Profile['area'];       // Pilot
   plan: Profile['plan'];
 }
 export type ProfileErrorCode =
@@ -74,186 +154,246 @@ export type SaveProfileResult =
   | { ok: false; errors: { code: ProfileErrorCode | MemberErrorCode; field: string }[] }; // field path, e.g. "owner.name"
 
 export interface ProfilesApi {
-  list(): Profile[];
   active(): Profile | null; // null before setup
-  create(input: NewHouseholdInput): SaveProfileResult; // first step of setup; the new household becomes active
+  create(input: NewHouseholdInput): SaveProfileResult; // first step of setup
   save(input: ProfileInput): SaveProfileResult;
-  setActive(id: string): Result<void, 'not_found'>;
-  remove(id: string): Result<void, 'not_found' | 'last_profile'>; // deletes its members' photos too
+  remove(id: string): Result<void, 'not_found'>; // deletes the household, its members' photos and ticks; setup starts again
 }
 
-// Family: member editor, photo screens, "Bilangan" and "Hinahanap". Always the active household.
 export interface MemberInput {
-  id?: string;      // omit to add
-  name: string;     // name or nickname, 1 to 40 chars
+  id?: string;   // omit to add
+  name: string;  // name or nickname, 1 to 40 chars
   relation: Relation;
   ageGroup: AgeGroup;
   needs: NeedTag[];
-  note?: string;    // ≤ 80 chars
+  note?: string; // ≤ 80 chars
   phone?: string;
 }
 export type MemberErrorCode =
   | 'name_required' | 'too_long' | 'phone_invalid' | 'too_many_members' | 'owner_relation';
 export type SaveMemberResult =
-  | { ok: true; value: Member }
+  | { ok: true; value: Member } // a new member starts with photoStatus 'pending'
   | { ok: false; errors: { code: MemberErrorCode; field: string }[] };
 
 export interface MemberCardView { // "Hinahanap": shown full screen, offline
-  member: Member;     // includes photo and note
+  member: Member;     // includes photo (or photoStatus 'pending') and note
   ownerName: string;
   ownerPhone?: string;
   evacuationCenter?: string;
   meetingPlace?: string;
 }
-export interface RollCallView { // "Bilangan"
-  entries: { member: Member; present: boolean; at?: string }[]; // main person first
-  presentCount: number;
-  total: number;
-}
+export type ShareableView = unknown; // a React ref (RefObject<View>) of the rendered "Hinahanap" card; the engine captures it
 
 export interface FamilyApi {
-  members(): Member[]; // main person first
+  members(): Member[];  // main person first
+  pending(): Member[];  // members with photoStatus 'pending', main person first; Home shows copy('photo_pending') per member
   saveMember(input: MemberInput): SaveMemberResult; // re-derives tags and headcount; fires 'family' and 'checklist'
   removeMember(memberId: string): Result<void, 'not_found' | 'owner_required'>; // also deletes the photo file
-  photos: PhotosApi;   // MVP stretch
-  card(memberId: string): MemberCardView | null;                                       // MVP stretch
-  shareCard(memberId: string): Promise<Result<void, 'not_found' | 'cancelled' | 'failed'>>; // user tap only
-  rollCall(): RollCallView;                                                            // MVP stretch
-  markPresent(memberId: string, present: boolean): Result<RollCallView, 'not_found'>;
-  resetRollCall(): RollCallView;
+  photos: PhotosApi;
+  location: LocationApi;
+  card(memberId: string): MemberCardView | null; // MVP
+  // User tap only; the only way a member photo leaves the phone. The engine captures cardView to a PNG
+  // and opens the Android share sheet (section 7, ShareService).
+  shareCard(memberId: string, cardView: ShareableView): Promise<Result<void, 'not_found' | 'cancelled' | 'failed'>>;
 }
 
-// Photos (MVP stretch). Face detection only finds boxes to crop; it never identifies anyone.
 export interface FaceBox { x: number; y: number; width: number; height: number } // 0 to 1, relative to the preview
 export type CropRect = FaceBox; // square crop the user approved
 export interface PhotoDraft {
   draftId: string;
-  previewUri: string;     // temp downscaled copy; deleted on discard, expiry or app restart
-  faces: FaceBox[];       // left to right, at most 15; [] when none found or detection unavailable
-  faceCheck: FaceCheck;
-  suggestedCrop: CropRect; // around the face, or centered when there is none
-  expiresAt: string;      // 30 minutes
+  memberId: string;
+  previewUri: string;          // temp downscaled copy; deleted on discard, expiry or app restart
+  detection: FaceDetection;    // 'one_face' suggests the crop; anything else sends the user to manual crop
+  faces: FaceBox[];            // left to right, at most 15; [] when none found or detection unavailable
+  suggestedCrop: CropRect;     // around the one face, or centered otherwise
+  expiresAt: string;           // 30 minutes
 }
 export type PhotoError =
   | 'permission_denied' | 'no_camera' | 'unreadable' | 'draft_expired' | 'not_found' | 'io';
 
 export interface PhotosApi {
-  // Opens the system camera (asks CAMERA permission on first use) or the system photo picker.
-  // 'group' takes one family photo whose faces the user assigns to members. null: the user backed out.
-  start(target: { memberId: string } | 'group', source: 'camera' | 'gallery'):
-    Promise<Result<PhotoDraft | null, PhotoError>>;
-  // Crops to 512 × 512 JPEG without EXIF and attaches it to the member, replacing any old photo.
-  // For a group draft, call once per assigned face with that face's crop.
-  save(draftId: string, memberId: string, crop: CropRect): Promise<Result<MemberPhoto, PhotoError>>;
-  discard(draftId: string): void; // call when the photo screen closes; deletes the preview and unused crops
+  start(target: { memberId: string }, source: 'camera' | 'gallery'): Promise<Result<PhotoDraft | null, PhotoError>>;
+  save(draftId: string, crop: CropRect): Promise<Result<MemberPhoto, PhotoError>>;
+  discard(draftId: string): void;
   remove(memberId: string): Result<void, 'not_found'>;
-  removeAll(): void;              // "Burahin ang lahat ng litrato"
+  removeAll(): void;
 }
 
-// Context: the Home screen's phase buttons and the "Ano ang narinig mo?" picker
+export interface PlaceOption { psgc: string; name: string; level: PlaceLevel; hasChildren: boolean }
+export type LocationError =
+  | 'permission_denied'
+  | 'services_off'
+  | 'unavailable'
+  | 'unknown_place';
+export interface LocationApi {
+  get(): HouseholdLocation | null;
+  places(parentPsgc?: string): PlaceOption[];
+  setArea(psgc: string): Result<HouseholdLocation, 'unknown_place'>;
+  useGps(): Promise<Result<HouseholdLocation, LocationError>>;
+}
+
 export type WarningInput =
   | { kind: 'tcws'; level: TcwsLevel }
   | { kind: 'rainfall' | 'surge'; level: ColorLevel }
-  | { kind: 'gale' };
+  | { kind: 'gale' | 'barangay_order' };
 
 export interface ContextApi {
   get(): Context;
-  options(): WarningEntry[];                    // every picker choice, in display order
-  setPhase(phase: Phase): Context;              // 'after' clears all warnings
-  setWarning(input: WarningInput): Context;     // replaces the same kind; setAt = now
+  options(): WarningEntry[];
+  cards(): WarningCard[];
+  setPhase(phase: Phase): Context;
+  undoPhase(): Result<Context, 'nothing_to_undo'>;
+  setWarning(input: WarningInput): Context;
   clearWarning(kind: WarningKind): Context;
-  reconfirmWarning(kind: WarningKind): Context; // "Pareho pa rin": resets setAt and clears the stale banner
+  reconfirmWarning(kind: WarningKind): Context;
 }
 
-// Checklist screen
 export interface ChecklistApi {
-  view(): ChecklistView; // for the active profile and context
+  view(): ChecklistView;
   tick(itemId: string, ticked: boolean): Result<ChecklistView, 'unknown_item'>;
-  reset(): ChecklistView; // clears the active profile's ticks
+  reset(): ChecklistView;
 }
 
-// Ask screen
 export interface AskApi {
-  run(question: string, opts?: AskOptions): AsyncIterable<AnswerEvent>; // event order: section 6
-  cancel(): void; // ends the current stream with done { outcome: 'cancelled' }
-  warm(): void;   // call when the Ask screen gains focus; does nothing if AI is not allowed
+  run(question: string, opts?: AskOptions): AsyncIterable<AnswerEvent>;
+  cancel(): void;
+  warm(): void;
   readonly maxLength: 200;
 }
 
-// Guide topics screen and "Saan galing ito?"
 export interface PassageCard { id: string; title: string; summary: string; topic: TopicGroup; critical: boolean }
 export interface PassageDetail extends PassageCard {
   text: string; source: SourceRef; reviewedBy: string; reviewedAt: string; version: number;
 }
 export interface GuideApi {
-  topics(): { topic: TopicGroup; count: number }[]; // the UI maps each topic to its label
+  topics(): { topic: TopicGroup; count: number }[];
   byTopic(topic: TopicGroup): PassageCard[];
   passage(id: string): PassageDetail | null;
-  sources(): Source[]; // About screen
+  sources(): Source[];
+  reviewers(): { name: string; passages: number }[];
 }
 
-// Emergency card: opened from Home, or delivered by an emergency_card event
 export interface EmergencyCardView { id: string; title: string; steps: string[]; hotlines: Hotline[]; source: SourceRef }
 export interface EmergencyApi {
-  card(id?: string): EmergencyCardView; // the default card when id is omitted
+  card(id?: string): EmergencyCardView;
 }
 
-// Plan and texts screen
 export interface PlanApi {
-  hotlines(): Hotline[];                   // national; the Pilot adds the LGU's
-  evacuationCenters(): EvacuationCenter[]; // Pilot; [] in the MVP
-  call(hotlineId: string): Promise<Result<void, 'not_found' | 'no_dialer'>>; // opens the dialer
-  textPreview(kind: TextKind, opts: { where?: string }): string; // the body the SMS app will open with
-  composeText(kind: TextKind, opts: { to: string[]; where?: string }):
-    Promise<Result<void, 'no_recipients' | 'no_sms_app'>>; // MVP stretch
-  exportPlan(): Promise<Result<void, 'cancelled' | 'failed'>>; // Pilot: printable plan
+  hotlines(): Hotline[];
+  call(hotlineIdOrPhone: string): Promise<Result<void, 'not_found' | 'no_dialer'>>;
 }
 
-// Settings screen
+export type FeedStatus = 'off' | 'empty' | 'fresh' | 'stale';
+export interface FeedState {
+  status: FeedStatus;
+  refreshing: boolean;
+  latest: BulletinCardView | null;
+  fetchedAt?: string;
+  checkedAt?: string;
+  serverStale: boolean;
+}
+export type FeedError =
+  | 'disabled' | 'offline' | 'http'
+  | 'unknown_key' | 'key_expired' | 'bad_signature' | 'app_too_old'
+  | 'rollback' | 'hash_mismatch' | 'schema';
+export interface FeedApi {
+  get(): FeedState;
+  refresh(): Promise<Result<FeedState, FeedError>>;
+}
+
+export interface EvacuationView {
+  householdCenter?: string;
+  bulletin: BulletinCardView | null;
+  storm: StormMeasure | null;
+  centers: RankedCenter[];
+  centersFirst: boolean;
+  barangayCopyKey: 'barangay_decides';
+  needsLocation: boolean;
+}
+export interface EvacuationApi {
+  view(): EvacuationView;
+}
+
 export interface SettingsApi {
   get(): Settings;
-  update(patch: Partial<Settings>): Result<Settings, 'out_of_range'>; // lowBatteryThreshold 5–50, staleWarningHours 1–12 (proposals)
+  update(patch: Partial<Settings>): Result<Settings, 'out_of_range'>;
 }
 
-// Question history, cleared from Settings
 export interface HistoryApi {
-  list(limit?: number): QuestionLogEntry[]; // newest first
+  list(limit?: number): QuestionLogEntry[];
   clear(): void;
 }
 
-// Evaluation screen
 export interface EvalSummary {
   generatedAt: string;
   retrieval: { hitAt2: number; correctRefusal: number; emergencyTrigger: number; liveDataReply: number };
-  answers: { faithfulness: number | null; numberCheckPass: number }; // faithfulness comes from the two-person review
+  answers: { faithfulness: number | null; numberCheckPass: number };
+  phase: { casesPassed: number; casesTotal: number; wrongDirection: number };
   device: { summaryP50Ms?: number; firstWordsP50Ms?: number; fullAnswerP50Ms?: number; peakRamMb?: number };
 }
 export interface EvaluationApi {
-  summary(): EvalSummary | null; // the laptop report bundled at build time, plus on-device timings
+  summary(): EvalSummary | null;
 }
 
-// Packs (MVP stretch): Settings and About
 export interface PacksApi {
   installed(): InstalledPack[];
-  importFromPicker(): Promise<Result<ImportPreview | null, PackError>>; // null when the user closes the picker
-  importFile(uri: string): Promise<Result<ImportPreview, PackError>>;   // a file shared into the app
+  importFromPicker(): Promise<Result<ImportPreview | null, PackError>>;
+  importFile(uri: string): Promise<Result<ImportPreview, PackError>>;
   apply(previewId: string): Promise<Result<ApplyResult, PackError | 'io'>>;
   rollback(packId: string): Promise<Result<void, 'io' | 'nothing_to_roll_back'>>;
-  share(): Promise<Result<void, 'no_pack' | 'cancelled'>>;
 }
 
-// Updates (Pilot): Home banner, Settings and About
 export interface UpdatesApi {
-  pending(): UpdatePlan | null; // set by the auto-check; drives "May bagong gabay. I-download?"
-  check(): Promise<Result<UpdatePlan | null, UpdateError>>; // user-triggered
+  pending(): UpdatePlan | null;
+  check(): Promise<Result<UpdatePlan | null, UpdateError>>;
   download(planId: string, onProgress: (bytes: number, total: number) => void, signal?: AbortSignal):
-    Promise<Result<ImportPreview, UpdateError>>; // then packs.apply(previewId)
+    Promise<Result<ImportPreview, UpdateError>>;
   networkLog(): NetworkLogEntry[];
 }
 
+export type AccountState =
+  | { signedIn: false }
+  | { signedIn: true; email: string; lastSyncAt: string | null; syncEnabled: boolean };
+export interface AccountApi {
+  state(): AccountState;
+  signUp(input: { email: string; password: string }): Promise<Result<AccountState, AccountError>>;
+  signIn(input: { email: string; password: string }): Promise<Result<AccountState, AccountError>>;
+  signOut(): Result<void, 'not_signed_in'>;
+  sendReset(email: string): Promise<Result<'sent', AccountError>>;
+  setSync(enabled: boolean): Result<AccountState, 'not_signed_in'>;
+}
+
+export interface ModelApi {
+  installFromPicker(onProgress: (bytes: number, total: number) => void, signal?: AbortSignal):
+    Promise<Result<'installed' | null, ModelInstallError>>;
+  remove(): Promise<void>;
+}
+
+export interface ScreenApi {
+  sosOn(): Promise<void>;
+  sosOff(): Promise<void>;
+}
+
+export interface DamageInput {
+  damageType: DamageType;
+  severity: DamageSeverity;
+  affectedMembers: number; // a count, never names
+  notes?: string;          // ≤ 300 chars
+}
+export interface DamageApi {
+  list(): DamageDraft[];
+  save(input: DamageInput & { id?: string }): Result<DamageDraft, 'invalid' | 'io'>;
+  addPhoto(id: string, source: 'camera' | 'gallery'): Promise<Result<DamageDraft | null, PhotoError | 'too_many_photos'>>;
+  removePhoto(id: string, index: number): Result<DamageDraft, 'not_found'>;
+  send(id: string): Promise<Result<'sent', 'offline' | 'not_opted_in' | 'http' | 'not_found'>>;
+  remove(id: string): void;
+}
+
 export type MockScenario =
-  | 'guide_full' | 'guide_critical' | 'emergency_then_guide' | 'refusal' | 'live_data' | 'medical_dose'
-  | 'plan_center' | 'plan_empty' | 'ai_rejected' | 'low_battery' | 'no_model';
+  | 'guide_full' | 'guide_critical' | 'emergency_then_guide' | 'refusal'
+  | 'live_data' | 'live_data_bulletin' | 'medical_dose'
+  | 'plan_center' | 'plan_empty' | 'ai_rejected' | 'low_battery' | 'no_model'
+  | 'phase_cue_during' | 'phase_cue_after';
 
 export interface MockOptions {
   scenario?: MockScenario;      // force one scenario for every question
@@ -265,8 +405,15 @@ export interface MockEngine extends Engine {
     setScenario(s: MockScenario | null): void;     // null goes back to picking by keyword
     setStatus(patch: Partial<EngineStatus>): void; // e.g. battery 10%, tier 'lite'; fires onChange('status')
     emit(change: EngineChange): void;
-    // the next family.photos.start() result: a draft with 1, 0, 2 or 3 faces, or an error
-    setPhotoResult(r: 'one_face' | 'no_face' | 'many_faces' | 'group_3' | PhotoError): void;
-    reset(): void;                                 // restore the fixtures
+    // the next family.photos.start() result: a draft with that detection, or an error
+    setPhotoResult(r: FaceDetection | PhotoError): void;
+    // the next family.location.useGps() result
+    setLocationResult(r: 'ok' | LocationError): void;
+    // the feed state; 'near', 'signal_here', 'track_approach' and 'left' swap in a variant of the sample bulletin
+    // and run the phase rules as if bands were sourced, so the automatic switch and banner can be seen
+    setFeed(f: 'off' | 'empty' | 'fresh' | 'stale' | 'near' | 'signal_here' | 'track_approach' | 'left' | FeedError): void;
+    // the next model.installFromPicker() result
+    setModelInstallResult(r: 'installed' | ModelInstallError): void;
+    reset(): void; // restore the fixtures
   };
 }

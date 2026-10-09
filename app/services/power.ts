@@ -27,7 +27,8 @@ export function tierFromRamBytes(totalMemory: number | null): DeviceTier {
 
 /**
  * Decides whether on-device AI may run. First failing check wins:
- * ai_off, tier, no_model, battery_saver, low_battery. Unknown battery (null) is allowed.
+ * ai_off, no_model, tier, battery_saver, low_battery. The manual low-battery switch
+ * denies at any level; an unknown battery (null) is allowed unless that switch is on.
  */
 export function decideAi(input: {
   settings: Settings;
@@ -37,10 +38,11 @@ export function decideAi(input: {
 }): AiDecision {
   const { settings, battery, tier, modelPresent } = input;
   if (!settings.aiEnabled) return { allowed: false, reason: 'ai_off' };
-  if (tier === 'none') return { allowed: false, reason: 'tier' };
   if (!modelPresent) return { allowed: false, reason: 'no_model' };
+  if (tier === 'none') return { allowed: false, reason: 'tier' };
+  if (battery !== null && battery.saver) return { allowed: false, reason: 'battery_saver' };
+  if (settings.lowBatteryMode) return { allowed: false, reason: 'low_battery' };
   if (battery !== null) {
-    if (battery.saver) return { allowed: false, reason: 'battery_saver' };
     const threshold = Number.isFinite(settings.lowBatteryThreshold)
       ? settings.lowBatteryThreshold
       : DEFAULT_LOW_BATTERY_THRESHOLD;

@@ -1,6 +1,6 @@
 import type {
   BuiltPrompt, ChatMessage, Context, HomeTag, MemberTag, Passage, Phase, Profile, PromptInput,
-} from '../types';
+} from '../types/index.ts';
 
 export const SYSTEM_TL = [
   'Ikaw si Bagyo Buddy, gabay sa paghahanda sa bagyo para sa isang sambahayan.',
@@ -10,6 +10,7 @@ export const SYSTEM_TL = [
   'Huwag magbigay ng numero ng telepono, hotline o dosis ng gamot.',
   'Kung hindi sinasagot ng mga talata ang tanong, ilagay ang "in_guide": false.',
   'Ilagay sa "used" ang ID ng talatang pinagkunan mo.',
+  'Ilagay sa "phase_hint" ang yugto ng bagyo kung sinabi ito ng tanong; kung hindi, null.',
 ].join('\n');
 
 export function answerSchema(ids: string[]) {
@@ -18,9 +19,10 @@ export function answerSchema(ids: string[]) {
     properties: {
       used: { type: 'array', items: { enum: ids }, minItems: 1, maxItems: ids.length },
       in_guide: { type: 'boolean' },
+      phase_hint: { enum: ['before', 'during', 'after', null] },
       answer: { type: 'string', maxLength: 400 },
     },
-    required: ['used', 'in_guide', 'answer'],
+    required: ['used', 'in_guide', 'phase_hint', 'answer'],
     additionalProperties: false,
   };
 }
@@ -69,6 +71,7 @@ export function warningsSummary(ctx: Context): string {
   if (w.rainfall) parts.push(`${w.rainfall.level} na babala sa ulan`);
   if (w.surge) parts.push(`${w.surge.level} na babala sa storm surge`);
   if (w.gale) parts.push('gale warning');
+  if (w.barangay_order) parts.push('pinapalikas na ng barangay');
   return parts.length > 0 ? parts.join('; ') : 'wala';
 }
 
@@ -86,15 +89,16 @@ const EXAMPLE_PASSAGES = [{ id: EXAMPLE_PASSAGE_ID, text: EXAMPLE_PASSAGE_TEXT }
 const EXAMPLE_SUMMARY = '4 tao; may bata';
 const EXAMPLE_HEADER = `${PHASE_LABEL.before}; wala`;
 export const EXAMPLE_1_USER = userTurn(EXAMPLE_SUMMARY, EXAMPLE_HEADER, EXAMPLE_PASSAGES, 'Ano ang dapat ilagay sa go bag?');
-// Keys in order used, in_guide, answer: the answer streams last.
+// Keys in order used, in_guide, phase_hint, answer: the answer streams last; the question states no phase.
 export const EXAMPLE_1_JSON = JSON.stringify({
   used: [EXAMPLE_PASSAGE_ID],
   in_guide: true,
+  phase_hint: null,
   answer:
     'Ilagay sa go bag ang tubig, pagkain, gamot, flashlight at damit. Isama rin ang gamit sa kalinisan at mga dokumento, at suriin ito nang regular.',
 });
 export const EXAMPLE_2_USER = userTurn(EXAMPLE_SUMMARY, EXAMPLE_HEADER, EXAMPLE_PASSAGES, 'Magkano ang pamasahe papuntang evacuation center?');
-export const EXAMPLE_2_JSON = JSON.stringify({ used: [EXAMPLE_PASSAGE_ID], in_guide: false, answer: '' });
+export const EXAMPLE_2_JSON = JSON.stringify({ used: [EXAMPLE_PASSAGE_ID], in_guide: false, phase_hint: null, answer: '' });
 
 function assemble(input: PromptInput, passages: Passage[]): BuiltPrompt {
   const header = `${PHASE_LABEL[input.context.phase]}; ${warningsSummary(input.context)}`;

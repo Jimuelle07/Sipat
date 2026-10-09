@@ -155,7 +155,7 @@ export function AskScreen(): JSX.Element {
 
   const planLines = (event: Extract<AnswerEvent, { type: 'plan_answer' }>): { label: string; value: string }[] => {
     if (event.field === 'evacuation_center') {
-      const value = event.center ? `${event.center.name} · ${event.center.landmark}` : event.text;
+      const value = event.center ?? event.text;
       return value ? [{ label: t.planLabel_evacuation_center, value }] : [];
     }
     if (event.field === 'meeting_place') {

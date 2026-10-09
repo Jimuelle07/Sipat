@@ -1,6 +1,5 @@
 import type {
   ApplyResult,
-  BundledContent,
   ImportPreview,
   InstalledPack,
   PackError,
@@ -9,13 +8,14 @@ import type {
   Result,
   Store,
 } from '../types/index.ts';
+import type { BundledContent } from '../core/validateContent.ts';
 import { rawContent } from '../content/index.ts';
 import { validateContent } from '../core/validateContent.ts';
 import { toManilaIso } from '../core/time.ts';
 
 const CORE_PACK_ID = 'core-tl';
 const SUPPORTED_SCHEMA_VERSION = 1;
-const PACK_KINDS: readonly PackKind[] = ['core', 'area', 'language', 'model'];
+const PACK_KINDS: readonly PackKind[] = ['core', 'area', 'model'];
 
 type Rec = Record<string, unknown>;
 const isRec = (v: unknown): v is Rec => typeof v === 'object' && v !== null && !Array.isArray(v);

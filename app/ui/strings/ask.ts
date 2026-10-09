@@ -19,7 +19,7 @@ export const askStrings = defineStrings({
     aiReason_ai_off: 'Naka-off ang AI sa Settings.', aiReason_tier: 'Hindi kaya ng phone na ito ang AI. Buod mula sa gabay ang ipinapakita.', aiReason_no_model: 'Wala pang AI model sa phone na ito.',
     filipinoNote: 'Official guide text is in Filipino.',
     historyTitle: 'Mga naunang tanong', historyEmpty: 'Wala pang tanong.', clearHistory: 'Burahin ang kasaysayan',
-    outcome_answered_ai: 'Sagot na may AI', outcome_answered_summary: 'Buod mula sa gabay', outcome_refused: 'Wala sa gabay', outcome_fixed_reply: 'Paalala', outcome_plan_answer: 'Plano ng pamilya', outcome_cancelled: 'Kinansela',
+    outcome_answered_ai: 'Sagot na may AI', outcome_answered_summary: 'Buod mula sa gabay', outcome_refused: 'Wala sa gabay', outcome_fixed_reply: 'Paalala', outcome_bulletin_card: 'Balita tungkol sa bagyo', outcome_plan_answer: 'Plano ng pamilya', outcome_cancelled: 'Kinansela',
     topic_signals: 'Mga signal', topic_go_bag: 'Go bag', topic_home_prep: 'Paghahanda sa bahay', topic_evacuation: 'Paglikas', topic_flood: 'Baha', topic_surge: 'Storm surge', topic_landslide: 'Pagguho ng lupa', topic_infant: 'Sanggol', topic_senior: 'Nakatatanda', topic_pregnancy: 'Pagbubuntis', topic_disability: 'May kapansanan', topic_pets: 'Alagang hayop', topic_water_food: 'Tubig at pagkain', topic_electrical: 'Kuryente', topic_generator_fire: 'Generator at sunog', topic_gas_safety: 'LPG at gas', topic_cleanup: 'Paglilinis', topic_health_after_flood: 'Kalusugan pagkatapos ng baha', topic_first_aid: 'Pangunang lunas', topic_psychosocial: 'Kalusugang pangkaisipan', topic_damage_report: 'Pag-uulat ng pinsala', topic_assistance: 'Tulong at ayuda', topic_out_of_guide: 'Wala sa gabay',
   },
   en: {
@@ -39,7 +39,7 @@ export const askStrings = defineStrings({
     aiReason_ai_off: 'AI is off in Settings.', aiReason_tier: 'This phone cannot run the AI. The summary from the guide is shown.', aiReason_no_model: 'There is no AI model on this phone yet.',
     filipinoNote: 'Official guide text is in Filipino.',
     historyTitle: 'Past questions', historyEmpty: 'No questions yet.', clearHistory: 'Clear history',
-    outcome_answered_ai: 'Answer with AI', outcome_answered_summary: 'Summary from the guide', outcome_refused: 'Not in the guide', outcome_fixed_reply: 'Reminder', outcome_plan_answer: 'Family plan', outcome_cancelled: 'Cancelled',
+    outcome_answered_ai: 'Answer with AI', outcome_answered_summary: 'Summary from the guide', outcome_refused: 'Not in the guide', outcome_fixed_reply: 'Reminder', outcome_bulletin_card: 'Storm bulletin', outcome_plan_answer: 'Family plan', outcome_cancelled: 'Cancelled',
     topic_signals: 'Signals', topic_go_bag: 'Go bag', topic_home_prep: 'Home preparation', topic_evacuation: 'Evacuation', topic_flood: 'Flood', topic_surge: 'Storm surge', topic_landslide: 'Landslide', topic_infant: 'Infant', topic_senior: 'Older adult', topic_pregnancy: 'Pregnancy', topic_disability: 'Disability', topic_pets: 'Pets', topic_water_food: 'Water and food', topic_electrical: 'Electricity', topic_generator_fire: 'Generator and fire', topic_gas_safety: 'LPG and gas', topic_cleanup: 'Cleanup', topic_health_after_flood: 'Health after a flood', topic_first_aid: 'First aid', topic_psychosocial: 'Mental health', topic_damage_report: 'Reporting damage', topic_assistance: 'Aid and assistance', topic_out_of_guide: 'Not in the guide',
   },
 });

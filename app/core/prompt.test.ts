@@ -1,41 +1,48 @@
 import { describe, expect, it } from 'vitest';
-import type { BuiltPrompt, Context, Passage, Profile } from '../types';
-import guide from '../../content/guide.tl.json';
+import type { BuiltPrompt, ContentFile, Context, Passage, Profile } from '../types';
+import guideRaw from '../../content/guide.tl.json';
 import {
   EXAMPLE_1_JSON, EXAMPLE_1_USER, EXAMPLE_PASSAGE_TEXT, PROMPT_TOKEN_BUDGET, buildPrompt,
   estimateTokens, profileSummary, warningsSummary,
 } from './prompt';
 
+const guide = guideRaw as unknown as ContentFile<Passage>;
+
 const passage = (id: string, text: string): Passage => ({
-  id, lang: 'tl', title: id, topic: 'go_bag', phase: ['before'],
-  warnings: { tcws: [], rainfall: [], surge: [], gale: false },
+  id, lang: 'tl', title: id, topic: 'go_bag' as Passage['topic'], phase: ['before'],
+  warnings: { tcws: [], rainfall: [], surge: [], gale: false, barangay_order: false },
   profile_tags: [], hazards: [], critical: false, text, summary: text,
   source_id: 's', locator: 'l', reviewed_by: 'r', reviewed_at: '2026-10-09', version: 1,
-} as Passage);
+});
 
 const profile: Profile = {
   id: 'p1', name: 'Bahay namin', ownerId: 'm1',
   people: [
-    { id: 'm1', name: 'Ana', relation: 'self', ageGroup: 'adult', needs: [], phone: '09171234567', updatedAt: '' },
-    { id: 'm2', name: 'Lolo Ben', relation: 'grandparent', ageGroup: 'senior', needs: ['maintenance_meds'], note: 'losartan', updatedAt: '' },
+    { id: 'm1', name: 'Ana', relation: 'self', ageGroup: 'adult', needs: [], phone: '09171234567', photoStatus: 'done', updatedAt: '' },
+    { id: 'm2', name: 'Lolo Ben', relation: 'grandparent', ageGroup: 'senior', needs: ['maintenance_meds'], note: 'losartan', photoStatus: 'done', updatedAt: '' },
   ],
-  petsCount: 0, headcount: 2, members: ['senior', 'maintenance_meds'], home: ['near_river'], livelihood: [],
+  petsCount: 0, headcount: 2, members: ['senior', 'maintenance_meds'], home: ['near_river'], location: null,
   plan: { evacuationCenter: 'Covered Court', meetingPlace: 'Plaza', contacts: [{ name: 'Tita Rosa', phone: '09181234567' }] },
   updatedAt: '',
 };
 
-const ctx: Context = { phase: 'during', warnings: { tcws: { level: 2, setAt: '' }, rainfall: { level: 'orange', setAt: '' } } };
-type UsedSchema = { properties: { used: { items: { enum: string[] }; maxItems: number } } };
-const used = (p: BuiltPrompt) => (p.responseFormat.json_schema.schema as UsedSchema).properties.used;
+const ctx: Context = {
+  phase: 'during', phaseSource: 'manual', reason: { source: 'manual', text: '' },
+  changedAt: '', recommended: null, warnings: { tcws: { level: 2, setAt: '' }, rainfall: { level: 'orange', setAt: '' } }, suppressed: [],
+};
+type UsedSchema = { properties: { used: { items: { enum: string[] }; maxItems: number }; phase_hint: { enum: unknown[] } } };
+const schema = (p: BuiltPrompt) => p.responseFormat.json_schema.schema as UsedSchema;
+const used = (p: BuiltPrompt) => schema(p).properties.used;
 const lastTurn = (p: BuiltPrompt) => p.messages[5]?.content ?? '';
 const total = (p: BuiltPrompt) => p.messages.reduce((n, m) => n + estimateTokens(m.content), 0);
 const short: [Passage, Passage] = [passage('a-01', 'Lumikas kapag sinabi ng barangay.'), passage('b-01', 'Ihanda ang go bag.')];
 
 describe('buildPrompt', () => {
-  it('schema enum equals allowedIds', () => {
+  it('schema enum equals allowedIds and carries the phase_hint enum', () => {
     const p = buildPrompt({ question: 'Lilikas na ba?', profile, context: ctx, passages: short });
     expect(used(p).items.enum).toEqual(p.allowedIds);
     expect(p.allowedIds).toEqual(['a-01', 'b-01']);
+    expect(schema(p).properties.phase_hint.enum).toEqual(['before', 'during', 'after', null]);
     expect(p.messages.map((m) => m.role)).toEqual(['system', 'user', 'assistant', 'user', 'assistant', 'user']);
   });
 
@@ -66,9 +73,10 @@ describe('buildPrompt', () => {
   });
 
   // chars/4 heuristic overestimates Tagalog; system-design §6.1 puts the fixed part at ~180 real tokens.
+  // The v2 contract adds the phase_hint line to SYSTEM_TL and phase_hint to both examples, so the bound grows.
   it('fixed part stays small', () => {
     const p = buildPrompt({ question: 'q', profile, context: ctx, passages: short });
-    expect(p.messages.slice(0, 5).reduce((n, m) => n + estimateTokens(m.content), 0)).toBeLessThanOrEqual(330);
+    expect(p.messages.slice(0, 5).reduce((n, m) => n + estimateTokens(m.content), 0)).toBeLessThanOrEqual(360);
   });
 
   it('normal 2-passage input with real passages fits the budget', () => {
@@ -83,14 +91,18 @@ describe('buildPrompt', () => {
     const bundled = guide.items.find((x) => x.id === 'before-gobag-01');
     expect(EXAMPLE_PASSAGE_TEXT).toBe(bundled?.summary);
     expect(EXAMPLE_1_USER).toContain(`Talata [before-gobag-01]: ${bundled?.summary}`);
-    expect(Object.keys(JSON.parse(EXAMPLE_1_JSON))).toEqual(['used', 'in_guide', 'answer']);
+    expect(Object.keys(JSON.parse(EXAMPLE_1_JSON))).toEqual(['used', 'in_guide', 'phase_hint', 'answer']);
   });
 });
 
 describe('summaries', () => {
+  const ctxOf = (warnings: Context['warnings']): Context => ({
+    phase: 'before', phaseSource: 'manual', reason: { source: 'manual', text: '' },
+    changedAt: '', recommended: null, warnings, suppressed: [],
+  });
   it('warnings', () => {
-    expect(warningsSummary({ phase: 'before', warnings: {} })).toBe('wala');
-    expect(warningsSummary({ phase: 'during', warnings: { surge: { level: 'red', setAt: '' }, gale: { setAt: '' } } }))
+    expect(warningsSummary(ctxOf({}))).toBe('wala');
+    expect(warningsSummary(ctxOf({ surge: { level: 'red', setAt: '' }, gale: { setAt: '' } })))
       .toBe('red na babala sa storm surge; gale warning');
   });
   it('profile without tags', () => {
