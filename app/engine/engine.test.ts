@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
+import type { Store, UpdateClient } from '../types/index.ts';
 import { createEngine } from './engine.ts';
 import { createMemoryStore } from './testing.ts';
+
+const fakeUpdates = {
+  fetchFeed: async () => ({ ok: false as const, error: { code: 'disabled' as const, message: 'x' } }),
+  fetchCenters: async () => ({ ok: false as const, error: { code: 'disabled' as const, message: 'x' } }),
+  check: async () => ({ ok: true as const, value: null }),
+  download: async () => ({ ok: false as const, error: { code: 'disabled' as const, message: 'x' } }),
+} as unknown as UpdateClient;
 
 describe('Engine v2 facade', () => {
   it('resolves every method on the default engine after init with documented result shapes', async () => {
@@ -8,6 +16,7 @@ describe('Engine v2 facade', () => {
     const initialized = await engine.init();
     expect(initialized.ok).toBe(true);
     expect(engine.info().engineApiVersion).toBe(2);
+    expect(engine.info().model.sizeBytes).toBeGreaterThan(0);
     expect(() => engine.status()).not.toThrow();
     expect(engine.copy('closing')).toBe('Sundin ang utos ng barangay at ng mga awtoridad.');
     const unsubscribe = engine.onChange(() => undefined);
@@ -34,7 +43,7 @@ describe('Engine v2 facade', () => {
     engine.family.photos.removeAll();
     expect((await engine.family.shareCard(member.id, {})).ok).toBe(false);
     expect(engine.family.location.get()).toBeNull();
-    expect(engine.family.location.places()).toEqual([]);
+    expect(engine.family.location.places().length).toBeGreaterThan(0);
     expect(engine.family.location.setArea('missing').ok).toBe(false);
     expect((await engine.family.location.useGps()).ok).toBe(false);
     expect(engine.context.get().phase).toBe('before');
@@ -61,6 +70,7 @@ describe('Engine v2 facade', () => {
     expect(engine.emergency.card()).toHaveProperty('steps');
     expect(engine.plan.hotlines()).toBeInstanceOf(Array);
     expect((await engine.plan.call('+12345678')).ok).toBe(false);
+    expect((await engine.plan.call('hotline-911')).ok).toBe(false);
     expect(engine.feed.get()).toMatchObject({ refreshing: false });
     expect((await engine.feed.refresh()).ok).toBe(false);
     expect(engine.evacuation.view()).toMatchObject({ centers: [], barangayCopyKey: 'barangay_decides' });
@@ -82,6 +92,7 @@ describe('Engine v2 facade', () => {
     engine.damage.remove('missing');
     expect(engine.settings.get()).toHaveProperty('lowBatteryMode');
     expect(engine.settings.update({ lowBatteryMode: true }).ok).toBe(true);
+    expect(engine.settings.update({ aiEnabled: 'yes' as never })).toMatchObject({ ok: false, error: { code: 'out_of_range' } });
     expect(engine.history.list()).toBeInstanceOf(Array);
     engine.history.clear();
     expect(engine.evaluation.summary()).not.toBeNull();
@@ -95,5 +106,84 @@ describe('Engine v2 facade', () => {
     expect((await engine.updates.download('missing', () => undefined)).ok).toBe(false);
     expect(engine.updates.networkLog()).toEqual([]);
     expect(engine.profiles.remove(profile.id).ok).toBe(true);
+  });
+});
+
+describe('Engine v2 robustness', () => {
+  it('location.places() with no parent returns provinces and region-level cities (NCR), never regions', async () => {
+    const engine = createEngine({ store: createMemoryStore() });
+    await engine.init();
+    const top = engine.family.location.places();
+    expect(top.some((place) => place.level === 'province')).toBe(true);
+    expect(top.some((place) => place.level === 'city')).toBe(true);
+    expect(top.every((place) => place.level !== 'region' && place.level !== 'barangay')).toBe(true);
+  });
+
+  it('a throwing onChange listener breaks neither the mutation nor the other listeners', async () => {
+    const engine = createEngine({ store: createMemoryStore() });
+    await engine.init();
+    const seen: string[] = [];
+    engine.onChange(() => { throw new Error('listener boom'); });
+    engine.onChange((change) => { seen.push(change); });
+
+    const created = engine.profiles.create({
+      name: 'Bahay namin', owner: { name: 'Ana', relation: 'self', ageGroup: 'adult', needs: [] },
+    });
+    expect(created.ok).toBe(true);
+    expect(seen).toContain('profiles');
+  });
+
+  it('a malformed cached feed degrades to null without throwing', async () => {
+    const store = createMemoryStore({ feed: { bulletins: null } } as never);
+    const engine = createEngine({ store, updates: fakeUpdates });
+    await engine.init();
+
+    expect(() => engine.feed.get()).not.toThrow();
+    expect(engine.feed.get().latest).toBeNull();
+    expect(() => engine.evacuation.view()).not.toThrow();
+    expect(engine.evacuation.view().bulletin).toBeNull();
+    expect(engine.evacuation.view().storm).toBeNull();
+  });
+
+  it('init() reports storage_failed when the store cannot write', async () => {
+    const base = createMemoryStore();
+    const store = {
+      get: (key: string) => base.get(key as never),
+      set: (key: string, value: unknown) => {
+        if (key === 'profiles') throw new Error('store full');
+        base.set(key as never, value as never);
+      },
+      delete: (key: string) => base.delete(key as never),
+    } as unknown as Store;
+    const engine = createEngine({ store });
+
+    const result = await engine.init();
+
+    expect(result).toMatchObject({ ok: false, error: { code: 'storage_failed' } });
+  });
+
+  it('a store write failure inside a mutation never throws and returns the documented io code', async () => {
+    const base = createMemoryStore();
+    let failWrites = false;
+    const store = {
+      get: (key: string) => base.get(key as never),
+      set: (key: string, value: unknown) => {
+        if (failWrites) throw new Error('store full');
+        base.set(key as never, value as never);
+      },
+      delete: (key: string) => base.delete(key as never),
+    } as unknown as Store;
+    const engine = createEngine({ store });
+    await engine.init();
+    engine.profiles.create({
+      name: 'Bahay namin', owner: { name: 'Ana', relation: 'self', ageGroup: 'adult', needs: [] },
+    });
+
+    failWrites = true;
+
+    expect(() => engine.checklist.tick('now-listen-radio', true)).not.toThrow();
+    expect(() => engine.settings.update({ lowBatteryMode: true })).not.toThrow();
+    expect(engine.damage.save({ damageType: 'flood', severity: 'light', affectedMembers: 1 }))
+      .toMatchObject({ ok: false, error: { code: 'io' } });
   });
 });

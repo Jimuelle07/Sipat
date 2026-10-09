@@ -29,6 +29,29 @@ export function answerSchema(ids: string[]) {
 
 export const PROMPT_TOKEN_BUDGET = 700;
 
+/** Neutral replacement used in both local prompts and the on-device question log. */
+export const PRIVATE_QUESTION_TOKEN = '[pribado]';
+
+export function redactQuestion(question: string, profile: Profile | null, extraValues: readonly string[] = []): string {
+  const values = [
+    profile?.name,
+    ...(profile?.people.flatMap((member) => [member.name, member.note, member.phone, member.photo?.uri]) ?? []),
+    profile?.plan.evacuationCenter,
+    profile?.plan.meetingPlace,
+    ...(profile?.plan.contacts.flatMap((contact) => [contact.name, contact.phone]) ?? []),
+    profile?.location?.psgc,
+    profile?.location?.coords?.lat.toString(),
+    profile?.location?.coords?.lon.toString(),
+    ...extraValues,
+  ].filter((value): value is string => typeof value === 'string' && value.trim().length > 0);
+  let result = question;
+  for (const value of [...new Set(values)].sort((a, b) => b.length - a.length)) {
+    const pattern = value.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
+    result = result.replace(new RegExp(`(?<![\\p{L}\\p{N}])${pattern}(?![\\p{L}\\p{N}])`, 'giu'), PRIVATE_QUESTION_TOKEN);
+  }
+  return result;
+}
+
 export function estimateTokens(s: string): number {
   return Math.ceil(s.length / 4);
 }
@@ -108,7 +131,7 @@ function assemble(input: PromptInput, passages: Passage[]): BuiltPrompt {
     { role: 'assistant', content: EXAMPLE_1_JSON },
     { role: 'user', content: EXAMPLE_2_USER },
     { role: 'assistant', content: EXAMPLE_2_JSON },
-    { role: 'user', content: userTurn(input.profile ? profileSummary(input.profile) : 'hindi pa naka-setup', header, passages, input.question) },
+    { role: 'user', content: userTurn(input.profile ? profileSummary(input.profile) : 'hindi pa naka-setup', header, passages, redactQuestion(input.question, input.profile)) },
   ];
   const allowedIds = passages.map((p) => p.id);
   return {

@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { BuiltPrompt, ContentFile, Context, Passage, Profile } from '../types';
+import type { BuiltPrompt, ContentFile, Context, Passage, Profile } from '../types/index.ts';
 import guideRaw from '../../content/guide.tl.json';
 import {
   EXAMPLE_1_JSON, EXAMPLE_1_USER, EXAMPLE_PASSAGE_TEXT, PROMPT_TOKEN_BUDGET, buildPrompt,
-  estimateTokens, profileSummary, warningsSummary,
-} from './prompt';
+  estimateTokens, profileSummary, warningsSummary, PRIVATE_QUESTION_TOKEN, redactQuestion,
+} from './prompt.ts';
 
 const guide = guideRaw as unknown as ContentFile<Passage>;
 
@@ -62,6 +62,19 @@ describe('buildPrompt', () => {
     }
     expect(lastTurn(p)).toContain('Sambahayan: 2 tao; may senior at maintenance na gamot; malapit sa ilog');
     expect(lastTurn(p)).toContain('Yugto at babala: Habang; Signal No. 2; orange na babala sa ulan');
+  });
+
+  it('redacts private values typed in the question before assembling messages', () => {
+    const withArea = { ...profile, location: { psgc: 'SAMPLE-AREA-1' } };
+    const question = 'Ana at Lolo Ben, losartan, 09171234567, Tita Rosa 09181234567, Plaza, Covered Court, SAMPLE-AREA-1: ano ang go bag?';
+    const p = buildPrompt({ question, profile: withArea, context: ctx, passages: short });
+    const messages = p.messages.map((message) => message.content).join('\n');
+    for (const privateValue of ['Ana', 'Lolo Ben', 'losartan', '09171234567', 'Tita Rosa', '09181234567', 'Plaza', 'Covered Court', 'SAMPLE-AREA-1']) {
+      expect(messages).not.toContain(privateValue);
+    }
+    expect(lastTurn(p)).toContain(PRIVATE_QUESTION_TOKEN);
+    expect(lastTurn(p)).toContain('ano ang go bag?');
+    expect(redactQuestion('banana, Ana!', profile)).toBe(`banana, ${PRIVATE_QUESTION_TOKEN}!`);
   });
 
   it('drops the second passage over budget', () => {

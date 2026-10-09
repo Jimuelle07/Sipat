@@ -151,6 +151,17 @@ describe('decidePhase: collecting candidates', () => {
     expect(r.candidates.every((c) => c.phase === 'during' && c.source === 'warning' && c.effect === 'switch')).toBe(true);
   });
 
+  it('derives the surge key from its level', () => {
+    const r = decide({ context: context({ warnings: { surge: { level: 'red', setAt: NOW } } }) });
+    expect(r.candidates.map((c) => c.key)).toEqual(['warning:surge-red']);
+  });
+
+  it('derives the barangay-order key with no level', () => {
+    const r = decide({ context: context({ warnings: { barangay_order: { setAt: NOW } } }) });
+    expect(r.candidates.map((c) => c.key)).toEqual(['warning:barangay-order']);
+    expect(r.switched?.to).toBe('during');
+  });
+
   it('ignores a suppressed input', () => {
     const r = decide({
       context: context({ warnings: { tcws: { level: 3, setAt: NOW } }, suppressed: ['warning:tcws-3'] }),
@@ -165,6 +176,15 @@ describe('decidePhase: collecting candidates', () => {
       context: context({ warnings: { tcws: { level: 4, setAt: NOW } }, suppressed: ['warning:tcws-3'] }),
     });
     expect(r.candidates.map((c) => c.key)).toEqual(['warning:tcws-4']);
+    expect(r.switched?.to).toBe('during');
+    expect(r.switched?.source).toBe('warning');
+  });
+
+  it('a different warning kind still switches', () => {
+    const r = decide({
+      context: context({ warnings: { gale: { setAt: NOW } }, suppressed: ['warning:tcws-3'] }),
+    });
+    expect(r.candidates.map((c) => c.key)).toEqual(['warning:gale']);
     expect(r.switched?.to).toBe('during');
     expect(r.switched?.source).toBe('warning');
   });
@@ -211,6 +231,21 @@ describe('decidePhase: phase cues', () => {
     expect(r.candidates[0]).toMatchObject({ key: 'ask:q1', phase: 'before', effect: 'recommend' });
     expect(r.hint).toBe('accepted');
   });
+
+  it('a weak after cue recommends when a matching hint backs it', () => {
+    const r = decide({ context: context({ phase: 'during' }), ask: { questionId: 'q1', cue: cue('after', false), hint: 'after' } });
+    expect(r.candidates[0]).toMatchObject({ key: 'ask:q1', phase: 'after', effect: 'recommend' });
+    expect(r.hint).toBe('accepted');
+    expect(r.switched).toBeNull();
+    expect(r.state.recommended?.phase).toBe('after');
+  });
+
+  it('a weak cue whose hint names a different phase is ignored', () => {
+    const r = decide({ context: context(), ask: { questionId: 'q1', cue: cue('during', false), hint: 'before' } });
+    expect(r.candidates).toEqual([]);
+    expect(r.hint).toBe('dropped');
+    expect(r.switched).toBeNull();
+  });
 });
 
 describe('decidePhase: the phase_hint', () => {
@@ -256,6 +291,25 @@ describe('decidePhase: the phase_hint', () => {
     expect(r.switched).toBeNull();
   });
 
+  it('is dropped when it names before without a track candidate', () => {
+    const r = decide({ context: context({ phase: 'after' }), ask: { questionId: 'q1', cue: null, hint: 'before' } });
+    expect(r.hint).toBe('dropped');
+    expect(r.candidates).toEqual([]);
+    expect(r.switched).toBeNull();
+  });
+
+  it('is dropped when it names after without a final bulletin, but a signal still switches', () => {
+    const b = bulletin();
+    const r = decide({
+      context: context(),
+      ask: { questionId: 'q1', cue: null, hint: 'after' },
+      storm: { bulletin: b, measure: measure({ signalHere: 2 }) },
+    });
+    expect(r.hint).toBe('dropped');
+    expect(r.candidates.map((c) => c.key)).toEqual(['bulletin:bulletin-1']);
+    expect(r.switched?.to).toBe('during');
+  });
+
   it('is dropped when the cue names a different phase', () => {
     const r = decide({ context: context(), ask: { questionId: 'q1', cue: cue('before', true), hint: 'during' } });
     expect(r.hint).toBe('dropped');
@@ -295,6 +349,32 @@ describe('decidePhase: pick the most cautious', () => {
     expect(r.switched?.source).toBe('warning');
     expect(r.switched?.input).toBe('warning:tcws-2');
     expect(r.state.recommended?.reason.source).toBe('warning');
+  });
+
+  it('between before and after, before wins and the track switches', () => {
+    const b = bulletin({ final: true, forecast: [pos()] });
+    const r = decide({
+      context: context({ phase: 'after' }),
+      storm: { bulletin: b, measure: measure({ forecast: [fix(NOW_KM - 20)], closestKm: NOW_KM - 20 }) },
+      rules: bandRules(NOW_KM - 1, NOW_KM),
+    });
+    expect(r.candidates.map((c) => c.phase).sort()).toEqual(['after', 'before']);
+    expect(r.state.recommended?.phase).toBe('before');
+    expect(r.switched).toMatchObject({ from: 'after', to: 'before', source: 'bulletin', input: 'storm:storm-1' });
+  });
+
+  it('ties go to the source order: bulletin over ask', () => {
+    const b = bulletin({ forecast: [pos()] });
+    const r = decide({
+      context: context({ phase: 'after' }),
+      ask: { questionId: 'q1', cue: cue('before', true), hint: null },
+      storm: { bulletin: b, measure: measure({ forecast: [fix(NOW_KM - 20)], closestKm: NOW_KM - 20 }) },
+      rules: bandRules(NOW_KM - 1, NOW_KM),
+    });
+    expect(r.candidates.map((c) => c.source).sort()).toEqual(['ask', 'bulletin']);
+    expect(r.switched?.source).toBe('bulletin');
+    expect(r.switched?.input).toBe('storm:storm-1');
+    expect(r.state.recommended?.reason.source).toBe('bulletin');
   });
 
   it('resolves a same-source tie deterministically', () => {
