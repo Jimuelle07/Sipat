@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import type { Store, UpdateClient } from '../types/index.ts';
+import type { AnswerEvent, DeviceTier, Engine, PowerPolicy, Store, UpdateClient } from '../types/index.ts';
+import type { ContentFileName } from '../types/content.ts';
 import { createEngine } from './engine.ts';
 import { createMemoryStore } from './testing.ts';
+import { fixtureProfile } from './fixtures/households.ts';
+import {
+  FIXTURE_CHECKLIST, FIXTURE_HOTLINES, FIXTURE_INTENTS, FIXTURE_PASSAGES, FIXTURE_PHASE_RULES,
+  FIXTURE_PLACES, FIXTURE_SOURCES, FIXTURE_WARNINGS,
+} from './fixtures/content.ts';
+import { BUNDLED_MODEL } from '../services/modelEntry.ts';
+import { createModelManager, type LlamaBackend, type ModelFiles } from '../services/model.ts';
 
 const fakeUpdates = {
   fetchFeed: async () => ({ ok: false as const, error: { code: 'disabled' as const, message: 'x' } }),
@@ -185,5 +193,170 @@ describe('Engine v2 robustness', () => {
     expect(() => engine.settings.update({ lowBatteryMode: true })).not.toThrow();
     expect(engine.damage.save({ damageType: 'flood', severity: 'light', affectedMembers: 1 }))
       .toMatchObject({ ok: false, error: { code: 'io' } });
+  });
+});
+
+// Section 3.7, L733: "a weak cue switches only with a matching, accepted phase_hint; a phase_hint
+// with no backing is dropped." The shared contract suite (section 3.6) has no weak-cue scenario, so
+// these cases drive the real engine with the fixture content, a fixture household and a scripted
+// model whose completion carries phase_hint.
+const HINT_START = new Date('2026-10-10T08:00:00+08:00');
+const HINT_GENERATED_AT = '2026-10-10T08:00:00+08:00';
+
+const envelope = <T>(items: T[]) => ({
+  schema_version: 1, content_version: 1, generated_at: HINT_GENERATED_AT, items,
+});
+
+function hintContent(): Partial<Record<ContentFileName, unknown>> {
+  return {
+    'guide.tl.json': envelope(FIXTURE_PASSAGES),
+    'checklist.json': envelope(FIXTURE_CHECKLIST),
+    'warnings.json': envelope(FIXTURE_WARNINGS),
+    'synonyms.json': envelope([]),
+    'intents.json': {
+      schema_version: 1, content_version: 1, generated_at: HINT_GENERATED_AT, rules: FIXTURE_INTENTS,
+    },
+    'sources.json': envelope(FIXTURE_SOURCES),
+    'hotlines.json': envelope(FIXTURE_HOTLINES.map((hotline) => ({ ...hotline, number: '000' }))),
+    'phase_rules.json': {
+      schema_version: 1, content_version: 1, generated_at: HINT_GENERATED_AT,
+      rules: JSON.parse(JSON.stringify(FIXTURE_PHASE_RULES)) as unknown,
+    },
+    'places.json': FIXTURE_PLACES,
+  };
+}
+
+interface ScriptedModel { manager: ReturnType<typeof createModelManager>; setNextOutput(output: string): void }
+
+function makeScriptedModel(readTier: () => Promise<DeviceTier>): ScriptedModel {
+  const files = new Map<string, { size: number; hash: string }>();
+  const modelPath = `memory://models/${BUNDLED_MODEL.file_name}`;
+  files.set(modelPath, { size: BUNDLED_MODEL.size, hash: BUNDLED_MODEL.sha256 });
+  let nextOutput: string | null = null;
+  const fileApi: ModelFiles = {
+    freeBytes: async () => BUNDLED_MODEL.size * 2,
+    exists: async (path) => files.has(path),
+    size: async (path) => files.get(path)?.size ?? null,
+    async copyWithSha256(_src, dest, onProgress) {
+      files.set(dest, { size: BUNDLED_MODEL.size, hash: BUNDLED_MODEL.sha256 });
+      onProgress(BUNDLED_MODEL.size, BUNDLED_MODEL.size);
+      return BUNDLED_MODEL.sha256;
+    },
+    async remove(path) { files.delete(path); },
+    async move(srcPath, destPath) {
+      const found = files.get(srcPath);
+      files.delete(srcPath);
+      if (found) files.set(destPath, found);
+    },
+  };
+  const backend: LlamaBackend = {
+    async init() {
+      return {
+        async completion(params, onToken) {
+          const allowed = params.messages.at(-1)?.content ?? '';
+          const offeredIds = [...allowed.matchAll(/Talata \[([^\]]+)\]/g)].map((match) => match[1]!);
+          const used = offeredIds[0] ?? 'before-gobag-01';
+          const parsed = nextOutput === null
+            ? { used: [used], in_guide: true, phase_hint: null as string | null,
+              answer: 'Ihanda ang gamit at sundin ang gabay na nakasaad sa talata.' }
+            : JSON.parse(nextOutput) as { used: string[]; in_guide: boolean; phase_hint: string | null; answer: string };
+          nextOutput = null;
+          parsed.used = [used];
+          const summary = FIXTURE_PASSAGES.find((passage) => passage.id === parsed.used[0])?.summary;
+          if (summary !== undefined) parsed.answer = summary;
+          const output = JSON.stringify(parsed);
+          onToken(output);
+          return { text: output, timings: { prompt_n: 1, prompt_ms: 1, predicted_n: 20 } };
+        },
+        async stopCompletion() {},
+        async release() {},
+      };
+    },
+  };
+  const manager = createModelManager({
+    backend, files: fileApi, modelDir: 'memory://models', readTier, idleUnloadMs: 0, expected: BUNDLED_MODEL,
+  });
+  return { manager, setNextOutput(output: string) { nextOutput = output; } };
+}
+
+/** A model answer that passed verify, carrying only the given phase_hint. */
+function verifiedOutput(phaseHint: 'before' | 'during' | 'after' | null): string {
+  return JSON.stringify({
+    used: ['before-gobag-01'], in_guide: true, phase_hint: phaseHint,
+    answer: 'Ihanda ang gamit at sundin ang gabay na nakasaad sa talata.',
+  });
+}
+
+async function makeHintEngine(): Promise<{ engine: Engine; setNextOutput(output: string): void }> {
+  const profile = fixtureProfile();
+  const store = createMemoryStore({ profiles: [profile], activeProfileId: profile.id });
+  const model = makeScriptedModel(async () => 'full');
+  const power: PowerPolicy = { aiAllowed: async () => ({ allowed: true }), onChange: () => () => {} };
+  const engine = createEngine({
+    store, content: hintContent(), now: () => new Date(HINT_START.getTime()), power, model: model.manager,
+  });
+  const initialized = await engine.init();
+  if (!initialized.ok) throw new Error(`Hint engine init failed: ${initialized.error.code}`);
+  return { engine, setNextOutput: model.setNextOutput };
+}
+
+async function runAsk(engine: Engine, question: string): Promise<AnswerEvent[]> {
+  const events: AnswerEvent[] = [];
+  for await (const event of engine.ask.run(question)) events.push(event);
+  return events;
+}
+
+describe('phase hints (real engine)', () => {
+  it('a weak during cue switches only when the verified phase_hint matches it', async () => {
+    const { engine, setNextOutput } = await makeHintEngine();
+    const changes: string[] = [];
+    engine.onChange((change) => changes.push(change));
+    setNextOutput(verifiedOutput('during'));
+
+    const events = await runAsk(engine, 'lumalakas na ang hangin, paano ihanda ang go bag?');
+
+    expect(events.some((event) => event.type === 'phase_change' && event.kind === 'switched'
+      && event.from === 'before' && event.to === 'during' && event.source === 'ask')).toBe(true);
+    expect(events[events.length - 1]).toMatchObject({ type: 'done', outcome: 'answered_ai' });
+    expect(engine.context.get()).toMatchObject({ phase: 'during', phaseSource: 'ask' });
+    expect(changes).toContain('phase');
+
+    const undone = engine.context.undoPhase();
+    expect(undone.ok).toBe(true);
+    expect(engine.context.get().phase).toBe('before');
+  });
+
+  it('the same weak during cue does not switch when the phase_hint is null', async () => {
+    const { engine, setNextOutput } = await makeHintEngine();
+    setNextOutput(verifiedOutput(null));
+
+    const events = await runAsk(engine, 'lumalakas na ang hangin, paano ihanda ang go bag?');
+
+    expect(events.some((event) => event.type === 'phase_change')).toBe(false);
+    expect(engine.context.get().phase).toBe('before');
+  });
+
+  it('a phase_hint with no cue, warning or bulletin backing is dropped', async () => {
+    const { engine, setNextOutput } = await makeHintEngine();
+    setNextOutput(verifiedOutput('during'));
+
+    const events = await runAsk(engine, 'Paano ihanda ang go bag?');
+
+    expect(events.some((event) => event.type === 'phase_change')).toBe(false);
+    expect(engine.context.get().phase).toBe('before');
+    expect(engine.history.list()[0]?.phaseHint).toBe('during');
+    expect(engine.history.list()[0]?.hint).toBe('dropped');
+  });
+
+  it('never switches to after, even with a matching after cue and phase_hint', async () => {
+    const { engine, setNextOutput } = await makeHintEngine();
+    setNextOutput(verifiedOutput('after'));
+
+    const events = await runAsk(engine, 'humupa na ang bagyo, paano ihanda ang go bag?');
+
+    expect(events.some((event) => event.type === 'phase_change' && event.kind === 'switched')).toBe(false);
+    expect(events.some((event) => event.type === 'phase_change' && event.kind === 'recommended'
+      && event.to === 'after')).toBe(true);
+    expect(engine.context.get().phase).toBe('before');
   });
 });
