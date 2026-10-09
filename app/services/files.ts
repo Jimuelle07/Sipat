@@ -38,3 +38,13 @@ export function createFilePicker(): FilePicker {
     },
   };
 }
+
+/**
+ * Production pack reader: the raw bytes of a picked `.bagyopack` (a ZIP). `PackManager` unzips and
+ * verifies them; it rejects text input, so this must return bytes.
+ */
+export async function readFileBytes(uri: string): Promise<Uint8Array> {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { File } = require('expo-file-system') as { File: new (uri: string) => { bytes(): Promise<Uint8Array> } };
+  return new File(uri).bytes();
+}

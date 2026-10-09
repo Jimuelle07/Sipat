@@ -1,17 +1,18 @@
 import type {
   AccountState, AiDecision, AnswerEvent, AskOptions, Bulletin, ChecklistTick, ChecklistView, Context, Engine,
-  EngineChange, EngineOverrides, EngineInfo, EngineStatus, EvalSummary, FaceBox, Member, MemberPhoto,
-  FaceDetection, HomePoint, PhotoDraft, PhotoError, Phase, PickedPhoto, Profile, Result,
-  SaveMemberResult, SaveProfileResult, Settings, Store, StoreSchema, StormMeasure,
+  EngineChange, EngineOverrides, EngineInfo, EngineStatus, EvalSummary, FaceBox, FeedError, FeedState, Member,
+  MemberPhoto, FaceDetection, HomePoint, LocationService, PhotoDraft, PhotoError, Phase, PickedPhoto, Profile, Result,
+  SaveMemberResult, SaveProfileResult, ScreenService, Settings, Store, StoreSchema, StormMeasure, UpdateClient,
   WarningInput, WarningKind, TopicGroup,
 } from '../types/index.ts';
-import type { PhaseRules, Place } from '../types/content.ts';
+import type { ContentFileName, EvacuationCenter, PhaseRules, Place } from '../types/content.ts';
 import { ENGINE_API_VERSION } from '../types/engine.ts';
 import { bundledContent, rawContent } from '../content/index.ts';
 import { buildChecklist } from '../core/checklist.ts';
 import { deriveHousehold } from '../core/deriveHousehold.ts';
 import { decidePhase } from '../core/decidePhase.ts';
-import { measureStorm } from '../core/measureStorm.ts';
+import { haversineKm, measureStorm } from '../core/measureStorm.ts';
+import { rankCenters } from '../core/rankCenters.ts';
 import { createIndex } from '../core/search.ts';
 import { toManilaIso } from '../core/time.ts';
 import { validateContent } from '../core/validateContent.ts';
@@ -20,12 +21,21 @@ import { createModelManager, defaultLlamaBackend, defaultModelFiles } from '../s
 import { BUNDLED_MODEL } from '../services/modelEntry.ts';
 import { createPhotoService } from '../services/photos.ts';
 import { createShareService } from '../services/share.ts';
-import { createFilePicker } from '../services/files.ts';
+import { createFilePicker, readFileBytes } from '../services/files.ts';
+import { createLocationService } from '../services/location.ts';
 import { createPackManager } from '../services/packs.ts';
+import { createScreenService } from '../services/screen.ts';
 import { createStore } from '../services/store.ts';
+import { updateHost } from '../services/updateConfig.ts';
+import { createUpdateClient, type FetchLike } from '../services/updates.ts';
 import { runAskPipeline } from './askPipeline.ts';
 import { copyText } from './copy.ts';
 import { EVAL_SUMMARY_FIXTURE } from './fixtures/eval.ts';
+// The laptop evaluation report, bundled at build time (`npm run eval` writes it). Never read at runtime.
+import evalReport from '../../eval/results/latest.json';
+
+// Keep in step with `version` in app.config.ts; manifests compare it with `min_app_version`.
+const APP_VERSION = '0.1.0';
 
 const DEFAULT_SETTINGS: Settings = {
   language: 'tl', lowBatteryThreshold: 15, aiEnabled: true, lowBatteryMode: false,
@@ -41,6 +51,26 @@ const iso = (date: Date) => toManilaIso(date);
 const keyFor = (id: string) => `checklist:${id}` as `checklist:${string}`;
 const phoneRe = /^\+?\d{7,15}$/;
 const cleanPhone = (value: string) => value.replace(/[\s()\-]/g, '');
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+// Used only to read rankCenters' `centersFirst` flag when the household has no location.
+const FALLBACK_HOME: HomePoint = { point: { lat: 0, lon: 0 }, from: 'area', areaCodes: [] };
+// How many ranked centers the Evacuation screen lists (proposal; the doc sets no number).
+const CENTERS_LIMIT = 5;
+// The latest Node evaluation report; the placeholder fixture only when the bundled file has none.
+// `scripts/eval.ts` writes `summary` as an EvalSummary; the record check guards a hand-edited file.
+const evalReportFile: unknown = evalReport;
+const BUNDLED_EVAL: EvalSummary = isRecord(evalReportFile) && isRecord(evalReportFile.summary)
+  ? evalReportFile.summary as unknown as EvalSummary
+  : EVAL_SUMMARY_FIXTURE;
+
+/** The evacuation centers carried by the merged content (the bundled set or an applied area pack). */
+function evacuationCentersFrom(file: unknown): EvacuationCenter[] {
+  if (!isRecord(file) || !Array.isArray(file.items)) return [];
+  return file.items.filter((item): item is EvacuationCenter => isRecord(item)
+    && typeof item.id === 'string' && typeof item.name === 'string'
+    && isRecord(item.coords) && typeof item.coords.lat === 'number' && typeof item.coords.lon === 'number');
+}
 
 function emptyContext(at: string): Context {
   return {
@@ -81,6 +111,7 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
   const store: Store = overrides.store ?? createStore();
   const now = overrides.now ?? (() => new Date());
   let content = bundledContent;
+  let rawMap: Partial<Record<ContentFileName, unknown>> = rawContent;
   let index = createIndex(content.passages);
   let profiles: Profile[] = [];
   let activeId: string | null = null;
@@ -112,6 +143,48 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
   const newId = (kind: string) => `${kind}-${now().getTime()}-${++idSeq}`;
   const activeRef = () => profiles.find((profile) => profile.id === activeId) ?? null;
   const active = () => { const profile = activeRef(); return profile ? cloneProfile(profile) : null; };
+  // Production services. `overrides.*` stays a test seam. The build has the online stretch only when
+  // a pinned host is configured: otherwise `info().online` is false, no update client exists and
+  // every online call is `disabled` (docs section 3.2 and section 11.a).
+  const location: LocationService = overrides.location ?? createLocationService();
+  const screen: ScreenService = overrides.screen ?? createScreenService();
+  const packs = createPackManager({ store, now: () => iso(now()), readFile: readFileBytes, appVersion: APP_VERSION });
+  const pinnedHost = updateHost();
+  const online = pinnedHost !== null;
+  const realFetch: FetchLike = (url, init) => (globalThis.fetch as unknown as FetchLike)(url, init);
+  const updates: UpdateClient | undefined = overrides.updates ?? (pinnedHost
+    ? createUpdateClient({
+      host: pinnedHost, fetch: realFetch, store, now, appVersion: APP_VERSION,
+      province: () => provincePsgc(),
+      importArchive: (files) => packs.importArchive(files),
+    })
+    : undefined);
+  // The household's province PSGC, or null (e.g. NCR has none). At most the province code ever
+  // reaches a request (AGENTS rule 6); names, notes, photos and coordinates never do.
+  function provincePsgc(): string | null {
+    const household = activeRef()?.location;
+    if (!household) return null;
+    const places = getPlaces();
+    let place = places.find((item) => item.psgc === household.psgc);
+    const seen = new Set<string>();
+    while (place && !seen.has(place.psgc)) {
+      if (place.level === 'province') return place.psgc;
+      seen.add(place.psgc);
+      place = places.find((item) => item.psgc === place?.parent);
+    }
+    return null;
+  }
+  // The barangay with the nearest places.json centroid to a one-shot GPS reading.
+  function nearestBarangay(reading: { lat: number; lon: number }): Place | undefined {
+    let best: Place | undefined;
+    let bestKm = Infinity;
+    for (const place of getPlaces()) {
+      if (place.level !== 'barangay' || !place.centroid) continue;
+      const km = haversineKm(reading, place.centroid);
+      if (km < bestKm) { bestKm = km; best = place; }
+    }
+    return best;
+  }
   const phaseRules = (): PhaseRules => content.phaseRules ?? fallbackRules();
   // A malformed cached feed or bulletin degrades to null instead of throwing.
   const cachedBulletin = (): Bulletin | null => {
@@ -128,7 +201,7 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
     return bulletin as Bulletin;
   };
   const currentFeed = () => {
-    if (!settings.feedEnabled || !overrides.updates) {
+    if (!settings.feedEnabled || !updates) {
       return { status: 'off' as const, refreshing, latest: null, serverStale: false };
     }
     try {
@@ -176,7 +249,6 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
   const photosService = overrides.photos ?? createPhotoService();
   const shareService = overrides.share ?? createShareService();
   const filePicker = overrides.files ?? createFilePicker();
-  const packs = createPackManager({ store, now: () => iso(now()) });
   const powerUpdate = async () => {
     cachedTier = powerService
       ? await powerService.tier().catch(() => 'none')
@@ -290,9 +362,9 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
       (date, passage) => passage.reviewed_at > date ? passage.reviewed_at : date,
       '',
     );
-    return { appVersion: '0.0.0', engineApiVersion: ENGINE_API_VERSION, guideDate,
+    return { appVersion: APP_VERSION, engineApiVersion: ENGINE_API_VERSION, guideDate,
       passagesCount: content.passages.length, sourcesCount: content.sources.length, packs: packs.installed(),
-      online: false, model: { fileName: BUNDLED_MODEL.file_name, sizeBytes: BUNDLED_MODEL.size, present: installedModel,
+      online, model: { fileName: BUNDLED_MODEL.file_name, sizeBytes: BUNDLED_MODEL.size, present: installedModel,
         attribution: 'Built with Llama' } };
   };
   const status = (): EngineStatus => {
@@ -619,10 +691,20 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
         return ok(profile.location);
       },
       async useGps() {
-        if (!overrides.location) return err('unavailable', 'Location is unavailable');
-        const result = await overrides.location.readOnce().catch(() => err('unavailable', 'Location unavailable'));
+        const profile = activeRef();
+        if (!profile) return err('unavailable', 'No household');
+        const result = await location.readOnce().catch(() => err('unavailable', 'Location unavailable'));
         if (!result.ok) return result;
-        return err('unavailable', 'GPS-to-area matching is unavailable without place coordinates');
+        const { lat, lon, accuracyM, at } = result.value;
+        const place = nearestBarangay({ lat, lon });
+        if (!place) return err('unavailable', 'No barangay coordinates to match the reading');
+        // The reading stays on the phone: stored in the profile only, never logged or sent.
+        profile.location = { psgc: place.psgc, coords: { lat, lon, accuracyM, at } };
+        profile.updatedAt = iso(now());
+        save('profiles', profiles);
+        emit('profiles');
+        decideCurrentPhase();
+        return ok({ ...profile.location, coords: { lat, lon, accuracyM, at } });
       },
     },
     card(memberId) {
@@ -728,28 +810,56 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
       return [...counts].map(([name, passages]) => ({ name, passages }));
     },
   };
+  // Swap in the PackManager's merged content after a successful apply.
+  const applyPack = async (previewId: string) => {
+    const result = await packs.apply(previewId).catch(() => err('io', 'Pack apply failed'));
+    if (!result.ok) return result;
+    const merged = packs.content();
+    if (merged.ok) {
+      content = merged.value;
+      rawMap = packs.raw();
+      index = createIndex(content.passages);
+    }
+    emit('packs');
+    emit('updates');
+    return result;
+  };
+  // Centers are a signed area pack (`centers-{province}`) of reviewed records, applied without a
+  // prompt after a successful feed fetch (docs section 7). Only the province code is sent.
+  let centersCheckedDay: string | null = null;
+  const refreshCenters = async () => {
+    const province = provincePsgc();
+    const day = iso(now()).slice(0, 10);
+    if (!updates || !province || centersCheckedDay === day) return;
+    centersCheckedDay = day;
+    const result = await updates.fetchCenters(province).catch(() => null);
+    if (result?.ok && result.value !== 'unchanged') await applyPack(result.value.previewId);
+  };
+  // One feed fetch: cache a new feed, re-run decidePhase, emit `feed`. Never throws.
+  const fetchFeedOnce = async (trigger: 'open' | 'pull'): Promise<Result<FeedState, FeedError>> => {
+    if (!settings.feedEnabled) return err('disabled', 'Feed is disabled');
+    if (!updates) return err('disabled', 'Online feed is not configured');
+    lastFeedCheckAt = iso(now());
+    refreshing = true;
+    emit('feed');
+    const result = await Promise.resolve().then(() => updates.fetchFeed({ trigger }))
+      .catch(() => err('http', 'Feed request failed'));
+    refreshing = false;
+    if (!result.ok) {
+      emit('feed');
+      return result;
+    }
+    if (result.value !== 'unchanged') {
+      save('feed', result.value);
+    }
+    emit('feed');
+    decideCurrentPhase();
+    await refreshCenters().catch(() => undefined);
+    return ok(currentFeed());
+  };
   const feed: Engine['feed'] = {
     get: currentFeed,
-    async refresh() {
-      if (!settings.feedEnabled) return err('disabled', 'Feed is disabled');
-      if (!overrides.updates) return err('disabled', 'Online feed is not configured');
-      lastFeedCheckAt = iso(now());
-      refreshing = true;
-      emit('feed');
-      const result = await Promise.resolve().then(() => overrides.updates!.fetchFeed({ trigger: 'pull' }))
-        .catch(() => err('http', 'Feed request failed'));
-      refreshing = false;
-      if (!result.ok) {
-        emit('feed');
-        return result;
-      }
-      if (result.value !== 'unchanged') {
-        save('feed', result.value);
-      }
-      emit('feed');
-      decideCurrentPhase();
-      return ok(currentFeed());
-    },
+    refresh: () => fetchFeedOnce('pull'),
   };
   const plan: Engine['plan'] = {
     hotlines: () => content.hotlines.filter((hotline) => hotline.scope === 'national'),
@@ -801,9 +911,11 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
   const engine: Engine = {
     async init() {
       try {
-        const checked = validateContent(overrides.content ? { ...rawContent, ...overrides.content } : rawContent);
+        const raw = overrides.content ? { ...rawContent, ...overrides.content } : rawContent;
+        const checked = validateContent(raw);
         if (!checked.ok) return err('content_invalid', checked.error.message);
         content = checked.value;
+        rawMap = raw;
         index = createIndex(content.passages);
         profiles = (store.get('profiles') ?? []).slice(0, 1);
         activeId = profiles[0]?.id ?? null;
@@ -825,6 +937,8 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
         await powerService?.refresh().catch(() => undefined);
         await powerUpdate();
         decideCurrentPhase();
+        // App open with the online stretch: one non-awaited feed fetch. No timer, retry or background work.
+        if (online && settings.feedEnabled && updates) void fetchFeedOnce('open').catch(() => undefined);
         return ok(info());
       } catch (cause) {
         return err('storage_failed', cause instanceof Error ? cause.message : 'Could not load local data');
@@ -844,17 +958,17 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
           const profile = active();
           const latest = currentFeed().latest;
           const storm = stormInput();
-          const threshold = phaseRules().evacuation_threshold;
-          const categoryOrder = ['TD', 'TS', 'STS', 'TY', 'STY'];
-          const categoryCrossed = threshold.category_min !== null && storm !== null
-            && categoryOrder.indexOf(storm.bulletin.storm.category) >= categoryOrder.indexOf(threshold.category_min);
-          const signalHere = storm?.measure.signalHere ?? null;
-          const signalCrossed = threshold.tcws_min !== null && signalHere !== null
-            && signalHere >= threshold.tcws_min;
+          const home = homePoint();
+          // rankCenters owns the threshold check; with no home it ranks nothing (`centers: []`).
+          const ranked = rankCenters(home ? evacuationCentersFrom(rawMap['evacuation_centers.json']) : [], home ?? FALLBACK_HOME, {
+            bulletin: storm?.bulletin ?? null, storm: storm?.measure ?? null, rules: phaseRules(), limit: CENTERS_LIMIT,
+          });
           return {
             ...(profile?.plan.evacuationCenter ? { householdCenter: profile.plan.evacuationCenter } : {}),
             bulletin: latest,
-            storm: storm?.measure ?? null, centers: [], centersFirst: !threshold.placeholder && (categoryCrossed || signalCrossed),
+            storm: storm?.measure ?? null,
+            centers: ranked.items,
+            centersFirst: ranked.centersFirst,
             barangayCopyKey: 'barangay_decides' as const,
             needsLocation: !profile?.location,
           };
@@ -894,8 +1008,8 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
       },
     },
     screen: {
-      sosOn: async () => { await overrides.screen?.sosOn().catch(() => undefined); },
-      sosOff: async () => { await overrides.screen?.sosOff().catch(() => undefined); },
+      sosOn: async () => { await screen.sosOn().catch(() => undefined); },
+      sosOff: async () => { await screen.sosOff().catch(() => undefined); },
     },
     damage: {
       list: () => damageDrafts(),
@@ -963,7 +1077,7 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
         ? [] : [entry.timings.firstTokenMs]));
       const fullAnswerP50Ms = p50(history.filter((entry) => entry.outcome === 'answered_ai')
         .map((entry) => entry.timings.totalMs));
-      return { ...EVAL_SUMMARY_FIXTURE, device: {
+      return { ...BUNDLED_EVAL, device: {
         ...(summaryP50Ms !== undefined ? { summaryP50Ms } : {}),
         ...(firstWordsP50Ms !== undefined ? { firstWordsP50Ms } : {}),
         ...(fullAnswerP50Ms !== undefined ? { fullAnswerP50Ms } : {}),
@@ -977,14 +1091,7 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
         return picked.value ? packs.importFile(picked.value.uri).catch(() => err('bad_archive')) : ok(null);
       },
       importFile: (uri) => packs.importFile(uri).catch(() => err('bad_archive')),
-      async apply(id) {
-        const result = await packs.apply(id).catch(() => err('io', 'Pack apply failed'));
-        if (result.ok) {
-          emit('packs');
-          emit('updates');
-        }
-        return result;
-      },
+      apply: (id) => applyPack(id),
       async rollback(id) {
         const result = await packs.rollback(id).catch(() => err('io', 'Pack rollback failed'));
         if (result.ok) emit('packs');
@@ -994,16 +1101,16 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
     updates: {
       pending: () => null,
       async check() {
-        return overrides.updates
-          ? overrides.updates.check({ trigger: 'user' }).catch(() => err('http'))
+        return updates
+          ? updates.check({ trigger: 'user' }).catch(() => err('http'))
           : err('disabled');
       },
       async download(planId, onProgress, signal) {
-        if (!overrides.updates) return err('disabled');
-        const result = await overrides.updates.check({ trigger: 'user' }).catch(() => err('http'));
+        if (!updates) return err('disabled');
+        const result = await updates.check({ trigger: 'user' }).catch(() => err('http'));
         if (!result.ok) return result;
         if (!result.value || result.value.planId !== planId) return err('disabled');
-        return overrides.updates.download(result.value, onProgress, signal).catch(() => err('http'));
+        return updates.download(result.value, onProgress, signal).catch(() => err('http'));
       },
       networkLog: () => { try { return store.get('networkLog') ?? []; } catch { return []; } },
     },
