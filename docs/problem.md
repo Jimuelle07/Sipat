@@ -2,7 +2,7 @@
 
 When a typhoon cuts power and signal, Filipino households lose access to preparedness guidance at the moment they need it most, and the guidance that does exist was written for nobody in particular.
 
-Related: [README](README.md) · [solution.md](solution.md) · [system-design.md](system-design.md) · [api-layer.md](api-layer.md) · [BMC.md](BMC.md)
+Related: [README](README.md) · [features.md](features.md) · [solution.md](solution.md) · [system-design.md](system-design.md) · [api-layer.md](api-layer.md) · [BMC.md](BMC.md)
 
 ## 1. The problem in one sentence
 
@@ -29,7 +29,7 @@ The municipal or city DRRMO must prepare residents by law, and it has a budget f
 
 ### The distributors: barangay officials and BHWs
 
-Barangay officials issue local evacuation orders and run evacuation centers. Barangay health workers already make home visits. Both can help households set up the app on a calm day and, in v2, pass guide updates from phone to phone (README, U3). They lack a simple tool to leave behind that keeps working after they go.
+Barangay officials issue local evacuation orders and run evacuation centers. Barangay health workers already make home visits. Both can help households set up the app on a calm day: install it, enter each member and take the required face photo of everyone, infants and elders included. They lack a simple tool to leave behind that keeps working after they go.
 
 ## 3. When it hits
 
@@ -66,7 +66,7 @@ Lead times come from PAGASA's wind signal definitions ([PAGASA](https://bagong.p
 2. **Generic, not household-fitted.** Checklists rarely say what changes with an infant, a pregnancy, a disability, a senior's medicines, pets, or a house by a river or on a slope.
 3. **Long and static.** Nobody searches a long PDF in the dark while the roof rattles.
 4. **Wind-only thinking.** Signals describe wind. Floods come from rain and storm surge from the sea, each with its own PAGASA warning.
-5. **Language.** Guides use English or formal Filipino. People ask in Taglish, and Odette's hardest-hit provinces are largely Bisaya-speaking.
+5. **Language.** Guides use English or formal Filipino. People ask in Taglish. (Other Philippine languages are real gaps too, but they are deliberately out of MVP scope — features.md D8.)
 6. **No offline channel for LGUs.** The DRRMO knows its evacuation centers and hotlines, but cannot put them in every household's pocket in a form that works without signal.
 
 ## 6. Current alternatives
@@ -74,21 +74,23 @@ Lead times come from PAGASA's wind signal definitions ([PAGASA](https://bagong.p
 | Alternative | What it does well | Gap for this household |
 | :-- | :-- | :-- |
 | Free cell-broadcast alerts ([RA 10639](https://en.wikipedia.org/wiki/Emergency_Cell_Broadcast_System)) | Official alerts pushed free to phones in the area, with no app | One-way and general. Needs a working tower. Says a storm is coming, not what this household should do. |
-| PAGASA bulletins (radio, TV, web, social media) | The authoritative source for signals and rainfall and storm surge warnings. Radio works without grid power. | Says what is coming, not what to do for an infant, a senior or a riverside house. Web and social media need data. |
+| PAGASA bulletins (radio, TV, web, social media) | The authoritative source for signals and rainfall and storm surge warnings. Radio works without grid power. | Says what is coming, not what to do for an infant, a senior or a riverside house. Web and social media need data, and the last bulletin seen is gone once signal drops. |
 | Project NOAH (UP) | Flood, landslide and storm surge hazard maps | Online, and built for planning rather than help during the storm |
 | HazardHunterPH (DOST-PHIVOLCS) | Hazard assessment for a chosen location | Online. Describes the hazards of a place, not actions for this storm. |
 | LGU Facebook pages and group chats | Local, timely and trusted: evacuation orders, class suspensions | Need data, are noisy, and go silent when towers go down |
 | Printed or PDF guides (NDRRMC, OCD, DOH) | Authoritative, and print works offline | Long, generic and hard to search under stress |
 | Online AI chatbots | Conversational, and understand Taglish | Need internet. May answer from memory with no source. |
 
-**Positioning.** Alerts tell you a storm is coming. Bagyo Buddy tells your household what to do, even with no signal. It complements these channels rather than replacing them.
+**Positioning.** Alerts tell you a storm is coming. Bagyo Buddy tells your household what to do, even with no signal. While signal lasts it also keeps the latest PAGASA bulletin, shown verbatim with its issued and fetched times, so the family can still read it offline (MVP stretch, [features.md, section 7](features.md#7-evacuation-and-bagyo-forecast)). It complements these channels, the radio included, rather than replacing them.
 
 ## 7. Honest limits
 
-- **Not a forecast.** The app does not know the storm's location, track or your local signal. The user brings that from the radio or the barangay.
-- **Not live.** Guidance is as current as the last installed guide pack, whose date the About screen shows.
-- **Not an emergency service.** It can open a pre-filled text (U1, MVP stretch), but delivery depends on the network.
-- **Never overrides officials.** Every answer ends with "Sundin ang utos ng barangay at ng mga awtoridad."
+- **Not a forecast.** The app makes no forecast and never says when the bagyo arrives. Where it shows the bagyo's position, track or signal areas, that is the latest PAGASA bulletin, copied from PAGASA, not our prediction.
+- **The cached bulletin can be old.** It is as current as the last time the phone had signal. The card shows when PAGASA issued it and when the phone fetched it, and after 3 hours from issue it says "Makinig muli sa radyo. Baka nagbago na ang signal." Without a cached bulletin, storm questions get the fixed "Walang live na balita..." reply. Guide passages are as current as the last installed guide pack, whose date the About screen shows.
+- **Phase switching is a suggestion.** The app may switch to "Habang may bagyo" or "Bago ang bagyo" from the warnings tapped, the user's words or the bulletin. Every switch shows "Ibalik" to undo, and moving to "Pagkatapos ng bagyo" is always the user's tap.
+- **Location is optional.** The household picks its barangay from a list; phone GPS is one coarse reading on tap, never in the background, and never leaves the phone.
+- **Not an emergency service.** It shows the emergency card and hotlines, but calls and help depend on the network and responders.
+- **Never overrides officials.** Every answer ends with "Sundin ang utos ng barangay at ng mga awtoridad." The app may recommend where to evacuate; the barangay decides when.
 - **Not new information.** Offline guides already exist. The new part is a sourced answer to your own Taglish question, fitted to your household, without signal.
 
 ## 8. Problem statement
@@ -107,8 +109,10 @@ Pass signals are proposals to agree on before testing.
 | A budget phone is fast enough | Hour 1 of the build: time 20 prompts on a 4 GB phone | README defaults met (summary ≤ 1 s, full AI answer ≤ 10 s median); otherwise the tier rules turn AI off |
 | LGUs will pay from the Local DRRM Fund | Interview 5 municipal DRRMOs on where this fits their DRRM fund plan | At least one letter of intent for a pilot |
 | Agencies will approve reuse for the paid LGU tier | Write to OCD, PAGASA and DOH (RA 8293, Sec. 176; see [BMC.md](BMC.md)) | Written approval, or clear conditions, before any sale |
-| BHWs can roll out the app and share packs offline | BHWs share a signed pack to 20 phones with no internet | Packs install and verify; BHWs repeat it unassisted after one training |
-| People understand the app has no live data | Ask "saan na ang bagyo?" in a usability test | Users follow the fixed reply to the radio or the barangay |
+| Families will take a face photo of every member, infants and elders included | BHW-assisted setup in one barangay; count members left at "Mamaya na" (pending) after one week | Most households have every photo done within a week; nobody abandons setup over the photo |
+| People trust and keep the automatic phase switch | Usability test: trigger switches from a tapped warning and a spoken cue; watch for "Ibalik" taps and confusion | Most users understand why the phase changed and keep it; undo is used for real mismatches, not confusion |
+| The scraper stays reliable and PAGASA permits server-side use of its bulletins | Run the scraper through a real advisory and log parse failures and lag; write to PAGASA for permission or a data feed | Every bulletin parsed or marked stale without a guessed field; written permission or clear conditions before the Pilot |
+| People treat a cached bulletin as old, not live | Ask "saan na ang bagyo?" in a usability test with an old cached card, and with none | Users read the issued time, follow the stale prompt or the fixed reply to the radio or the barangay, and do not skip the radio |
 
 ## 10. What success looks like
 

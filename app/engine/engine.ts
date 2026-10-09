@@ -24,7 +24,7 @@ import { exportChecklistText, exportHouseholdSms } from './exportText';
 
 const DEFAULT_SETTINGS: Settings = {
   language: 'tl', lowBatteryThreshold: 15, aiEnabled: true, staleWarningHours: 3, autoCheckUpdates: true,
-  wifiOnly: true, topicReportsOptIn: false,
+  wifiOnly: true, topicReportsOptIn: false, damageReportsOptIn: false,
 };
 const MODEL_FILE = 'Llama-3.2-1B-Instruct-Q4_K_M.gguf';
 const ok = <T>(value: T): Result<T, never> => ({ ok: true, value });

@@ -19,6 +19,7 @@ function settings(over: Partial<Settings> = {}): Settings {
     autoCheckUpdates: true,
     wifiOnly: true,
     topicReportsOptIn: false,
+    damageReportsOptIn: false,
     ...over,
   };
 }

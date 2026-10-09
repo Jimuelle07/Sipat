@@ -8,6 +8,7 @@ import { HomeScreen } from '../screens/HomeScreen';
 import { HotlinesScreen } from '../screens/HotlinesScreen';
 import { GuideScreen } from '../screens/GuideScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
+import { AccountScreen } from '../screens/AccountScreen';
 import type { RootTabParamList } from './types';
 import { colors } from '../theme';
 
@@ -22,6 +23,7 @@ export function RootTabs(): JSX.Element {
       <Tab.Screen name="Guide" component={GuideScreen} options={{ title: t.tabGuide, tabBarIcon: ({ color, size }) => <Ionicons name="book-outline" color={color} size={size} /> }} />
       <Tab.Screen name="Hotlines" component={HotlinesScreen} options={{ title: t.tabHotlines, tabBarIcon: ({ color, size }) => <Ionicons name="call-outline" color={color} size={size} /> }} />
       <Tab.Screen name="Family" component={ProfileScreen} options={{ title: t.tabProfile, tabBarIcon: ({ color, size }) => <Ionicons name="people-outline" color={color} size={size} /> }} />
+      <Tab.Screen name="Account" component={AccountScreen} options={{ title: t.tabAccount, tabBarIcon: ({ color, size }) => <Ionicons name="person-circle-outline" color={color} size={size} /> }} />
     </Tab.Navigator>
   );
 }

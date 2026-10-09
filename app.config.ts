@@ -1,5 +1,6 @@
 import type { ExpoConfig } from 'expo/config';
 import withReleaseNoInternet from './plugins/withReleaseNoInternet.js';
+import withSecureScreen from './plugins/withSecureScreen.js';
 
 const config: ExpoConfig = {
   name: 'Bagyo Buddy',
@@ -14,7 +15,7 @@ const config: ExpoConfig = {
   android: {
     package: 'ph.bagyobuddy.app',
   },
-  plugins: ['expo-status-bar', 'llama.rn', withReleaseNoInternet],
+  plugins: ['expo-status-bar', 'llama.rn', withReleaseNoInternet, withSecureScreen],
 };
 
 export default config;

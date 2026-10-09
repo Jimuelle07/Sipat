@@ -17,7 +17,7 @@ export interface ContentFile<T> {
 
 export interface Passage {
   id: string;
-  lang: 'tl' | 'ceb' | 'en';
+  lang: 'tl' | 'en';
   title: string;
   topic: TopicGroup;
   phase: Phase[];
@@ -67,8 +67,8 @@ export interface WarningEntry {
 
 export interface SynonymEntry {
   canonical: string; // token added to the query
-  forms: string[];   // inflections, Taglish, English, Bisaya (MVP stretch)
-  lang: 'tl' | 'ceb' | 'en';
+  forms: string[];   // inflections, Taglish, English (MVP stretch)
+  lang: 'tl' | 'en';
   topic?: TopicGroup; // hint for refusal suggestions
 }
 
