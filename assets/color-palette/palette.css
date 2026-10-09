@@ -1,0 +1,75 @@
+:root {
+  /* Mascot */
+  --mascot-original: #A1B5C8;
+  --mascot: #A9CDF2;
+
+  /* Primary: soft pastel blue */
+  --blue-50: #F2F7FD;
+  --blue-100: #E3EFFB;
+  --blue-200: #C9E0F7;
+  --blue-300: #A9CDF2;
+  --blue-400: #86B8EA;
+  --blue-500: #6A9FDB;
+  --blue-600: #4E83C4;
+  --blue-700: #3B67A3;
+  --blue-800: #2E5181;
+  --blue-900: #213B5E;
+
+  /* Phase: Before (Bago ang bagyo) */
+  --before-tint: #EBF9F6;
+  --before-soft: #BFEBE2;
+  --before-main: #7FD4C4;
+  --before-deep: #22756A;
+
+  /* Phase: During (Habang may bagyo) */
+  --during-tint: #FFF5EA;
+  --during-soft: #FFDDB8;
+  --during-main: #FFBC78;
+  --during-deep: #93500E;
+
+  /* Phase: After (Pagkatapos ng bagyo) */
+  --after-tint: #F5F2FE;
+  --after-soft: #DDD4F8;
+  --after-main: #B5A6EE;
+  --after-deep: #5847A3;
+
+  /* Neutrals */
+  --gray-0: #FFFFFF;
+  --gray-50: #F7F9FC;
+  --gray-100: #EEF2F7;
+  --gray-200: #DDE4EE;
+  --gray-300: #C2CCDA;
+  --gray-400: #94A2B6;
+  --gray-500: #6B7A90;
+  --gray-600: #4E5C70;
+  --gray-700: #384455;
+  --gray-800: #252F3D;
+  --gray-900: #161D27;
+
+  /* Emergency only */
+  --alert-tint: #FDEEEE;
+  --alert-soft: #F6B9B9;
+  --alert-main: #CC3636;
+  --alert-deep: #8F2323;
+
+  /* Semantic */
+  --color-bg: var(--blue-50);
+  --color-surface: var(--blue-100);
+  --color-border: var(--gray-200);
+  --color-text: var(--blue-900);
+  --color-text-muted: var(--gray-600);
+  --color-primary: var(--blue-700);
+  --color-primary-soft: var(--blue-300);
+  --color-on-primary: #FFFFFF;
+}
+
+[data-theme="dark"] {
+  --color-bg: #121A26;
+  --color-surface: #1B2636;
+  --color-border: #2C3A4F;
+  --color-text: var(--blue-100);
+  --color-text-muted: var(--gray-400);
+  --color-primary: var(--blue-300);
+  --color-primary-soft: var(--blue-800);
+  --color-on-primary: var(--blue-900);
+}

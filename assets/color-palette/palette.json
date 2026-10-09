@@ -1,0 +1,64 @@
+{
+  "mascot": {
+    "original": "#A1B5C8",
+    "refresh": "#A9CDF2"
+  },
+  "blue": {
+    "50": "#F2F7FD",
+    "100": "#E3EFFB",
+    "200": "#C9E0F7",
+    "300": "#A9CDF2",
+    "400": "#86B8EA",
+    "500": "#6A9FDB",
+    "600": "#4E83C4",
+    "700": "#3B67A3",
+    "800": "#2E5181",
+    "900": "#213B5E"
+  },
+  "phase": {
+    "before": {
+      "tint": "#EBF9F6",
+      "soft": "#BFEBE2",
+      "main": "#7FD4C4",
+      "deep": "#22756A"
+    },
+    "during": {
+      "tint": "#FFF5EA",
+      "soft": "#FFDDB8",
+      "main": "#FFBC78",
+      "deep": "#93500E"
+    },
+    "after": {
+      "tint": "#F5F2FE",
+      "soft": "#DDD4F8",
+      "main": "#B5A6EE",
+      "deep": "#5847A3"
+    }
+  },
+  "gray": {
+    "0": "#FFFFFF",
+    "50": "#F7F9FC",
+    "100": "#EEF2F7",
+    "200": "#DDE4EE",
+    "300": "#C2CCDA",
+    "400": "#94A2B6",
+    "500": "#6B7A90",
+    "600": "#4E5C70",
+    "700": "#384455",
+    "800": "#252F3D",
+    "900": "#161D27"
+  },
+  "alert": {
+    "tint": "#FDEEEE",
+    "soft": "#F6B9B9",
+    "main": "#CC3636",
+    "deep": "#8F2323"
+  },
+  "dark": {
+    "bg": "#121A26",
+    "surface": "#1B2636",
+    "border": "#2C3A4F",
+    "primary": "#A9CDF2",
+    "text": "#E3EFFB"
+  }
+}
