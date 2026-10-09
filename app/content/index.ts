@@ -1,5 +1,6 @@
-import type { BundledContent, ContentFileName } from '../types/index.ts';
+import type { ContentFileName } from '../types/index.ts';
 import { validateContent } from '../core/validateContent.ts';
+import type { BundledContent } from '../core/validateContent.ts';
 import guide from '../../content/guide.tl.json';
 import checklist from '../../content/checklist.json';
 import warnings from '../../content/warnings.json';

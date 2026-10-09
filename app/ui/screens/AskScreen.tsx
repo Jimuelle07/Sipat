@@ -141,7 +141,7 @@ export function AskScreen(): JSX.Element {
     const detail = open ? engine.guide.passage(passageId) : null;
     return <View style={styles.sourceBlock}>
       <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={() => toggleSource(passageId)} style={styles.sourceToggle}>
-        {open ? <Text style={styles.sourceLink}>{t.hideSource}</Text> : <View><Text style={styles.sourceLink}>{engine.copy('source_link')}</Text>{lang === 'en' ? <Text style={styles.sourceTranslation}>{engine.copy('source_link', 'en')}</Text> : null}</View>}
+        {open ? <Text style={styles.sourceLink}>{t.hideSource}</Text> : <View><Text style={styles.sourceLink}>{engine.copy('source_link')}</Text>{lang === 'en' ? <Text style={styles.sourceTranslation}>{engine.copy('source_link', { lang: 'en' })}</Text> : null}</View>}
       </Pressable>
       {open ? detail ? <View style={styles.sourceDetail}>
         <Text style={styles.text}>{detail.source.agency} · {detail.source.title} · {detail.source.date}</Text>
@@ -171,7 +171,7 @@ export function AskScreen(): JSX.Element {
       </View>;
       case 'plan_answer': return <View key={`event-${index}`} style={styles.answerBubble}>
         {event.text ? <Text style={styles.text}>{event.text}</Text> : null}
-        {event.center ? <Text style={styles.text}>{event.center.name} · {event.center.landmark}</Text> : null}
+        {event.center ? <Text style={styles.text}>{event.center}</Text> : null}
         {event.contacts?.map((contact, i) => <Text key={`${i}-${contact.name}`} style={styles.text}>{contact.name}{contact.phone ? ` · ${contact.phone}` : ''}</Text>)}
         {event.hotlines?.map((hotline) => <Pressable key={hotline.id} onPress={() => { void engine.plan.call(hotline.id); }} style={styles.hotlineRow}><Ionicons name="call-outline" size={18} color={colors.accent} /><Text style={styles.text}>{hotline.name} · {hotline.number}</Text></Pressable>)}
         {event.empty ? <Text style={styles.text}>{t.planEmpty}</Text> : null}
@@ -188,6 +188,7 @@ export function AskScreen(): JSX.Element {
       case 'ai_rejected': return <View key={`event-${index}`} style={styles.answerBubble}><Text style={styles.muted}>{t.aiRejected}</Text>{renderSource(event.fallbackPassageId)}</View>;
       case 'closing': return <View key={`event-${index}`} style={styles.closing}><SafetyText copyKey={event.copyKey} /></View>;
       case 'done': return null;
+      default: return null;
     }
   };
 

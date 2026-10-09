@@ -36,7 +36,7 @@ const profile: Profile = {
   headcount: 1,
   members: [],
   home: ['near_river', 'concrete'],
-  livelihood: [],
+  location: null,
   plan: {
     evacuationCenter: 'Brgy Hall',
     evacuationCenterId: 'ec-9',
@@ -94,6 +94,7 @@ describe('member drafts', () => {
       needs: ['pwd'],
       note: '  allergy  ',
       phone: '09171234567',
+      photoStatus: 'done',
       updatedAt: '2026-10-09T00:00:00+08:00',
     };
     const draft = memberDraftFrom(member);

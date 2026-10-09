@@ -6,6 +6,6 @@ import { useLang } from '../i18n';
 import { colors, font, space } from '../theme';
 export function SafetyText({ copyKey }: { copyKey: CopyKey }): JSX.Element {
   const engine = useEngine(); const { lang } = useLang();
-  return <View style={styles.wrap}><Text style={styles.primary}>{engine.copy(copyKey)}</Text>{lang === 'en' ? <Text style={styles.translation}>{engine.copy(copyKey, 'en')}</Text> : null}</View>;
+  return <View style={styles.wrap}><Text style={styles.primary}>{engine.copy(copyKey)}</Text>{lang === 'en' ? <Text style={styles.translation}>{engine.copy(copyKey, { lang: 'en' })}</Text> : null}</View>;
 }
 const styles = StyleSheet.create({ wrap: { gap: space.xs }, primary: { color: colors.text, fontSize: font.md }, translation: { color: colors.muted, fontSize: font.sm } });

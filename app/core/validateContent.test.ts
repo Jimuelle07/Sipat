@@ -12,14 +12,13 @@ function fixture(): Record<string, any> {
     'guide.tl.json': env([
       {
         id: 'p1', lang: 'tl', title: 't', topic: 'signals', phase: ['before'],
-        warnings: { tcws: [], rainfall: [], surge: [], gale: false }, profile_tags: [], hazards: [],
+        warnings: { tcws: [], rainfall: [], surge: [], gale: false, barangay_order: false }, profile_tags: [], hazards: [],
         critical: false, text: 'x', summary: 's', source_id: 'src', locator: 'p1',
         reviewed_by: 'Reviewer', reviewed_at: '2026-10-01', version: 1,
       },
     ]),
     'checklist.json': env([
-      { id: 'c1', text: 'Tubig', group: 'water_food', phase: ['before'], priority: 1, critical: true,
-        quantity: { per: 'person', amount: 4, unit: 'L', days: 3 }, source_id: 'src' },
+      { id: 'c1', text: 'Tubig', group: 'go_bag', phase: ['before'], priority: 1, critical: true, source_id: 'src' },
     ]),
     'warnings.json': env([
       { id: 'gale', kind: 'gale', level: 'on', label: 'Gale', meaning: 'm', actions: [], source_id: 'src', confirmed: true },
@@ -61,6 +60,12 @@ describe('validateContent', () => {
     expect(errorOf(f)).toContain('reviewed_by');
   });
 
+  it('rejects a passage whose lang is not tl', () => {
+    const f = fixture();
+    f['guide.tl.json'].items[0].lang = 'en';
+    expect(errorOf(f)).toContain("lang must be 'tl'");
+  });
+
   it('rejects an unknown source_id', () => {
     const f = fixture();
     f['warnings.json'].items[0].source_id = 'nope';
@@ -73,10 +78,18 @@ describe('validateContent', () => {
     expect(errorOf(f)).toContain('h911');
   });
 
-  it('rejects checklist amount 0', () => {
+  it('rejects an invalid checklist group', () => {
     const f = fixture();
-    f['checklist.json'].items[0].quantity.amount = 0;
-    expect(errorOf(f)).toContain('quantity.amount');
+    f['checklist.json'].items[0].group = 'water_food';
+    expect(errorOf(f)).toContain('group must be one of');
+  });
+
+  it('validates phase_cues when intents.json carries them', () => {
+    const f = fixture();
+    f['intents.json'].rules.phase_cues = { during: { strong: ['nandito na'], weak: [] } };
+    expect(validateContent(f).ok).toBe(true);
+    f['intents.json'].rules.phase_cues = { during: { strong: 'nope' } };
+    expect(errorOf(f)).toContain('phase_cues.during');
   });
 
   it('collects every problem and reports missing files', () => {

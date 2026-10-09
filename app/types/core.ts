@@ -1,5 +1,24 @@
-import type { Context, Profile, TopicGroup, WarningKind } from './common.ts';
-import type { Passage } from './content.ts';
+import type {
+  Bulletin,
+  Context,
+  Phase,
+  PhaseInputKey,
+  PhaseReason,
+  PhaseRules,
+  PhaseSource,
+  PhaseState,
+  PhaseSwitch,
+  PackManifest,
+  PinnedKey,
+  Profile,
+  RankedCenter,
+  StormMeasure,
+  TopicGroup,
+  KeySet,
+  WarningEntry,
+  WarningKind,
+} from './index.ts';
+import type { Passage } from './index.ts';
 
 export interface NormalizedQuery {
   raw: string;        // as typed, trimmed, at most 200 chars
@@ -10,14 +29,21 @@ export interface NormalizedQuery {
 
 export type PlanField = 'evacuation_center' | 'meeting_place' | 'contacts' | 'hotlines';
 
-export interface RouteResult {
-  emergency: boolean; // show the emergency card first, then continue with `primary`
-  primary: 'live_data' | 'plan' | 'medical_dose' | 'guide';
-  matched: string[];  // phrases that fired, for the question log
-  planField?: PlanField; // set when primary is 'plan'
+export interface PhaseCue {
+  phase: Phase;     // the most cautious phase whose cue list matched
+  strong: boolean;  // a strong phrase matched; weak phrases need a matching phase_hint
+  matched: string[];
 }
 
-export interface GuideIndex { readonly __brand: 'GuideIndex' } // opaque; wraps a MiniSearch instance built at startup
+export interface RouteResult {
+  emergency: boolean;       // show the emergency card first, then continue with `primary`
+  phaseCue: PhaseCue | null; // combines with any primary route
+  primary: 'live_data' | 'plan' | 'medical_dose' | 'guide';
+  matched: string[];        // phrases that fired, for the question log
+  planField?: PlanField;    // set when primary is 'plan'
+}
+
+export interface GuideIndex {} // opaque; wraps a MiniSearch instance built at startup
 
 export interface SearchConfig {
   threshold: number;          // calibrated on the evaluation set
@@ -49,7 +75,6 @@ export interface SearchResult {
   suggestions: TopicGroup[]; // up to 3, for the refusal buttons
 }
 
-
 export type ChecklistGroupId = 'now' | 'go_bag' | 'home' | 'evacuate' | 'after';
 export interface ChecklistTick { ticked: boolean; updatedAt: string }
 
@@ -60,14 +85,15 @@ export interface WarningCard {
   meaning: string;
   leadTimeH?: number;
   setAt: string;
-  confirmed: boolean; // false shows "(i-check sa PAGASA)"
+  hoursSinceSet: number; // whole hours, from the engine's clock
+  stale: boolean;        // hoursSinceSet ≥ staleWarningHours
+  confirmed: boolean;    // false shows "(i-check sa PAGASA)"
 }
 
 export interface ChecklistItemView {
   id: string;
   text: string;
-  quantityText?: string; // e.g. "× 5 tao × 3 araw", computed, never typed by hand
-  forMembers?: { id: string; name: string; note?: string }[]; // who the item is for, e.g. "gamot ni Lolo Ben"
+  forMembers?: { id: string; name: string; note?: string }[]; // who the item is for
   priority: 1 | 2 | 3;
   critical: boolean;
   ticked: boolean;
@@ -75,18 +101,50 @@ export interface ChecklistItemView {
 }
 
 export interface ChecklistView {
+  phase: Phase;
   warningCards: WarningCard[];
-  groups: { id: ChecklistGroupId; items: ChecklistItemView[] }[]; // items sorted by priority
-  progress: { done: number; total: number };
+  groups: { id: ChecklistGroupId; recommended: boolean; items: ChecklistItemView[] }[];
+  progress: { done: number; total: number }; // ticks over the shown items
   stale?: { kind: WarningKind; hoursSinceSet: number; copyKey: 'stale_warning' };
 }
 
+export interface PhaseInputs {
+  context: Context;
+  ask?: {
+    questionId: string;
+    cue: PhaseCue | null;
+    hint: Phase | null;
+  };
+  storm?: { bulletin: Bulletin; measure: StormMeasure } | null;
+  rules: PhaseRules;
+  now: string;
+}
+
+export interface PhaseCandidate {
+  key: PhaseInputKey;
+  phase: Phase;
+  source: Exclude<PhaseSource, 'manual'>;
+  effect: 'switch' | 'recommend';
+  reason: PhaseReason;
+}
+
+export interface PhaseDecision {
+  state: PhaseState;
+  switched: PhaseSwitch | null;
+  hint: 'none' | 'accepted' | 'dropped';
+  candidates: PhaseCandidate[];
+}
+
+export interface RankedCenters {
+  items: RankedCenter[]; // nearest first
+  centersFirst: boolean;     // the evacuation threshold is crossed
+}
 
 export interface ChatMessage { role: 'system' | 'user' | 'assistant'; content: string }
 
 export interface PromptInput {
   question: string;    // NormalizedQuery.raw
-  profile: Profile | null; // null before household setup
+  profile: Profile | null; // null before household setup: no tag boost, summary "hindi pa naka-setup"
   context: Context;
   passages: Passage[]; // the 1 or 2 selected, in rank order
 }
@@ -101,11 +159,31 @@ export type VerifierFailure =
   | 'schema' | 'not_in_guide' | 'bad_citation' | 'unknown_number'
   | 'phone_number' | 'too_long' | 'wrong_language';
 
-export interface ModelOutput { used: string[]; in_guide: boolean; answer: string }
+export interface ModelOutput {
+  used: string[];
+  in_guide: boolean;
+  phase_hint: Phase | null;
+  answer: string;
+}
 
 export interface VerifyResult {
   ok: boolean;
   output?: ModelOutput; // present when the JSON parsed
   failures: { code: VerifierFailure; detail?: string }[];
-  text?: string; // answer + closing, set only when ok
+}
+
+export type PackError =
+  | 'bad_archive' | 'unknown_key' | 'key_expired' | 'bad_signature'
+  | 'app_too_old' | 'rollback' | 'hash_mismatch' | 'schema';
+
+export interface TrustStore {
+  rootKeys: PinnedKey[];
+  keySet?: KeySet;
+  installed: Record<string, number>;
+}
+
+export interface VerifiedPack {
+  manifest: PackManifest;
+  blobs: Map<string, Uint8Array>; // sha256 → gzip bytes
+  keySet?: KeySet;
 }

@@ -1,10 +1,6 @@
 import type { ModelOutput, Passage, VerifierFailure, VerifyResult } from '../types/index.ts';
 
-export const CLOSING_TL = 'Sundin ang utos ng barangay at ng mga awtoridad.';
-
-export function withClosing(text: string): string {
-  return text.trimEnd() + '\n\n' + CLOSING_TL;
-}
+const PHASES: readonly string[] = ['before', 'during', 'after'];
 
 const UNITS: Record<string, number> = {
   // Tagalog
@@ -129,10 +125,12 @@ function parse(raw: string): ModelOutput | null {
   if (typeof v !== 'object' || v === null || Array.isArray(v)) return null;
   const o = v as Record<string, unknown>;
   const keys = Object.keys(o);
-  if (keys.length !== 3 || !keys.every((k) => k === 'used' || k === 'in_guide' || k === 'answer')) return null;
+  if (keys.length !== 4 || !keys.every((k) => k === 'used' || k === 'in_guide' || k === 'phase_hint' || k === 'answer')) return null;
   if (!Array.isArray(o.used) || !o.used.every((u) => typeof u === 'string')) return null;
   if (typeof o.in_guide !== 'boolean' || typeof o.answer !== 'string') return null;
-  return { used: o.used as string[], in_guide: o.in_guide, answer: o.answer };
+  const hint = o.phase_hint;
+  if (hint !== null && !(typeof hint === 'string' && PHASES.includes(hint))) return null;
+  return { used: o.used as string[], in_guide: o.in_guide, phase_hint: hint as ModelOutput['phase_hint'], answer: o.answer };
 }
 
 export function verify(raw: string, passages: Passage[], allowedExtra: number[] = []): VerifyResult {
@@ -171,5 +169,5 @@ export function verify(raw: string, passages: Passage[], allowedExtra: number[] 
   const fn = tokens.filter((t) => FUNCTION_WORDS[t]).length;
   if (fn / tokens.length < 0.1) return fail('wrong_language', output, 'function_words');
 
-  return { ok: true, output, failures: [], text: withClosing(answer) };
+  return { ok: true, output, failures: [] };
 }

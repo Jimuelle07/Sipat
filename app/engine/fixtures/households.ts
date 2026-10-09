@@ -1,13 +1,17 @@
-import type { Member, MemberPhoto, Profile } from '../../types';
-import { deriveHousehold } from '../../core/deriveHousehold';
+// Placeholder fixture data for the mock engine and tests. Not official content.
+import type { DamageDraft, Member, MemberPhoto, Profile } from '../../types/index.ts';
+import { deriveHousehold } from '../../core/deriveHousehold.ts';
+import { FIXTURE_PLACES } from './content.ts';
 
-/** A placeholder photo on the phone only; the mock never opens a camera. */
+const AT = '2026-10-09T00:00:00+08:00';
+
+/** A placeholder photo stored on the phone only; the mock never opens a camera. */
 export const FIXTURE_PHOTO: MemberPhoto = {
-  uri: 'fixture://photos/lola.jpg',
+  uri: 'fixture://photos/sample.jpg',
   bytes: 0,
   source: 'gallery',
   faceCheck: 'one_face',
-  takenAt: '2026-10-09T00:00:00+08:00',
+  takenAt: AT,
   version: 1,
 };
 
@@ -19,72 +23,73 @@ function member(
   needs: Member['needs'] = [],
   extra: { note?: string; phone?: string; photo?: MemberPhoto } = {},
 ): Member {
-  const m: Member = { id, name, relation, ageGroup, needs, updatedAt: '2026-10-09T00:00:00+08:00' };
+  const photo = extra.photo;
+  const m: Member = {
+    id,
+    name,
+    relation,
+    ageGroup,
+    needs,
+    photoStatus: photo ? 'done' : 'pending',
+    updatedAt: AT,
+  };
   if (extra.note !== undefined) m.note = extra.note;
   if (extra.phone !== undefined) m.phone = extra.phone;
-  if (extra.photo !== undefined) m.photo = extra.photo;
+  if (photo !== undefined) m.photo = photo;
   return m;
 }
 
-function profile(
-  id: string,
-  name: string,
-  ownerId: string,
-  people: Member[],
-  petsCount: number,
-  home: Profile['home'],
-  plan: Profile['plan'],
-): Profile {
-  const { members, headcount } = deriveHousehold(people, petsCount);
+/**
+ * One household of 4 members: the main person, two others with placeholder photos and exactly one
+ * member still pending (docs/api-layer.md section 3.6). A fresh copy every call.
+ */
+export function fixtureProfile(): Profile {
+  const people: Member[] = [
+    member('member-self', 'Nena', 'self', 'adult', [], {
+      phone: '0000000000',
+      photo: { ...FIXTURE_PHOTO, uri: 'fixture://photos/member-self.jpg' },
+    }),
+    member('member-child', 'Totoy', 'child', 'child', [], {
+      photo: { ...FIXTURE_PHOTO, uri: 'fixture://photos/member-child.jpg' },
+    }),
+    member('member-senior', 'Lola Ising', 'parent', 'senior', ['maintenance_meds'], {
+      note: 'gamot sa presyon',
+      photo: { ...FIXTURE_PHOTO, uri: 'fixture://photos/member-senior.jpg' },
+    }),
+    member('member-infant', 'Baby Joy', 'child', 'infant'),
+  ];
+  const { members, headcount } = deriveHousehold(people, 0);
+  const homeArea = FIXTURE_PLACES.items.find((p) => p.level === 'barangay');
   return {
-    id,
-    name,
-    ownerId,
+    id: 'household-sample',
+    name: 'Bahay namin (SAMPLE)',
+    ownerId: 'member-self',
     people,
-    petsCount,
+    petsCount: 0,
     headcount,
     members,
-    home,
-    livelihood: [],
-    plan,
-    updatedAt: '2026-10-09T00:00:00+08:00',
+    home: ['near_river'],
+    location: homeArea ? { psgc: homeArea.psgc } : null,
+    plan: {
+      evacuationCenter: 'SAMPLE Barangay Hall (placeholder)',
+      contacts: [],
+    },
+    updatedAt: AT,
   };
 }
 
-/** Two households of four members each (docs/api-layer.md section 3.6). Fresh copies every call. */
-export function fixtureHouseholds(): Profile[] {
-  const a = profile(
-    'hh-a',
-    'Bahay namin',
-    'a1',
-    [
-      member('a1', 'Mika', 'self', 'adult'),
-      member('a2', 'Paolo', 'spouse', 'adult'),
-      member('a3', 'Bunso', 'child', 'infant'),
-      member('a4', 'Lola Nena', 'parent', 'senior', ['maintenance_meds'], {
-        note: 'gamot sa altapresyon',
-        photo: FIXTURE_PHOTO,
-      }),
-    ],
-    1,
-    ['near_river', 'light_materials'],
-    { evacuationCenter: 'Barangay Hall', contacts: [] },
-  );
-
-  const b = profile(
-    'hh-b',
-    'Bahay nina Lola',
-    'b1',
-    [
-      member('b1', 'Lola Iska', 'self', 'adult'),
-      member('b2', 'Mang Tino', 'spouse', 'adult'),
-      member('b3', 'Ate Rosa', 'child', 'adult'),
-      member('b4', 'Kuya Jun', 'sibling', 'adult', ['pwd']),
-    ],
-    0,
-    ['near_sea', 'concrete'],
-    { evacuationCenter: 'Bahay ng Kapitana', contacts: [] },
-  );
-
-  return [a, b];
+/** Exactly one unsent damage report draft (Pilot) so the damage screen has data. */
+export function fixtureDamageDrafts(): DamageDraft[] {
+  return [
+    {
+      id: 'damage-sample-1',
+      createdAt: '2026-10-10T07:00:00+08:00',
+      damageType: 'wind',
+      severity: 'light',
+      affectedMembers: 1,
+      notes: 'SAMPLE – placeholder damage note',
+      photoPaths: [],
+      sentAt: null,
+    },
+  ];
 }

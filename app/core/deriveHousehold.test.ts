@@ -4,7 +4,8 @@ import { deriveHousehold, memberTags } from './deriveHousehold';
 import { toManilaIso } from './time';
 
 const m = (id: string, ageGroup: Member['ageGroup'], needs: Member['needs'] = []): Member => ({
-  id, name: id, relation: 'other', ageGroup, needs, updatedAt: '2026-10-09T00:00:00+08:00',
+  id, name: id, relation: 'other', ageGroup, needs, photoStatus: 'pending',
+  updatedAt: '2026-10-09T00:00:00+08:00',
 });
 
 describe('deriveHousehold', () => {

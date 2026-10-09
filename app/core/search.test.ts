@@ -29,10 +29,13 @@ const OUT_OF_SCOPE = [
   'Saan makakabili ng murang sapatos?',
 ];
 
-const context: Context = { phase: 'during', warnings: {} };
+const context: Context = {
+  phase: 'during', phaseSource: 'manual', reason: { source: 'manual', text: '' },
+  changedAt: '2026-10-09T00:00:00+08:00', recommended: null, warnings: {}, suppressed: [],
+};
 const profile: Profile = {
   id: 'test', name: 'Bahay namin', ownerId: 'owner', people: [], petsCount: 0,
-  headcount: 0, members: [], home: [], livelihood: [], plan: { contacts: [] }, updatedAt: '2026-10-09T00:00:00+08:00',
+  headcount: 0, members: [], home: [], location: null, plan: { contacts: [] }, updatedAt: '2026-10-09T00:00:00+08:00',
 };
 const index = createIndex(bundledContent.passages);
 

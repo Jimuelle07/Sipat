@@ -1,1116 +1,593 @@
+import { buildChecklist, PHASE_GROUPS } from '../core/checklist.ts';
+import { decidePhase } from '../core/decidePhase.ts';
+import { decideAi } from '../services/power.ts';
+import { deriveHousehold } from '../core/deriveHousehold.ts';
+import { COPY, COPY_EN } from './copy.ts';
+import { fixtureProfile, fixtureDamageDrafts } from './fixtures/households.ts';
+import {
+  FIXTURE_SOURCES, FIXTURE_PASSAGES, FIXTURE_CHECKLIST, FIXTURE_WARNINGS,
+  FIXTURE_HOTLINES, FIXTURE_INTENTS, FIXTURE_PHASE_RULES, FIXTURE_PLACES,
+} from './fixtures/content.ts';
+import { FIXTURE_BULLETIN, FIXTURE_CENTERS, DEMO_SOURCED_RULES, fixtureStorm, fixtureFeedState } from './fixtures/feed.ts';
+import { EVAL_SUMMARY_FIXTURE } from './fixtures/eval.ts';
 import type {
-  AiSkipReason,
-  AnswerEvent,
-  ApplyResult,
-  AskApi,
-  AskOptions,
-  ChecklistApi,
-  ChecklistTick,
-  ChecklistView,
-  Context,
-  ContextApi,
-  CopyKey,
-  EmergencyApi,
-  EmergencyCardView,
-  Engine,
-  EngineChange,
-  EngineInfo,
-  EngineStatus,
-  EvalSummary,
-  EvaluationApi,
-  FaceBox,
-  FaceCheck,
-  FamilyApi,
-  GuideApi,
-  HistoryApi,
-  Hotline,
-  ImportPreview,
-  InstalledPack,
-  Member,
-  MemberCardView,
-  MemberErrorCode,
-  MemberInput,
-  MemberPhoto,
-  MemberTag,
-  MockEngine,
-  MockOptions,
-  MockScenario,
-  NewHouseholdInput,
-  NormalizedQuery,
-  Outcome,
-  PackError,
-  PacksApi,
-  PhotoDraft,
-  PhotoError,
-  PhotosApi,
-  PlanApi,
-  PlanField,
-  Profile,
-  ProfileErrorCode,
-  ProfileInput,
-  QuestionLogEntry,
-  Result,
-  RollCallView,
-  SaveMemberResult,
-  SaveProfileResult,
-  SearchResult,
-  Settings,
-  SettingsApi,
-  SourceRef,
-  TextKind,
-  Timings,
-  TopicGroup,
-  UpdatesApi,
-  VerifierFailure,
-  WarningInput,
-  WarningKind,
-} from '../types';
-import { ENGINE_API_VERSION } from '../types';
-import type { BundledContent } from '../types';
-import { bundledContent, rawContent } from '../content/index';
-import { validateContent } from '../core/validateContent';
-import { buildChecklist } from '../core/checklist';
-import { deriveHousehold, memberTags } from '../core/deriveHousehold';
-import { normalize } from '../core/normalize';
-import { route } from '../core/route';
-import { toManilaIso } from '../core/time';
-import { createIndex, search } from '../core/search';
-import { DEFAULT_SEARCH_CONFIG } from '../core/config';
-import { COPY, COPY_EN } from './copy';
-import { fixtureHouseholds } from './fixtures/households';
-import { EVAL_SUMMARY_FIXTURE } from './fixtures/eval';
+  AccountState, ActiveWarnings, AnswerEvent, AskOptions, BulletinCardView, ChecklistTick, Context,
+  CopyKey, DamageDraft, EngineChange, EngineInfo, EngineStatus, EvalSummary,
+  FaceBox, FaceDetection, FeedError, FeedState, HouseholdLocation, ImportPreview, InstalledPack, Member, MemberPhoto, MockEngine,
+  MockOptions, MockScenario, ModelInstallError, Phase, PhotoDraft, PhotoError, Result, Settings,
+  PhaseInputKey, SourceRef, UiLanguage, UpdatePlan, WarningCard, WarningInput, PlanField,
+} from '../types/index.ts';
 
+const MS_HOUR = 3_600_000;
+const SOURCE_DATE = '2026-10-09';
 const MODEL_FILE = 'Llama-3.2-1B-Instruct-Q4_K_M.gguf';
-const GUIDE_DATE = '2026-10-09';
-const FALLBACK_PASSAGE_ID = 'before-gobag-01';
-const CRITICAL_PASSAGE_ID = 'during-flood-river-01';
-const PHONE_RE = /^\+?\d{7,15}$/;
+const resultOk = <T>(value: T): Result<T, never> => ({ ok: true, value });
+const resultErr = <T = never, E extends string = string>(code: E): Result<T, E> => ({ ok: false, error: { code, message: code } });
+const id = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
+const toManilaIso = (date: Date) => `${new Date(date.getTime() + 8 * MS_HOUR).toISOString().slice(0, -1)}+08:00`;
 
-const DEFAULT_SETTINGS: Settings = {
-  language: 'tl',
-  lowBatteryThreshold: 15,
-  aiEnabled: true,
-  staleWarningHours: 3,
-  autoCheckUpdates: true,
-  wifiOnly: true,
-  topicReportsOptIn: false,
-  damageReportsOptIn: false,
-};
-
-const ALL_CHANGES: EngineChange[] = [
-  'profiles', 'family', 'context', 'checklist', 'settings', 'status', 'history', 'packs', 'updates',
-];
-
-const KEYWORDS: readonly (readonly [MockScenario, readonly string[]])[] = [
-  ['emergency_then_guide', ['lumulubog']],
-  ['live_data', ['nasaan', 'pasok']],
-  ['medical_dose', ['dosis', 'dose', 'ilang tableta', 'ilang ml', 'gaano karami ang gamot']],
-  ['plan_center', ['evacuation center']],
-  ['plan_empty', ['magkikita']],
-  ['refusal', ['bigas']],
-  ['guide_critical', ['lumikas']],
-  ['ai_rejected', ['litro']],
-  ['low_battery', ['baterya', 'battery']],
-  ['no_model', ['model']],
-];
-
-const NO_SEARCH: readonly MockScenario[] = ['live_data', 'medical_dose', 'plan_center', 'plan_empty', 'refusal'];
-
-const VULNERABLE_TL: readonly { tag: MemberTag; label: string }[] = [
-  { tag: 'infant', label: 'sanggol' },
-  { tag: 'child', label: 'bata' },
-  { tag: 'pregnant', label: 'buntis' },
-  { tag: 'senior', label: 'senior' },
-  { tag: 'pwd', label: 'PWD' },
-  { tag: 'maintenance_meds', label: 'may maintenance na gamot' },
-];
-
-const PHOTO_ERROR_MESSAGE: Record<PhotoError, string> = {
-  permission_denied: 'Walang pahintulot sa camera.',
-  no_camera: 'Walang camera ang phone na ito.',
-  unreadable: 'Hindi mabuksan ang litrato.',
-  draft_expired: 'Nag-expire na ang litrato.',
-  not_found: 'Wala ang hinahanap.',
-  io: 'Hindi na-save.',
-};
-
-type ErrList = { code: ProfileErrorCode | MemberErrorCode; field: string }[];
-type MemberErrList = { code: MemberErrorCode; field: string }[];
-type PhotoFixture = 'one_face' | 'no_face' | 'many_faces' | 'group_3';
-type PhotoResultSetting = PhotoFixture | PhotoError;
-
-interface DraftEntry { draft: PhotoDraft; source: MemberPhoto['source'] }
-interface RunState { cancelled: boolean; wake?: () => void }
-
-function ok<T>(value: T): { ok: true; value: T } {
-  return { ok: true, value };
+function makePackPreview(packs: ImportPreview['packs'] = [{ packId: 'sample-core-pack', kind: 'core', toVersion: 2, sizeBytes: 1024, guideDate: '2026-10-10', upserts: 1, deletes: 0 }]): ImportPreview {
+  const previewId = id('preview');
+  return { previewId, signedBy: 'SAMPLE key (placeholder)', packs };
 }
 
-function err<E extends string>(code: E, message: string): { ok: false; error: { code: E; message: string } } {
-  return { ok: false, error: { code, message } };
+function makeUpdatePlan(): UpdatePlan {
+  return {
+    planId: id('update'),
+    items: [{ packId: 'sample-core-pack', kind: 'core', fromVersion: 1, toVersion: 2,
+      blob: { sha256: '0'.repeat(64), size: 1024, path: 'SAMPLE (placeholder)' }, delta: false }],
+    totalBytes: 1024,
+    guideDate: '2026-10-10',
+  };
 }
 
-function normalizePhone(raw: string): string {
-  return raw.replace(/[\s()\-]/g, '');
+function defaultContext(now: Date): Context {
+  return {
+    phase: 'before', phaseSource: 'manual', changedAt: toManilaIso(now), recommended: null,
+    reason: { source: 'manual', text: 'Manwal na pinili.' }, warnings: {}, suppressed: [],
+  };
 }
 
-function squareCrop(f: FaceBox): FaceBox {
-  const size = Math.min(1, Math.max(f.width, f.height));
-  const x = Math.max(0, Math.min(1 - size, f.x + f.width / 2 - size / 2));
-  const y = Math.max(0, Math.min(1 - size, f.y + f.height / 2 - size / 2));
-  return { x, y, width: size, height: size };
+function sourceRef(sourceId: string, locator?: string): SourceRef {
+  const source = FIXTURE_SOURCES.find((item) => item.id === sourceId) ?? FIXTURE_SOURCES[0]!;
+  const ref: SourceRef = { sourceId: source.id, agency: source.agency, title: source.title, date: source.date, url: source.url };
+  if (locator !== undefined) ref.locator = locator;
+  return ref;
 }
 
-function scenarioLog(scenario: MockScenario): { outcome: Outcome; failures: VerifierFailure[]; aiSkipReason?: AiSkipReason } {
-  switch (scenario) {
-    case 'live_data':
-    case 'medical_dose':
-      return { outcome: 'fixed_reply', failures: [] };
-    case 'plan_center':
-    case 'plan_empty':
-      return { outcome: 'plan_answer', failures: [] };
-    case 'refusal':
-      return { outcome: 'refused', failures: [] };
-    case 'guide_full':
-    case 'guide_critical':
-    case 'emergency_then_guide':
-      return { outcome: 'answered_ai', failures: [] };
-    case 'ai_rejected':
-      return { outcome: 'answered_summary', failures: ['unknown_number'] };
-    case 'low_battery':
-      return { outcome: 'answered_summary', failures: [], aiSkipReason: 'low_battery' };
-    case 'no_model':
-      return { outcome: 'answered_summary', failures: [], aiSkipReason: 'no_model' };
-  }
+function copyText(key: CopyKey, lang: UiLanguage, vars: Record<string, string> = {}): string {
+  let text = (lang === 'en' ? COPY_EN : COPY)[key] ?? key;
+  for (const [name, value] of Object.entries(vars)) text = text.replaceAll(`{${name}}`, value);
+  return text;
 }
 
-/**
- * The mock Engine (docs/api-layer.md section 3.6): the same `Engine` interface over fixture
- * households, the real bundled content and scripted answer streams. Runs fully in Node.
- */
+function validateMemberInput(input: { name: string; phone?: string; note?: string }, field: string) {
+  const errors: { code: 'name_required' | 'too_long' | 'phone_invalid'; field: string }[] = [];
+  const name = input.name.trim();
+  if (!name) errors.push({ code: 'name_required', field: `${field}.name` });
+  else if (name.length > 40) errors.push({ code: 'too_long', field: `${field}.name` });
+  if (input.note && input.note.length > 80) errors.push({ code: 'too_long', field: `${field}.note` });
+  if (input.phone?.trim() && !/^\+?[0-9 ()-]{7,20}$/.test(input.phone.trim())) errors.push({ code: 'phone_invalid', field: `${field}.phone` });
+  return errors;
+}
+
+function cardView(now: Date, bulletin = FIXTURE_BULLETIN): BulletinCardView {
+  const issuedHoursAgo = Math.max(0, Math.floor((now.getTime() - Date.parse(bulletin.issuedAt)) / MS_HOUR));
+  const fetchedHoursAgo = Math.max(0, Math.floor((now.getTime() - Date.parse(bulletin.fetchedAt)) / MS_HOUR));
+  return { bulletin, issuedHoursAgo, fetchedHoursAgo, stale: issuedHoursAgo >= 3, ageText: `Inilabas ${issuedHoursAgo} oras na ang nakalipas` };
+}
+
+function keywordScenario(question: string): MockScenario {
+  const q = question.toLocaleLowerCase('tl');
+  if (q.includes('lumulubog')) return 'emergency_then_guide';
+  if (q.includes('nasaan')) return 'live_data_bulletin';
+  if (q.includes('pasok')) return 'live_data';
+  if (q.includes('dosis')) return 'medical_dose';
+  if (q.includes('evacuation center')) return 'plan_center';
+  if (q.includes('magkikita')) return 'plan_empty';
+  if (q.includes('bigas')) return 'refusal';
+  if (q.includes('lumikas')) return 'guide_critical';
+  if (q.includes('na dito')) return 'phase_cue_during';
+  if (q.includes('humupa')) return 'phase_cue_after';
+  if (q.includes('litro')) return 'ai_rejected';
+  if (q.includes('baterya')) return 'low_battery';
+  if (q.includes('model')) return 'no_model';
+  return 'guide_full';
+}
+
+// After the documented section 3.6 keyword table, the mock also routes "kontak"/"tawagan" to contacts
+// and "hotline" to hotlines so every plan_answer field can be exercised in the UI.
+
 export function createMockEngine(opts: MockOptions = {}): MockEngine {
+  const now = () => new Date();
   const speed = opts.speed ?? 'realistic';
   const listeners = new Set<(change: EngineChange) => void>();
-
-  let content: BundledContent = bundledContent;
-  let passagesById = new Map(content.passages.map((p) => [p.id, p]));
-  let sourcesById = new Map(content.sources.map((s) => [s.id, s]));
-  let hotlinesById = new Map(content.hotlines.map((h) => [h.id, h]));
-  let index = createIndex(content.passages);
-
-  const counters: Record<string, number> = {};
-  const newId = (prefix: string): string => {
-    const n = (counters[prefix] ?? 0) + 1;
-    counters[prefix] = n;
-    return `${prefix}-${n}`;
+  const emit = (change: EngineChange) => { for (const listener of listeners) listener(change); };
+  let profile = fixtureProfile();
+  let hasProfile = true;
+  let context = defaultContext(now());
+  let settings: Settings = {
+    language: 'tl', lowBatteryThreshold: 15, aiEnabled: true, lowBatteryMode: false,
+    staleWarningHours: 6, feedEnabled: true, autoCheckUpdates: false, wifiOnly: true,
+    topicReportsOptIn: false, damageReportsOptIn: false,
   };
-
-  let profiles: Profile[] = [];
-  let activeProfileId: string | null = null;
-  let context: Context = { phase: 'before', warnings: {} };
-  let settings: Settings = { ...DEFAULT_SETTINGS };
-  let history: QuestionLogEntry[] = [];
-  let ticks = new Map<string, Record<string, ChecklistTick>>();
-  let rollCall = new Map<string, Record<string, { present: boolean; at: string }>>();
+  let ticks: Record<string, ChecklistTick> = {};
+  let history: import('../types/index.ts').QuestionLogEntry[] = [];
   let statusPatch: Partial<EngineStatus> = {};
+  let statusAiOverride: EngineStatus['ai'] | undefined;
   let scenario: MockScenario | null = opts.scenario ?? null;
-  let photoResult: PhotoResultSetting = 'one_face';
-  let drafts = new Map<string, DraftEntry>();
-  let knownPreviews = new Set<string>();
-  let currentRun: RunState | null = null;
-
-  const now = (): Date => new Date();
-
-  function emit(change: EngineChange): void {
-    for (const listener of [...listeners]) listener(change);
-  }
-
-  function emitAll(): void {
-    for (const change of ALL_CHANGES) emit(change);
-  }
-
-  function rebuildDerived(): void {
-    passagesById = new Map(content.passages.map((p) => [p.id, p]));
-    sourcesById = new Map(content.sources.map((s) => [s.id, s]));
-    hotlinesById = new Map(content.hotlines.map((h) => [h.id, h]));
-    index = createIndex(content.passages);
-  }
-
-  function resetState(): void {
-    profiles = fixtureHouseholds();
-    activeProfileId = profiles[0]?.id ?? null;
-    context = { phase: 'before', warnings: {} };
-    settings = { ...DEFAULT_SETTINGS };
-    history = [];
-    ticks = new Map();
-    rollCall = new Map();
-    statusPatch = {};
-    scenario = opts.scenario ?? null;
-    photoResult = 'one_face';
-    drafts = new Map();
-    knownPreviews = new Set();
-    for (const key of Object.keys(counters)) delete counters[key];
-    currentRun = null;
-  }
-
-  function activeProfile(): Profile | null {
-    return profiles.find((p) => p.id === activeProfileId) ?? null;
-  }
-
-  function sourceRef(sourceId: string, locator?: string): SourceRef {
-    const s = sourcesById.get(sourceId);
-    const ref: SourceRef = {
-      sourceId,
-      agency: s?.agency ?? '',
-      title: s?.title ?? '',
-      date: s?.date ?? '',
-      url: s?.url ?? '',
-    };
-    if (locator !== undefined) ref.locator = locator;
-    return ref;
-  }
-
-  function pickScenario(q: NormalizedQuery): MockScenario {
-    for (const [name, words] of KEYWORDS) {
-      if (words.some((w) => q.text.includes(w))) return name;
+  let photoResult: FaceDetection | PhotoError = 'one_face';
+  let locationResult: 'ok' | import('../types/index.ts').LocationError = 'ok';
+  let pendingFeedError: FeedError | null = null;
+  let feedState: FeedState = fixtureFeedState('fresh');
+  let feedChoice: 'off' | 'empty' | 'fresh' | 'stale' | 'near' | 'signal_here' | 'track_approach' | 'left' | null = 'fresh';
+  let feedVariant: ReturnType<typeof fixtureStorm> | null = fixtureStorm();
+  let demoFeedVariant = false;
+  let modelInstallResult: 'installed' | ModelInstallError = 'installed';
+  let modelPresent = true;
+  let undo: { state: Context; cause?: PhaseInputKey } | null = null;
+  let currentCancel: (() => void) | null = null;
+  let damage = fixtureDamageDrafts();
+  let photoDrafts = new Map<string, PhotoDraft>();
+  let photoDraftSources = new Map<string, 'camera' | 'gallery'>();
+  let installedPacks: InstalledPack[] = [];
+  let packPreviews = new Map<string, ImportPreview>();
+  let packRollback = new Map<string, InstalledPack[]>();
+  let pendingUpdate: UpdatePlan | null = null;
+  const registerPackPreview = (preview: ImportPreview): ImportPreview => { packPreviews.set(preview.previewId, preview); return preview; };
+  const logQuestion = (question: string): string => {
+    const privateValues = profile.people.flatMap((member) => [
+      member.name, member.note, member.phone, member.photo?.uri,
+    ]).filter((value): value is string => value !== undefined && value.length > 0);
+    if (profile.location) {
+      privateValues.push(profile.location.psgc);
+      if (profile.location.coords) {
+        privateValues.push(String(profile.location.coords.lat), String(profile.location.coords.lon));
+      }
     }
-    return 'guide_full';
-  }
-
-  function summaryPassageId(result: SearchResult | null): string {
-    const first = result?.selected[0];
-    if (first !== undefined && passagesById.has(first)) return first;
-    return FALLBACK_PASSAGE_ID;
-  }
-
-  function zeroTimings(): Timings {
-    return { routeMs: 0, searchMs: 0, totalMs: 0 };
-  }
-
-  function partialTexts(passageId: string): string[] {
-    const p = passagesById.get(passageId) ?? passagesById.get(FALLBACK_PASSAGE_ID);
-    const text = p?.summary ?? '';
-    if (text.length === 0) return ['', '', ''];
-    return [0.4, 0.7, 1].map((f) => text.slice(0, Math.max(1, Math.round(text.length * f))));
-  }
-
-  function summaryEvent(passageId: string): AnswerEvent {
-    const p = passagesById.get(passageId) ?? passagesById.get(FALLBACK_PASSAGE_ID)!;
-    return {
-      type: 'summary',
-      passageId: p.id,
-      title: p.title,
-      text: p.summary,
-      pinned: p.critical,
-      source: sourceRef(p.source_id, p.locator),
-    };
-  }
-
-  function emergencyCardView(id?: string): EmergencyCardView {
-    const cards = content.rules.emergency_cards;
-    const wanted = id ?? content.rules.emergency.card_id;
-    const card =
-      cards.find((c) => c.id === wanted) ??
-      cards.find((c) => c.id === content.rules.emergency.card_id) ??
-      cards[0];
-    if (!card) {
-      return { id: 'emergency-default', title: '', steps: [], hotlines: [], source: sourceRef('') };
+    let safe = question;
+    for (const value of privateValues) {
+      const escaped = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      safe = safe.replace(new RegExp(escaped, 'gi'), '[private]');
     }
-    return {
-      id: card.id,
-      title: card.title,
-      steps: [...card.steps],
-      hotlines: card.hotline_ids
-        .map((hid) => hotlinesById.get(hid))
-        .filter((h): h is Hotline => h !== undefined),
-      source: sourceRef(card.source_id),
-    };
-  }
+    return safe.slice(0, 200);
+  };
 
-  function planAnswer(field: PlanField, profile: Profile | null): AnswerEvent {
-    const plan = profile?.plan;
-    const value =
-      field === 'evacuation_center' ? plan?.evacuationCenter :
-      field === 'meeting_place' ? plan?.meetingPlace : undefined;
-    const empty = value === undefined || value.trim().length === 0;
-    return empty
-      ? { type: 'plan_answer', field, empty: true }
-      : { type: 'plan_answer', field, empty: false, text: value };
-  }
-
-  function buildEvents(
-    name: MockScenario,
-    args: { result: SearchResult | null; matched: string[]; profile: Profile | null; logId: string },
-  ): AnswerEvent[] {
-    const events: AnswerEvent[] = [];
-    const closing = (): void => {
-      events.push({ type: 'closing', copyKey: 'closing', text: COPY.closing });
-    };
-    const done = (outcome: Outcome): void => {
-      events.push({ type: 'done', logId: args.logId, outcome });
-    };
-    const aiFull = (passageId: string): void => {
-      events.push({ type: 'ai_status', status: 'loading_model' });
-      events.push({ type: 'ai_status', status: 'thinking' });
-      for (const text of partialTexts(passageId)) events.push({ type: 'ai_partial', text });
-      const answer = passagesById.get(passageId)?.summary ?? '';
-      events.push({ type: 'ai_final', text: answer, used: [passageId], timings: zeroTimings() });
-    };
-
-    switch (name) {
-      case 'emergency_then_guide': {
-        events.push({ type: 'emergency_card', card: emergencyCardView(), matched: args.matched });
-        const pid = summaryPassageId(args.result);
-        events.push(summaryEvent(pid));
-        aiFull(pid);
-        closing();
-        done('answered_ai');
-        break;
-      }
-      case 'guide_full': {
-        const pid = summaryPassageId(args.result);
-        events.push(summaryEvent(pid));
-        aiFull(pid);
-        closing();
-        done('answered_ai');
-        break;
-      }
-      case 'guide_critical': {
-        events.push(summaryEvent(CRITICAL_PASSAGE_ID));
-        aiFull(CRITICAL_PASSAGE_ID);
-        closing();
-        done('answered_ai');
-        break;
-      }
-      case 'ai_rejected': {
-        const pid = summaryPassageId(args.result);
-        events.push(summaryEvent(pid));
-        events.push({ type: 'ai_status', status: 'loading_model' });
-        events.push({ type: 'ai_status', status: 'thinking' });
-        for (const text of partialTexts(pid)) events.push({ type: 'ai_partial', text });
-        events.push({ type: 'ai_rejected', code: 'unknown_number', fallbackPassageId: pid });
-        closing();
-        done('answered_summary');
-        break;
-      }
-      case 'low_battery': {
-        const pid = summaryPassageId(args.result);
-        events.push(summaryEvent(pid));
-        events.push({ type: 'ai_status', status: 'skipped', reason: 'low_battery' });
-        closing();
-        done('answered_summary');
-        break;
-      }
-      case 'no_model': {
-        const pid = summaryPassageId(args.result);
-        events.push(summaryEvent(pid));
-        events.push({ type: 'ai_status', status: 'skipped', reason: 'no_model' });
-        closing();
-        done('answered_summary');
-        break;
-      }
-      case 'live_data':
-        events.push({ type: 'fixed_reply', route: 'live_data', copyKey: 'no_live_data', text: COPY.no_live_data });
-        closing();
-        done('fixed_reply');
-        break;
-      case 'medical_dose':
-        events.push({ type: 'fixed_reply', route: 'medical_dose', copyKey: 'medical_dose', text: COPY.medical_dose });
-        closing();
-        done('fixed_reply');
-        break;
-      case 'plan_center':
-        events.push(planAnswer('evacuation_center', args.profile));
-        closing();
-        done('plan_answer');
-        break;
-      case 'plan_empty':
-        events.push(planAnswer('meeting_place', args.profile));
-        closing();
-        done('plan_answer');
-        break;
-      case 'refusal':
-        events.push({
-          type: 'refusal',
-          copyKey: 'refusal',
-          text: COPY.refusal,
-          suggestions: ['signals', 'go_bag', 'evacuation'],
-        });
-        closing();
-        done('refused');
-        break;
-    }
-    return events;
-  }
-
-  function targetMs(ev: AnswerEvent, partialIndex: number): number {
-    switch (ev.type) {
-      case 'summary':
-        return 300;
-      case 'ai_status':
-        if (ev.status === 'loading_model') return 400;
-        if (ev.status === 'thinking') return 1500;
-        return 400;
-      case 'ai_partial':
-        return 3000 + partialIndex * 120;
-      case 'ai_final':
-        return 7000;
-      case 'closing':
-        return 7000;
-      default:
-        return 300;
-    }
-  }
-
-  function delay(ms: number, run: RunState): Promise<void> {
-    return new Promise((resolve) => {
-      if (run.cancelled || ms <= 0) {
-        resolve();
-        return;
-      }
-      const timer = setTimeout(() => {
-        run.wake = undefined;
-        resolve();
-      }, ms);
-      run.wake = () => {
-        clearTimeout(timer);
-        run.wake = undefined;
-        resolve();
-      };
+  const phaseRules = () => demoFeedVariant ? DEMO_SOURCED_RULES : FIXTURE_PHASE_RULES;
+  const storm = () => feedVariant;
+  const profileLocation = (): HouseholdLocation | null => hasProfile ? profile.location : null;
+  const checklistView = () => {
+    const view = buildChecklist(profile, context, FIXTURE_CHECKLIST, FIXTURE_WARNINGS, ticks, now(), settings.staleWarningHours);
+    const preferred = PHASE_GROUPS[context.phase];
+    const order = context.warnings.barangay_order
+      ? ['now', 'evacuate', ...preferred.filter((group) => group !== 'now' && group !== 'evacuate')]
+      : preferred;
+    view.groups.sort((a, b) => {
+      const ai = order.indexOf(a.id); const bi = order.indexOf(b.id);
+      return (ai < 0 ? order.length : ai) - (bi < 0 ? order.length : bi);
     });
-  }
-
-  async function* runAsk(question: string, askOpts?: AskOptions): AsyncIterable<AnswerEvent> {
-    const run: RunState = { cancelled: false };
-    if (currentRun) currentRun.cancelled = true;
-    currentRun = run;
-
-    const normalized = normalize(question, content.synonyms);
-    const profile =
-      (askOpts?.profileId ? profiles.find((p) => p.id === askOpts.profileId) : undefined) ??
-      activeProfile();
-    const routed = route(normalized, content.rules);
-    const name = scenario ?? pickScenario(normalized);
-    const usesSearch = !NO_SEARCH.includes(name);
-    let result: SearchResult | null = null;
-    if (usesSearch) {
-      result = search(normalized, context, profile, index, DEFAULT_SEARCH_CONFIG);
-    }
-
-    const meta = scenarioLog(name);
-    const logEntry: QuestionLogEntry = {
-      id: newId('log'),
-      at: toManilaIso(now()),
-      question: normalized.raw,
-      route: routed.primary,
-      emergency: routed.emergency,
-      topIds: result ? result.hits.slice(0, 2).map((h) => h.id) : [],
-      topScore: result ? result.gate.topScore : 0,
-      gatePassed: result ? result.gate.passed : false,
-      outcome: meta.outcome,
-      failures: meta.failures,
-      timings: zeroTimings(),
-    };
-    if (meta.aiSkipReason !== undefined) logEntry.aiSkipReason = meta.aiSkipReason;
-
-    const events = buildEvents(name, { result, matched: routed.matched, profile, logId: logEntry.id });
-    history.push(logEntry);
-    emit('history');
-
-    const start = Date.now();
-    let partialIndex = 0;
-    for (const ev of events) {
-      if (run.cancelled) {
-        logEntry.outcome = 'cancelled';
-        if (currentRun === run) currentRun = null;
-        yield { type: 'done', logId: logEntry.id, outcome: 'cancelled' };
-        return;
-      }
-      if (speed === 'realistic') {
-        const wait = Math.max(0, targetMs(ev, partialIndex) - (Date.now() - start));
-        await delay(wait, run);
-      }
-      if (ev.type === 'ai_partial') partialIndex++;
-      yield ev;
-    }
-    if (currentRun === run) currentRun = null;
-  }
-
-  function checklistView(): ChecklistView {
-    const profile = activeProfile();
-    if (!profile) return { warningCards: [], groups: [], progress: { done: 0, total: 0 } };
-    return buildChecklist(
-      profile,
-      context,
-      content.checklist,
-      content.warnings,
-      ticks.get(profile.id) ?? {},
-      now(),
-      settings.staleWarningHours,
-    );
-  }
-
-  function rollCallView(): RollCallView {
-    const profile = activeProfile();
-    if (!profile) return { entries: [], presentCount: 0, total: 0 };
-    const state = rollCall.get(profile.id) ?? {};
-    const entries: RollCallView['entries'] = profile.people.map((m) => {
-      const r = state[m.id];
-      return r ? { member: m, present: r.present, at: r.at } : { member: m, present: false };
-    });
-    return { entries, presentCount: entries.filter((e) => e.present).length, total: entries.length };
-  }
-
-  function validateMember(input: MemberInput, path: string): MemberErrList {
-    const errors: MemberErrList = [];
-    const name = input.name.trim();
-    if (name.length === 0) errors.push({ code: 'name_required', field: `${path}.name` });
-    else if (name.length > 40) errors.push({ code: 'too_long', field: `${path}.name` });
-    if (input.note !== undefined && input.note.length > 80) errors.push({ code: 'too_long', field: `${path}.note` });
-    if (input.phone !== undefined && input.phone.trim().length > 0 && !PHONE_RE.test(normalizePhone(input.phone)))
-      errors.push({ code: 'phone_invalid', field: `${path}.phone` });
-    return errors;
-  }
-
-  function buildMember(input: MemberInput, id: string, relation: Member['relation']): Member {
-    const m: Member = {
-      id,
-      name: input.name.trim(),
-      relation,
-      ageGroup: input.ageGroup,
-      needs: [...input.needs],
-      updatedAt: toManilaIso(now()),
-    };
-    if (input.note !== undefined) m.note = input.note;
-    if (input.phone !== undefined) m.phone = input.phone;
-    return m;
-  }
-
-  function recompute(profile: Profile): void {
-    const { members, headcount } = deriveHousehold(profile.people, profile.petsCount);
-    profile.members = members;
-    profile.headcount = headcount;
-    profile.updatedAt = toManilaIso(now());
-  }
-
-  function vulnerableText(profile: Profile): string {
-    const counts = new Map<MemberTag, number>();
-    for (const m of profile.people) {
-      for (const t of memberTags(m)) counts.set(t, (counts.get(t) ?? 0) + 1);
-    }
-    const parts = VULNERABLE_TL
-      .filter(({ tag }) => (counts.get(tag) ?? 0) > 0)
-      .map(({ tag, label }) => `${counts.get(tag)} ${label}`);
-    return parts.length > 0 ? parts.join(', ') : 'wala';
-  }
-
-  function textPreviewBody(kind: TextKind, previewOpts: { where?: string }): string {
-    const profile = activeProfile();
-    if (!profile) return '';
-    const where = previewOpts.where ?? profile.plan.evacuationCenter ?? '';
-    if (kind === 'need_help') {
-      return `TULONG: ${profile.headcount} tao sa ${where}. May ${vulnerableText(profile)}. - ${profile.name} ${toManilaIso(now())}`;
-    }
-    return `Ligtas kami, ${profile.headcount} tao. Nasa ${where}. - ${profile.name}`;
-  }
-
-  function emptyProfile(): Profile {
-    return {
-      id: '', name: '', ownerId: '', people: [], petsCount: 0, headcount: 0, members: [], home: [],
-      livelihood: [], plan: { contacts: [] }, updatedAt: '',
-    };
-  }
-
-  function contextStale(): EngineStatus['stale'] {
-    const view = buildChecklist(
-      activeProfile() ?? emptyProfile(),
-      context,
-      [],
-      content.warnings,
-      {},
-      now(),
-      settings.staleWarningHours,
-    );
-    return view.stale ? { kind: view.stale.kind, hoursSinceSet: view.stale.hoursSinceSet } : undefined;
-  }
-
-  function engineInfo(): EngineInfo {
-    return {
-      appVersion: '0.0.0-mock',
-      engineApiVersion: ENGINE_API_VERSION,
-      guideDate: GUIDE_DATE,
-      passagesCount: content.passages.length,
-      sourcesCount: content.sources.length,
-      packs: [],
-      model: { fileName: MODEL_FILE, sizeBytes: 0, present: false, attribution: 'Built with Llama' },
-    };
-  }
-
-  function engineStatus(): EngineStatus {
-    const merged: EngineStatus = {
-      tier: 'full',
-      model: 'unloaded',
-      ai: { allowed: true },
+    return view;
+  };
+  const stale = (): EngineStatus['stale'] => {
+    const item = checklistView().stale;
+    return item ? { kind: item.kind, hoursSinceSet: item.hoursSinceSet } : undefined;
+  };
+  const status = (): EngineStatus => {
+    const effectiveModelPresent = statusPatch.model === undefined ? modelPresent : statusPatch.model !== 'absent';
+    const base: EngineStatus = {
+      tier: 'full', model: modelPresent ? 'ready' : 'absent',
+      ai: decideAi({ settings, tier: statusPatch.tier ?? 'full', modelPresent: effectiveModelPresent,
+        battery: statusPatch.battery ?? { level: 80, charging: false, saver: false } }),
       battery: { level: 80, charging: false, saver: false },
-      ...statusPatch,
     };
-    const stale = contextStale();
-    if (merged.stale === undefined && stale !== undefined) merged.stale = stale;
+    const merged = { ...base, ...statusPatch, ai: statusAiOverride ?? base.ai };
+    const staleValue = stale();
+    if (merged.stale === undefined && staleValue !== undefined) merged.stale = staleValue;
     return merged;
-  }
-
-  const profilesApi: Engine['profiles'] = {
-    list: () => profiles,
-    active: () => activeProfile(),
-    create: (input: NewHouseholdInput): SaveProfileResult => {
-      const errors: ErrList = [];
-      const name = input.name.trim();
-      if (name.length === 0) errors.push({ code: 'name_required', field: 'name' });
-      else if (name.length > 60) errors.push({ code: 'too_long', field: 'name' });
-      errors.push(...validateMember(input.owner, 'owner'));
-      if (errors.length > 0) return { ok: false, errors };
-      const owner = buildMember({ ...input.owner, relation: 'self' }, newId('member'), 'self');
-      const profile: Profile = {
-        id: newId('household'),
-        name,
-        ownerId: owner.id,
-        people: [owner],
-        petsCount: 0,
-        headcount: 1,
-        members: memberTags(owner),
-        home: [],
-        livelihood: [],
-        plan: { contacts: [] },
-        updatedAt: toManilaIso(now()),
-      };
-      recompute(profile);
-      profiles.push(profile);
-      activeProfileId = profile.id;
-      emit('profiles');
-      emit('family');
-      emit('checklist');
-      return { ok: true, value: profile };
-    },
-    save: (input: ProfileInput): SaveProfileResult => {
-      const profile = profiles.find((p) => p.id === input.id);
-      if (!profile) return { ok: false, errors: [{ code: 'name_required', field: 'id' }] };
-      const errors: ErrList = [];
-      const name = input.name.trim();
-      if (name.length === 0) errors.push({ code: 'name_required', field: 'name' });
-      else if (name.length > 60) errors.push({ code: 'too_long', field: 'name' });
-      if (!Number.isInteger(input.petsCount) || input.petsCount < 0 || input.petsCount > 20)
-        errors.push({ code: 'pets_range', field: 'petsCount' });
-      const contacts = input.plan.contacts ?? [];
-      if (contacts.length > 5) errors.push({ code: 'too_many_contacts', field: 'plan.contacts' });
-      contacts.forEach((c, i) => {
-        if (c.name.length > 60) errors.push({ code: 'too_long', field: `plan.contacts.${i}.name` });
-        if (c.relation !== undefined && c.relation.length > 60)
-          errors.push({ code: 'too_long', field: `plan.contacts.${i}.relation` });
-        if (c.phone.trim().length > 0 && !PHONE_RE.test(normalizePhone(c.phone)))
-          errors.push({ code: 'contact_phone_invalid', field: `plan.contacts.${i}.phone` });
-      });
-      if (input.plan.evacuationCenter !== undefined && input.plan.evacuationCenter.length > 60)
-        errors.push({ code: 'too_long', field: 'plan.evacuationCenter' });
-      if (input.plan.meetingPlace !== undefined && input.plan.meetingPlace.length > 60)
-        errors.push({ code: 'too_long', field: 'plan.meetingPlace' });
-      if (errors.length > 0) return { ok: false, errors };
-      profile.name = name;
-      profile.petsCount = input.petsCount;
-      profile.home = [...input.home];
-      if (input.livelihood !== undefined) profile.livelihood = [...input.livelihood];
-      if (input.area !== undefined) profile.area = input.area;
-      profile.plan = { ...input.plan, contacts: [...contacts] };
-      recompute(profile);
-      emit('profiles');
-      emit('checklist');
-      return { ok: true, value: profile };
-    },
-    setActive: (id: string): Result<void, 'not_found'> => {
-      const profile = profiles.find((p) => p.id === id);
-      if (!profile) return err('not_found', `Walang profile ${id}`);
-      activeProfileId = id;
-      emit('profiles');
-      emit('family');
-      emit('checklist');
-      return ok(undefined);
-    },
-    remove: (id: string): Result<void, 'not_found' | 'last_profile'> => {
-      const i = profiles.findIndex((p) => p.id === id);
-      if (i < 0) return err('not_found', `Walang profile ${id}`);
-      if (profiles.length <= 1) return err('last_profile', 'Kailangan ng kahit isang profile');
-      profiles.splice(i, 1);
-      ticks.delete(id);
-      rollCall.delete(id);
-      if (activeProfileId === id) activeProfileId = profiles[0]?.id ?? null;
-      emit('profiles');
-      emit('family');
-      emit('checklist');
-      return ok(undefined);
-    },
   };
-
-  const photosApi: PhotosApi = {
-    start: async (target, source): Promise<Result<PhotoDraft | null, PhotoError>> => {
-      const r = photoResult;
-      if (r !== 'one_face' && r !== 'no_face' && r !== 'many_faces' && r !== 'group_3') {
-        return err(r, PHOTO_ERROR_MESSAGE[r]);
-      }
-      const count = r === 'no_face' ? 0 : r === 'many_faces' ? 2 : r === 'group_3' ? 3 : 1;
-      const faces: FaceBox[] = [];
-      for (let i = 0; i < count; i++) {
-        faces.push({ x: 0.1 + i * 0.2, y: 0.2, width: 0.15, height: 0.15 });
-      }
-      const faceCheck: FaceCheck = count === 0 ? 'no_face' : count === 1 ? 'one_face' : 'many_faces';
-      const draftId = newId('draft');
-      const draft: PhotoDraft = {
-        draftId,
-        previewUri: `fixture://photos/${draftId}.jpg`,
-        faces,
-        faceCheck,
-        suggestedCrop: faces[0] ? squareCrop(faces[0]) : { x: 0.25, y: 0.25, width: 0.5, height: 0.5 },
-        expiresAt: toManilaIso(new Date(now().getTime() + 30 * 60 * 1000)),
-      };
-      drafts.set(draftId, { draft, source: target === 'group' ? 'group' : source });
-      return ok(draft);
-    },
-    save: async (draftId, memberId, crop): Promise<Result<MemberPhoto, PhotoError>> => {
-      void crop;
-      const entry = drafts.get(draftId);
-      if (!entry) return err('draft_expired', PHOTO_ERROR_MESSAGE.draft_expired);
-      const member = activeProfile()?.people.find((m) => m.id === memberId);
-      if (!member) return err('not_found', PHOTO_ERROR_MESSAGE.not_found);
-      const photo: MemberPhoto = {
-        uri: `fixture://photos/${memberId}.jpg`,
-        bytes: 0,
-        source: entry.source,
-        faceCheck: entry.draft.faceCheck,
-        takenAt: toManilaIso(now()),
-        version: (member.photo?.version ?? 0) + 1,
-      };
-      member.photo = photo;
-      emit('family');
-      return ok(photo);
-    },
-    discard: (draftId: string): void => {
-      drafts.delete(draftId);
-    },
-    remove: (memberId: string): Result<void, 'not_found'> => {
-      const member = activeProfile()?.people.find((m) => m.id === memberId);
-      if (!member) return err('not_found', PHOTO_ERROR_MESSAGE.not_found);
-      delete member.photo;
-      emit('family');
-      return ok(undefined);
-    },
-    removeAll: (): void => {
-      for (const profile of profiles) for (const member of profile.people) delete member.photo;
-      emit('family');
-    },
+  const info = (): EngineInfo => ({
+    appVersion: '0.0.0-mock', engineApiVersion: 2, guideDate: SOURCE_DATE,
+    passagesCount: FIXTURE_PASSAGES.length, sourcesCount: FIXTURE_SOURCES.length,
+    packs: installedPacks, online: false,
+    model: { fileName: MODEL_FILE, sizeBytes: 810_000_000, present: modelPresent, attribution: 'Built with Llama' },
+  });
+  const warningCards = (): WarningCard[] => {
+    const view = checklistView();
+    return view.warningCards.map((warning) => ({ ...warning,
+      hoursSinceSet: Math.floor((now().getTime() - Date.parse(warning.setAt)) / MS_HOUR),
+      stale: Math.floor((now().getTime() - Date.parse(warning.setAt)) / MS_HOUR) >= settings.staleWarningHours,
+    }));
   };
-
-  const familyApi: FamilyApi = {
-    members: () => activeProfile()?.people ?? [],
-    saveMember: (input: MemberInput): SaveMemberResult => {
-      const profile = activeProfile();
-      if (!profile) return { ok: false, errors: [{ code: 'name_required', field: 'member.name' }] };
-      const errors: MemberErrList = validateMember(input, 'member');
-      const existing = input.id === undefined ? undefined : profile.people.find((m) => m.id === input.id);
-      const adding = existing === undefined;
-      if (adding && profile.people.length >= 30) errors.push({ code: 'too_many_members', field: 'member' });
-      const isOwnerEdit = existing !== undefined && existing.id === profile.ownerId;
-      if (input.relation === 'self' && !isOwnerEdit) errors.push({ code: 'owner_relation', field: 'member.relation' });
-      if (errors.length > 0) return { ok: false, errors };
-      let member: Member;
-      if (existing) {
-        member = buildMember(input, existing.id, input.relation);
-        if (existing.photo !== undefined) member.photo = existing.photo;
-        profile.people[profile.people.indexOf(existing)] = member;
+  const decide = (ask?: { questionId: string; cue: import('../types/index.ts').PhaseCue | null; hint: Phase | null }) =>
+    decidePhase({ context, rules: phaseRules(), storm: storm(), ask, now: toManilaIso(now()) });
+  const applyDecision = (decision: ReturnType<typeof decidePhase>, captureUndo = true, notifyPhase = true) => {
+    const previous = { ...context, warnings: { ...context.warnings } };
+    const changed = decision.state.phase !== context.phase || decision.state.phaseSource !== context.phaseSource;
+    if (captureUndo && decision.switched) undo = { state: previous, cause: decision.switched.input };
+    context = { ...decision.state, warnings: context.warnings };
+    if (changed && notifyPhase) emit('phase');
+    emit('context'); emit('checklist'); emit('status');
+    return decision;
+  };
+  const mutateWarning = (input: WarningInput) => {
+    const previous = { ...context, warnings: { ...context.warnings } };
+    const at = toManilaIso(now());
+    if (input.kind === 'tcws') context.warnings.tcws = { level: input.level, setAt: at };
+    else if (input.kind === 'rainfall' || input.kind === 'surge') context.warnings[input.kind] = { level: input.level, setAt: at };
+    else context.warnings[input.kind] = { setAt: at };
+    const decision = decide();
+    if (decision.switched) undo = {
+      state: { ...previous, warnings: { ...context.warnings } },
+      cause: decision.switched.input,
+    };
+    applyDecision(decision, false);
+    if (decision.switched) {
+      context.undo = {
+        phase: previous.phase,
+        phaseSource: previous.phaseSource,
+        reason: previous.reason,
+        warnings: { ...context.warnings },
+        cause: decision.switched.input,
+      };
+    }
+    return context;
+  };
+  const feedApi = {
+    get: () => feedState,
+    refresh: async (): Promise<Result<FeedState, FeedError>> => {
+      if (pendingFeedError) {
+        const error = pendingFeedError;
+        pendingFeedError = null;
+        return resultErr(error);
+      }
+      if (!settings.feedEnabled || feedChoice === 'off') return resultErr('disabled');
+      if (feedChoice === 'empty' || feedChoice === 'stale' || feedChoice === null) return resultErr('offline');
+      const choice = feedChoice;
+      const variant = choice === 'near' || choice === 'signal_here' || choice === 'track_approach' || choice === 'left' ? choice : undefined;
+      feedState = fixtureFeedState('fresh');
+      if (variant) {
+        feedVariant = fixtureStorm(variant);
+        feedState = { ...feedState, latest: cardView(now(), feedVariant.bulletin) };
+        demoFeedVariant = true;
       } else {
-        member = buildMember(input, newId('member'), input.relation);
-        profile.people.push(member);
+        feedVariant = choice === 'fresh' ? fixtureStorm() : null;
+        demoFeedVariant = false;
       }
-      recompute(profile);
-      emit('family');
-      emit('checklist');
-      return { ok: true, value: member };
-    },
-    removeMember: (memberId: string): Result<void, 'not_found' | 'owner_required'> => {
-      const profile = activeProfile();
-      if (!profile) return err('not_found', 'Wala ang miyembro');
-      const i = profile.people.findIndex((m) => m.id === memberId);
-      if (i < 0) return err('not_found', 'Wala ang miyembro');
-      if (memberId === profile.ownerId) return err('owner_required', 'Hindi puwedeng burahin ang pangunahing tao');
-      profile.people.splice(i, 1);
-      recompute(profile);
-      emit('family');
-      emit('checklist');
-      return ok(undefined);
-    },
-    photos: photosApi,
-    card: (memberId: string): MemberCardView | null => {
-      const profile = activeProfile();
-      if (!profile) return null;
-      const member = profile.people.find((m) => m.id === memberId);
-      if (!member) return null;
-      const owner = profile.people.find((m) => m.id === profile.ownerId);
-      const view: MemberCardView = { member, ownerName: owner?.name ?? '' };
-      if (owner?.phone !== undefined) view.ownerPhone = owner.phone;
-      if (profile.plan.evacuationCenter !== undefined) view.evacuationCenter = profile.plan.evacuationCenter;
-      if (profile.plan.meetingPlace !== undefined) view.meetingPlace = profile.plan.meetingPlace;
-      return view;
-    },
-    shareCard: async (memberId): Promise<Result<void, 'not_found' | 'cancelled' | 'failed'>> => {
-      const member = activeProfile()?.people.find((m) => m.id === memberId);
-      if (!member) return err('not_found', 'Wala ang miyembro');
-      return ok(undefined);
-    },
-    rollCall: () => rollCallView(),
-    markPresent: (memberId: string, present: boolean): Result<RollCallView, 'not_found'> => {
-      const profile = activeProfile();
-      if (!profile || !profile.people.some((m) => m.id === memberId))
-        return err('not_found', 'Wala ang miyembro');
-      const state = rollCall.get(profile.id) ?? {};
-      state[memberId] = { present, at: toManilaIso(now()) };
-      rollCall.set(profile.id, state);
-      return ok(rollCallView());
-    },
-    resetRollCall: (): RollCallView => {
-      const profile = activeProfile();
-      if (profile) rollCall.delete(profile.id);
-      return rollCallView();
+      applyDecision(decide());
+      emit('feed');
+      return resultOk(feedState);
     },
   };
 
-  const contextApi: ContextApi = {
-    get: () => context,
-    options: () => content.warnings,
-    setPhase: (phase) => {
-      context.phase = phase;
-      if (phase === 'after') context.warnings = {};
-      emit('context');
-      emit('checklist');
-      emit('status');
-      return context;
-    },
-    setWarning: (input: WarningInput) => {
-      const setAt = toManilaIso(now());
-      if (input.kind === 'gale') context.warnings.gale = { setAt };
-      else if (input.kind === 'tcws') context.warnings.tcws = { level: input.level, setAt };
-      else context.warnings[input.kind] = { level: input.level, setAt };
-      emit('context');
-      emit('checklist');
-      emit('status');
-      return context;
-    },
-    clearWarning: (kind: WarningKind) => {
-      delete context.warnings[kind];
-      emit('context');
-      emit('checklist');
-      emit('status');
-      return context;
-    },
-    reconfirmWarning: (kind: WarningKind) => {
-      const active = context.warnings[kind];
-      if (active) active.setAt = toManilaIso(now());
-      emit('context');
-      emit('checklist');
-      emit('status');
-      return context;
-    },
-  };
-
-  const checklistApi: ChecklistApi = {
-    view: () => checklistView(),
-    tick: (itemId: string, ticked: boolean): Result<ChecklistView, 'unknown_item'> => {
-      const profile = activeProfile();
-      if (!profile || !content.checklist.some((i) => i.id === itemId))
-        return err('unknown_item', `Walang item ${itemId}`);
-      const state = ticks.get(profile.id) ?? {};
-      state[itemId] = { ticked, updatedAt: toManilaIso(now()) };
-      ticks.set(profile.id, state);
-      emit('checklist');
-      return ok(checklistView());
-    },
-    reset: (): ChecklistView => {
-      const profile = activeProfile();
-      if (profile) ticks.delete(profile.id);
-      emit('checklist');
-      return checklistView();
-    },
-  };
-
-  const askApi: AskApi = {
-    maxLength: 200,
-    run: (question: string, askOpts?: AskOptions) => runAsk(question, askOpts),
-    cancel: (): void => {
-      if (currentRun) {
-        currentRun.cancelled = true;
-        currentRun.wake?.();
+  async function* run(question: string, askOpts?: AskOptions): AsyncIterable<AnswerEvent> {
+    currentCancel?.();
+    let cancelled = false;
+    currentCancel = () => { cancelled = true; };
+    const signal = askOpts?.signal;
+    const wait = async (ms: number) => {
+      if (speed === 'fast' || ms <= 0) { await Promise.resolve(); return; }
+      await new Promise<void>((resolve) => setTimeout(resolve, ms));
+    };
+    const emitEvent = async function* (event: AnswerEvent, ms = 0): AsyncGenerator<AnswerEvent> {
+      await wait(ms);
+      if (!cancelled && !signal?.aborted) yield event;
+    };
+    const normalizedQuestion = question.toLocaleLowerCase('tl');
+    const extraPlanField: PlanField | null = scenario === null && /\b(hotline|hotlines)\b/.test(normalizedQuestion)
+      ? 'hotlines'
+      : scenario === null && /(kontak|tawagan)\b/.test(normalizedQuestion) ? 'contacts' : null;
+    const chosen = scenario ?? keywordScenario(question);
+    const logId = id('q');
+    const isEmergency = chosen === 'emergency_then_guide';
+    const route: import('../types/index.ts').RouteResult['primary'] =
+      chosen === 'live_data' || chosen === 'live_data_bulletin' ? 'live_data' :
+      chosen === 'medical_dose' ? 'medical_dose' :
+      chosen === 'plan_center' || chosen === 'plan_empty' || extraPlanField !== null ? 'plan' : 'guide';
+    if (isEmergency) yield* emitEvent({ type: 'emergency_card', card: engine.emergency.card(), matched: ['lumulubog'] });
+    let outcome: import('../types/index.ts').Outcome = 'answered_ai';
+    const phasePassages = FIXTURE_PASSAGES.filter((item) => item.phase.includes(context.phase));
+    const ignoredWords = new Set(['ano', 'ang', 'ng', 'sa', 'na', 'kami', 'dapat', 'ito', 'ba', 'kung', 'mga', 'at']);
+    const words = normalizedQuestion.split(/[^\p{L}\p{N}]+/u).filter((word) => word && !ignoredWords.has(word));
+    const titleMatch = phasePassages.find((item) => words.some((word) =>
+      `${item.title} ${item.topic}`.toLocaleLowerCase('tl').includes(word)));
+    const passage = (chosen === 'guide_critical'
+      ? phasePassages.find((item) => item.critical) ?? titleMatch ?? phasePassages[0]
+      : titleMatch ?? phasePassages[0]) ?? FIXTURE_PASSAGES[0]!;
+    const guide = async function* (forceCritical = false): AsyncGenerator<AnswerEvent> {
+      const p = passage;
+      yield* emitEvent({ type: 'summary', passageId: p.id, title: p.title, text: p.summary, pinned: forceCritical || p.critical, source: sourceRef(p.source_id, p.locator) }, 300);
+      const ai = status().ai;
+      const skipReason = chosen === 'low_battery' ? 'low_battery' : chosen === 'no_model' ? 'no_model' : chosen === 'ai_rejected' ? null : ai.allowed ? null : ai.reason;
+      if (skipReason) {
+        outcome = 'answered_summary';
+        yield* emitEvent({ type: 'ai_status', status: 'skipped', reason: skipReason });
+        return;
       }
-    },
-    warm: (): void => {
-      /* the mock has no model to warm */
-    },
-  };
-
-  const guideApi: GuideApi = {
-    topics: () => {
-      const counts = new Map<TopicGroup, number>();
-      for (const p of content.passages) counts.set(p.topic, (counts.get(p.topic) ?? 0) + 1);
-      return [...counts.entries()].map(([topic, count]) => ({ topic, count }));
-    },
-    byTopic: (topic: TopicGroup) =>
-      content.passages
-        .filter((p) => p.topic === topic)
-        .map((p) => ({ id: p.id, title: p.title, summary: p.summary, topic: p.topic, critical: p.critical })),
-    passage: (id: string) => {
-      const p = passagesById.get(id);
-      if (!p) return null;
-      return {
-        id: p.id,
-        title: p.title,
-        summary: p.summary,
-        topic: p.topic,
-        critical: p.critical,
-        text: p.text,
-        source: sourceRef(p.source_id, p.locator),
-        reviewedBy: p.reviewed_by,
-        reviewedAt: p.reviewed_at,
-        version: p.version,
-      };
-    },
-    sources: () => content.sources,
-  };
-
-  const emergencyApi: EmergencyApi = {
-    card: (id?: string) => emergencyCardView(id),
-  };
-
-  const planApi: PlanApi = {
-    hotlines: () => content.hotlines.filter((h) => h.scope === 'national'),
-    evacuationCenters: () => [],
-    call: async (hotlineId): Promise<Result<void, 'not_found' | 'no_dialer'>> => {
-      if (!content.hotlines.some((h) => h.id === hotlineId)) return err('not_found', 'Wala ang hotline');
-      return ok(undefined);
-    },
-    textPreview: (kind: TextKind, previewOpts: { where?: string }) => textPreviewBody(kind, previewOpts),
-    composeText: async (kind, composeOpts): Promise<Result<void, 'no_recipients' | 'no_sms_app'>> => {
-      void kind;
-      if (composeOpts.to.length === 0) return err('no_recipients', 'Pumili ng padadalhan');
-      return ok(undefined);
-    },
-    exportPlan: async (): Promise<Result<void, 'cancelled' | 'failed'>> => ok(undefined),
-  };
-
-  const settingsApi: SettingsApi = {
-    get: () => settings,
-    update: (patch: Partial<Settings>): Result<Settings, 'out_of_range'> => {
-      if (patch.language !== undefined && patch.language !== 'tl' && patch.language !== 'en')
-        return err('out_of_range', 'language must be tl or en');
-      if (patch.lowBatteryThreshold !== undefined &&
-        (!Number.isFinite(patch.lowBatteryThreshold) || patch.lowBatteryThreshold < 5 || patch.lowBatteryThreshold > 50))
-        return err('out_of_range', 'lowBatteryThreshold 5-50');
-      if (patch.staleWarningHours !== undefined &&
-        (!Number.isFinite(patch.staleWarningHours) || patch.staleWarningHours < 1 || patch.staleWarningHours > 12))
-        return err('out_of_range', 'staleWarningHours 1-12');
-      settings = { ...settings, ...patch, language: patch.language ?? settings.language ?? 'tl' };
-      emit('settings');
-      emit('status');
-      return ok(settings);
-    },
-  };
-
-  const historyApi: HistoryApi = {
-    list: (limit?: number): QuestionLogEntry[] => {
-      const newestFirst = [...history].reverse();
-      return limit === undefined ? newestFirst : newestFirst.slice(0, limit);
-    },
-    clear: (): void => {
-      history = [];
-      emit('history');
-    },
-  };
-
-  const evaluationApi: EvaluationApi = {
-    summary: (): EvalSummary => EVAL_SUMMARY_FIXTURE,
-  };
-
-  const packsApi: PacksApi = {
-    installed: (): InstalledPack[] => [],
-    importFromPicker: async (): Promise<Result<ImportPreview | null, PackError>> => ok(null),
-    importFile: async (uri): Promise<Result<ImportPreview, PackError>> => {
-      void uri;
-      const preview: ImportPreview = { previewId: newId('preview'), signedBy: 'fixture-key', packs: [] };
-      knownPreviews.add(preview.previewId);
-      return ok(preview);
-    },
-    apply: async (previewId): Promise<Result<ApplyResult, PackError | 'io'>> => {
-      if (!knownPreviews.has(previewId)) return err('io', 'Hindi na-save');
-      return ok({ applied: [{ packId: 'core-tl', version: 1 }], guideDate: GUIDE_DATE });
-    },
-    rollback: async (): Promise<Result<void, 'io' | 'nothing_to_roll_back'>> =>
-      err('nothing_to_roll_back', 'Walang naunang bersyon'),
-    share: async (): Promise<Result<void, 'no_pack' | 'cancelled'>> =>
-      err('no_pack', 'Wala pang gabay na maibabahagi'),
-  };
-
-  const updatesApi: UpdatesApi = {
-    pending: () => null,
-    check: async () => ok(null),
-    download: async () => err('not_allowed', 'Hindi pinapayagan'),
-    networkLog: () => [],
-  };
-
-  const debugApi: MockEngine['debug'] = {
-    setScenario: (s: MockScenario | null): void => {
-      scenario = s;
-    },
-    setStatus: (patch: Partial<EngineStatus>): void => {
-      Object.assign(statusPatch, patch);
-      emit('status');
-    },
-    emit: (change: EngineChange): void => emit(change),
-    setPhotoResult: (r): void => {
-      photoResult = r;
-    },
-    reset: (): void => {
-      resetState();
-      emitAll();
-    },
-  };
+      yield* emitEvent({ type: 'ai_status', status: 'loading_model' }, 100);
+      yield* emitEvent({ type: 'ai_status', status: 'thinking' }, 1100);
+      const partials = ['Ayon sa gabay,', ' ihanda ang mahahalagang gamit', ' at sundin ang mga opisyal na abiso.'];
+      for (let index = 0; index < partials.length; index++)
+        yield* emitEvent({ type: 'ai_partial', text: partials.slice(0, index + 1).join('') }, index === 0 ? 1500 : 120);
+      if (chosen === 'ai_rejected') {
+        outcome = 'answered_summary';
+        yield* emitEvent({ type: 'ai_rejected', code: 'unknown_number', fallbackPassageId: p.id });
+      } else {
+        outcome = 'answered_ai';
+        yield* emitEvent({ type: 'ai_final', text: partials.join(''), used: [p.id], timings: { routeMs: 1, searchMs: 1, totalMs: 7000 } }, 4000);
+      }
+    };
+    switch (chosen) {
+      case 'live_data_bulletin':
+        outcome = 'bulletin_card'; yield* emitEvent({ type: 'bulletin_card', card: feedState.latest ?? cardView(now()) }); break;
+      case 'live_data':
+        outcome = 'fixed_reply'; yield* emitEvent({ type: 'fixed_reply', route: 'live_data', copyKey: 'no_live_data', text: copyText('no_live_data', settings.language) }); break;
+      case 'medical_dose':
+        outcome = 'fixed_reply'; yield* emitEvent({ type: 'fixed_reply', route: 'medical_dose', copyKey: 'medical_dose', text: copyText('medical_dose', settings.language) }); break;
+      case 'plan_center': {
+        const center = profile.plan.evacuationCenter;
+        outcome = 'plan_answer'; yield* emitEvent({ type: 'plan_answer', field: 'evacuation_center', empty: !center, ...(center ? { center } : {}) }); break;
+      }
+      case 'plan_empty':
+        outcome = 'plan_answer'; yield* emitEvent({ type: 'plan_answer', field: 'meeting_place', empty: !profile.plan.meetingPlace, ...(profile.plan.meetingPlace ? { text: profile.plan.meetingPlace } : {}) }); break;
+      case 'guide_full':
+        if (extraPlanField === 'contacts') {
+          outcome = 'plan_answer'; yield* emitEvent({ type: 'plan_answer', field: 'contacts', empty: profile.plan.contacts.length === 0, contacts: profile.plan.contacts }); break;
+        }
+        if (extraPlanField === 'hotlines') {
+          outcome = 'plan_answer'; yield* emitEvent({ type: 'plan_answer', field: 'hotlines', empty: FIXTURE_HOTLINES.length === 0, hotlines: FIXTURE_HOTLINES }); break;
+        }
+        yield* guide(); break;
+      case 'refusal':
+        outcome = 'refused'; yield* emitEvent({ type: 'refusal', copyKey: 'refusal', text: copyText('refusal', settings.language), suggestions: ['go_bag', 'home_prep', 'evacuation'] }); break;
+      default: yield* guide(chosen === 'guide_critical');
+    }
+    if (cancelled || signal?.aborted) {
+      history.push({ id: logId, at: toManilaIso(now()), question: logQuestion(question), route, emergency: isEmergency,
+        phaseCue: null, phaseHint: null, hint: 'none', topIds: [], topScore: 0, gatePassed: false, outcome: 'cancelled',
+        failures: [], timings: { routeMs: 1, searchMs: 0, totalMs: 1 } });
+      emit('history'); currentCancel = null;
+      yield { type: 'done', logId, outcome: 'cancelled' }; return;
+    }
+    if (chosen === 'phase_cue_during' || chosen === 'phase_cue_after') {
+      const to: Phase = chosen === 'phase_cue_during' ? 'during' : 'after';
+      const from = context.phase;
+      const previousRecommendation = context.recommended?.phase ?? null;
+      const questionId = id('question');
+      const decision = decide({ questionId, cue: { phase: to, strong: true, matched: [to === 'during' ? 'na dito' : 'humupa'] }, hint: null });
+      const switched = decision.switched;
+      const recommendation = decision.state.recommended;
+      applyDecision(decision);
+      const isNewRecommendation = recommendation?.phase === to && previousRecommendation !== to && from !== to;
+      if (switched || (to === 'after' && isNewRecommendation)) {
+        const kind = switched ? 'switched' : 'recommended';
+        const copyKey = kind === 'switched' ? 'phase_switched' : 'phase_after';
+        yield { type: 'phase_change', kind, from, to, source: 'ask', copyKey, text: copyText(copyKey, settings.language, { phase: copyText(`phase_${to}` as CopyKey, settings.language) }) };
+      }
+    }
+    yield { type: 'closing', copyKey: 'closing', text: COPY.closing };
+    history.push({ id: logId, at: toManilaIso(now()), question: logQuestion(question), route, emergency: isEmergency,
+      phaseCue: null, phaseHint: null, hint: 'none', topIds: [], topScore: 0, gatePassed: true, outcome,
+      failures: [], timings: { routeMs: 1, searchMs: 1, totalMs: 1 } });
+    emit('history');
+    yield { type: 'done', logId, outcome };
+    currentCancel = null;
+  }
 
   const engine: MockEngine = {
-    init: async (): Promise<Result<EngineInfo, 'content_invalid' | 'storage_failed'>> => {
-      const checked = validateContent(rawContent);
-      if (!checked.ok) return { ok: false, error: checked.error };
-      content = checked.value;
-      rebuildDerived();
-      resetState();
-      return ok(engineInfo());
+    init: async () => resultOk(info()),
+    info,
+    status,
+    copy: (key, options) => copyText(key, options?.lang ?? settings.language, options?.vars),
+    onChange: (listener) => { listeners.add(listener); return () => { listeners.delete(listener); }; },
+    profiles: {
+      active: () => hasProfile ? profile : null,
+      create: (input) => {
+        const errors = validateMemberInput(input.owner, 'owner');
+        const name = input.name.trim();
+        if (!name) errors.push({ code: 'name_required', field: 'name' });
+        else if (name.length > 60) errors.push({ code: 'too_long', field: 'name' });
+        if (errors.length) return { ok: false, errors };
+        const owner: Member = { ...input.owner, id: id('member'), relation: 'self', photoStatus: 'pending', updatedAt: toManilaIso(now()) };
+        const derived = deriveHousehold([owner], 0);
+        profile = { id: id('household'), name, ownerId: owner.id, people: [owner], petsCount: 0, headcount: derived.headcount,
+          members: derived.members, home: [], location: null, plan: { contacts: [] }, updatedAt: toManilaIso(now()) };
+        ticks = {}; photoDrafts.clear(); photoDraftSources.clear();
+        hasProfile = true;
+        emit('profiles'); emit('family'); emit('checklist'); return { ok: true, value: profile };
+      },
+      save: (input) => { if (!hasProfile || input.id !== profile.id) return { ok: false, errors: [{ code: 'name_required', field: 'id' }] };
+        const errors: { code: 'name_required' | 'too_long' | 'pets_range' | 'too_many_contacts' | 'contact_phone_invalid'; field: string }[] = [];
+        const name = input.name.trim(); if (!name) errors.push({ code: 'name_required', field: 'name' }); else if (name.length > 60) errors.push({ code: 'too_long', field: 'name' });
+        if (!Number.isInteger(input.petsCount) || input.petsCount < 0 || input.petsCount > 20) errors.push({ code: 'pets_range', field: 'petsCount' });
+        if (input.plan.contacts.length > 5) errors.push({ code: 'too_many_contacts', field: 'plan.contacts' });
+        input.plan.contacts.forEach((contact, index) => { if (contact.phone.trim() && !/^\+?[0-9 ()-]{7,20}$/.test(contact.phone.trim())) errors.push({ code: 'contact_phone_invalid', field: `plan.contacts.${index}.phone` }); });
+        if (errors.length) return { ok: false, errors };
+        profile = { ...profile, ...input, name, members: deriveHousehold(profile.people, input.petsCount).members, headcount: profile.people.length, updatedAt: toManilaIso(now()) }; emit('profiles'); emit('checklist'); return { ok: true, value: profile }; },
+      remove: (profileId) => { if (!hasProfile || profileId !== profile.id) return resultErr('not_found'); for (const member of profile.people) delete member.photo; profile.people = []; profile.location = null; hasProfile = false; ticks = {}; photoDrafts.clear(); photoDraftSources.clear(); emit('profiles'); emit('family'); emit('checklist'); return resultOk(undefined); },
     },
-    info: () => engineInfo(),
-    status: () => engineStatus(),
-    copy: (key: CopyKey, lang = 'tl') => lang === 'en' ? COPY_EN[key] : COPY[key],
-    onChange: (listener: (change: EngineChange) => void): (() => void) => {
-      listeners.add(listener);
-      return () => {
-        listeners.delete(listener);
-      };
+    family: {
+      members: () => hasProfile ? profile.people : [], pending: () => hasProfile ? profile.people.filter((member) => member.photoStatus === 'pending') : [],
+      saveMember: (input) => {
+        if (!hasProfile) return { ok: false, errors: [{ code: 'name_required', field: 'member.name' }] };
+        const errors: { code: import('../types/index.ts').MemberErrorCode; field: string }[] = validateMemberInput(input, 'member');
+        const oldMember = input.id ? profile.people.find((member) => member.id === input.id) : undefined;
+        if (input.relation === 'self' && (oldMember?.id ?? '') !== profile.ownerId) errors.push({ code: 'owner_relation', field: 'member.relation' });
+        if (!oldMember && profile.people.length >= 30) errors.push({ code: 'too_many_members', field: 'member' });
+        if (errors.length) return { ok: false, errors };
+        const old = oldMember;
+        const member: Member = { ...input, id: old?.id ?? id('member'), photoStatus: old?.photoStatus ?? 'pending', updatedAt: toManilaIso(now()) };
+        if (old?.photo) member.photo = old.photo;
+        profile.people = old ? profile.people.map((value) => value.id === old.id ? member : value) : [...profile.people, member];
+        const derived = deriveHousehold(profile.people, profile.petsCount); profile.headcount = derived.headcount; profile.members = derived.members; emit('family'); emit('checklist'); return { ok: true, value: member };
+      },
+      removeMember: (memberId) => { if (!hasProfile || !profile.people.some((member) => member.id === memberId)) return resultErr('not_found');
+        if (memberId === profile.ownerId) return resultErr('owner_required'); profile.people = profile.people.filter((member) => member.id !== memberId); profile.headcount = profile.people.length; emit('family'); emit('checklist'); return resultOk(undefined); },
+      photos: {
+        start: async ({ memberId }, source) => {
+          const nextPhotoResult = photoResult;
+          photoResult = 'one_face';
+          if (nextPhotoResult === 'permission_denied' || nextPhotoResult === 'no_camera' || nextPhotoResult === 'unreadable' ||
+            nextPhotoResult === 'draft_expired' || nextPhotoResult === 'not_found' || nextPhotoResult === 'io') {
+            const error = nextPhotoResult as PhotoError;
+            return resultErr(error);
+          }
+          if (!hasProfile || !profile.people.some((member) => member.id === memberId)) return resultErr('not_found');
+          const detection: FaceDetection = nextPhotoResult as FaceDetection;
+          const count = detection === 'one_face' ? 1 : detection === 'many_faces' ? 2 : 0;
+          const faces: FaceBox[] = Array.from({ length: count }, (_, index) => ({ x: 0.2 + index * 0.3, y: 0.2, width: 0.2, height: 0.2 }));
+          const draft: PhotoDraft = { draftId: id('photo'), memberId, previewUri: 'fixture://photo-preview', detection, faces,
+            suggestedCrop: faces[0] ?? { x: 0.25, y: 0.25, width: 0.5, height: 0.5 }, expiresAt: toManilaIso(new Date(now().getTime() + 30 * 60_000)) };
+          photoDrafts.set(draft.draftId, draft); photoDraftSources.set(draft.draftId, source); return resultOk(draft);
+        },
+        save: async (draftId, _crop) => {
+          const draft = photoDrafts.get(draftId); if (!draft) return resultErr('draft_expired');
+          const member = hasProfile ? profile.people.find((value) => value.id === draft.memberId) : undefined; if (!member) return resultErr('not_found');
+          const photo: MemberPhoto = { uri: 'fixture://saved-photo', bytes: 0, source: photoDraftSources.get(draftId) ?? 'gallery', faceCheck: draft.detection === 'one_face' ? 'one_face' : 'manual', takenAt: toManilaIso(now()), version: (member.photo?.version ?? 0) + 1 };
+          member.photo = photo; member.photoStatus = 'done'; photoDrafts.delete(draftId); photoDraftSources.delete(draftId); emit('family'); return resultOk(photo); },
+        discard: (draftId) => { photoDrafts.delete(draftId); photoDraftSources.delete(draftId); },
+        remove: (memberId) => { const member = hasProfile ? profile.people.find((value) => value.id === memberId) : undefined; if (!member) return resultErr('not_found'); delete member.photo; member.photoStatus = 'pending'; emit('family'); return resultOk(undefined); },
+        removeAll: () => { if (hasProfile) for (const member of profile.people) { delete member.photo; member.photoStatus = 'pending'; } emit('family'); },
+      },
+      location: {
+        get: profileLocation,
+        places: (parent) => FIXTURE_PLACES.items.filter((place) => place.parent === (parent ?? null)).map((place) => ({ psgc: place.psgc, name: place.name, level: place.level, hasChildren: FIXTURE_PLACES.items.some((child) => child.parent === place.psgc) })),
+        setArea: (psgc) => { const place = FIXTURE_PLACES.items.find((item) => item.psgc === psgc && item.level === 'barangay'); if (!hasProfile || !place) return resultErr('unknown_place');
+          profile.location = { psgc }; emit('profiles'); return resultOk(profile.location); },
+        useGps: async () => { if (!hasProfile) return resultErr('unavailable'); if (locationResult !== 'ok') return resultErr(locationResult); const place = FIXTURE_PLACES.items.find((item) => item.level === 'barangay')!;
+          profile.location = { psgc: place.psgc, coords: { lat: 14.5, lon: 121, accuracyM: 100, at: toManilaIso(now()) } }; emit('profiles'); return resultOk(profile.location); },
+      },
+      card: (memberId) => { const member = hasProfile ? profile.people.find((value) => value.id === memberId) : undefined; return member ? { member, ownerName: profile.people[0]?.name ?? '', ...(profile.plan.evacuationCenter ? { evacuationCenter: profile.plan.evacuationCenter } : {}), ...(profile.plan.meetingPlace ? { meetingPlace: profile.plan.meetingPlace } : {}) } : null; },
+      shareCard: async (memberId) => hasProfile && profile.people.some((member) => member.id === memberId) ? resultOk(undefined) : resultErr('not_found'),
     },
-    profiles: profilesApi,
-    family: familyApi,
-    context: contextApi,
-    checklist: checklistApi,
-    ask: askApi,
-    guide: guideApi,
-    emergency: emergencyApi,
-    plan: planApi,
-    settings: settingsApi,
-    history: historyApi,
-    evaluation: evaluationApi,
-    packs: packsApi,
-    updates: updatesApi,
-    debug: debugApi,
+    context: {
+      get: () => context, options: () => FIXTURE_WARNINGS, cards: warningCards,
+      setPhase: (phase) => { const previous = { ...context, warnings: { ...context.warnings } }; const candidates: PhaseInputKey[] = decide().candidates.map((candidate): PhaseInputKey => candidate.key); undo = { state: previous }; context.undo = { phase: previous.phase, phaseSource: previous.phaseSource, reason: previous.reason, warnings: { ...previous.warnings } }; context.phase = phase; context.phaseSource = 'manual'; context.changedAt = toManilaIso(now()); context.reason = { source: 'manual', text: 'Manwal na pinili.' }; context.suppressed = [...new Set<PhaseInputKey>([...context.suppressed, ...candidates])]; if (phase === 'after') context.warnings = {}; emit('phase'); emit('context'); emit('checklist'); emit('status'); return context; },
+      undoPhase: () => { if (!undo) return resultErr('nothing_to_undo'); const previous = undo; context = { ...previous.state, warnings: { ...previous.state.warnings }, suppressed: [...previous.state.suppressed] }; delete context.undo; if (previous.cause) context.suppressed = [...new Set<PhaseInputKey>([...context.suppressed, previous.cause])]; undo = null; emit('phase'); emit('context'); emit('checklist'); emit('status'); return resultOk(context); },
+      setWarning: mutateWarning,
+      clearWarning: (kind) => { delete context.warnings[kind]; const prefix = kind === 'barangay_order' ? 'warning:barangay-order' : `warning:${kind}`; context.suppressed = context.suppressed.filter((key) => !key.startsWith(prefix)); const decision = decide(); applyDecision(decision); return context; },
+      reconfirmWarning: (kind) => { const warning = context.warnings[kind]; if (warning) warning.setAt = toManilaIso(now()); emit('context'); emit('checklist'); emit('status'); return context; },
+    },
+    checklist: {
+      view: checklistView,
+      tick: (itemId, ticked) => { if (!FIXTURE_CHECKLIST.some((item) => item.id === itemId)) return resultErr('unknown_item'); ticks[itemId] = { ticked, updatedAt: toManilaIso(now()) }; emit('checklist'); return resultOk(checklistView()); },
+      reset: () => { ticks = {}; emit('checklist'); return checklistView(); },
+    },
+    ask: { maxLength: 200, run, cancel: () => { currentCancel?.(); }, warm: () => undefined },
+    guide: {
+      topics: () => { const active = FIXTURE_PASSAGES.filter((p) => p.phase.includes(context.phase)); return [...new Set(active.map((p) => p.topic))].map((topic) => ({ topic, count: active.filter((p) => p.topic === topic).length })); },
+      byTopic: (topic) => FIXTURE_PASSAGES.filter((p) => p.phase.includes(context.phase) && p.topic === topic).map(({ id: passageId, title, summary, critical }) => ({ id: passageId, title, summary, topic, critical })),
+      passage: (passageId) => { const p = FIXTURE_PASSAGES.find((item) => item.id === passageId); return p ? { id: p.id, title: p.title, summary: p.summary, topic: p.topic, critical: p.critical, text: p.text, source: sourceRef(p.source_id, p.locator), reviewedBy: p.reviewed_by, reviewedAt: p.reviewed_at, version: p.version } : null; },
+      sources: () => FIXTURE_SOURCES,
+      reviewers: () => [...new Set(FIXTURE_PASSAGES.map((p) => p.reviewed_by))].map((name) => ({ name, passages: FIXTURE_PASSAGES.filter((p) => p.reviewed_by === name).length })),
+    },
+    emergency: { card: (cardId) => { const c = FIXTURE_INTENTS.emergency_cards.find((item) => item.id === cardId) ?? FIXTURE_INTENTS.emergency_cards[0]!; return { id: c.id, title: c.title, steps: c.steps, hotlines: FIXTURE_HOTLINES.filter((hotline) => c.hotline_ids.includes(hotline.id)), source: sourceRef(c.source_id) }; } },
+    plan: { hotlines: () => FIXTURE_HOTLINES, call: async (value) => FIXTURE_HOTLINES.some((hotline) => hotline.id === value) || profile.people.some((member) => member.phone === value) || profile.plan.contacts.some((contact) => contact.phone === value) ? resultOk(undefined) : resultErr('not_found') },
+    feed: feedApi,
+    evacuation: { view: () => ({ ...(hasProfile && profile.plan.evacuationCenter ? { householdCenter: profile.plan.evacuationCenter } : {}), bulletin: feedState.latest, storm: hasProfile && profile.location ? feedVariant?.measure ?? null : null, centers: feedVariant && hasProfile && profile.location ? FIXTURE_CENTERS.map((center, i) => ({ center, distanceKm: i + 1, direction: 'N' as const })) : [], centersFirst: false, barangayCopyKey: 'barangay_decides', needsLocation: !profileLocation() }) },
+    account: {
+      state: (): AccountState => ({ signedIn: false }),
+      signUp: async () => resultErr('demo_only'), signIn: async () => resultErr('demo_only'),
+      signOut: () => resultErr('not_signed_in'), sendReset: async () => resultErr('demo_only'), setSync: () => resultErr('not_signed_in'),
+    },
+    model: {
+      installFromPicker: async (onProgress, signal) => { const result = modelInstallResult; modelInstallResult = 'installed'; if (result !== 'installed') return resultErr(result);
+        const total = 810_000_000; const steps = speed === 'fast' ? 1 : 30; for (let step = 1; step <= steps; step++) { if (signal?.aborted) return resultErr('cancelled'); if (speed === 'fast') await Promise.resolve(); else await new Promise<void>((resolve) => setTimeout(resolve, 100)); onProgress(Math.floor(total * step / steps), total); }
+        modelPresent = true; statusAiOverride = undefined; emit('status'); return resultOk('installed'); },
+      remove: async () => { modelPresent = false; statusAiOverride = undefined; emit('status'); },
+    },
+    screen: { sosOn: async () => undefined, sosOff: async () => undefined },
+    damage: {
+      list: () => damage,
+      save: (input) => { if (!Number.isInteger(input.affectedMembers) || input.affectedMembers < 0 || (input.notes?.length ?? 0) > 300) return resultErr('invalid'); const draft: DamageDraft = { id: input.id ?? id('damage'), createdAt: toManilaIso(now()), damageType: input.damageType, severity: input.severity, affectedMembers: input.affectedMembers, photoPaths: [], sentAt: null, ...(input.notes ? { notes: input.notes } : {}) }; damage = [...damage.filter((item) => item.id !== draft.id), draft]; emit('damage'); return resultOk(draft); },
+      addPhoto: async (damageId) => {
+        const draft = damage.find((item) => item.id === damageId && item.sentAt === null);
+        if (!draft) return resultErr('not_found');
+        if (draft.photoPaths.length >= 5) return resultErr('too_many_photos');
+        draft.photoPaths.push(`fixture://damage/${draft.id}/${draft.photoPaths.length + 1}.jpg`);
+        emit('damage');
+        return resultOk(draft);
+      },
+      removePhoto: (damageId, index) => { const draft = damage.find((item) => item.id === damageId); if (!draft || !draft.photoPaths[index]) return resultErr('not_found'); draft.photoPaths.splice(index, 1); emit('damage'); return resultOk(draft); },
+      send: async (damageId) => !damage.some((item) => item.id === damageId) ? resultErr('not_found') : !settings.damageReportsOptIn ? resultErr('not_opted_in') : resultErr('offline'),
+      remove: (damageId) => { damage = damage.filter((item) => item.id !== damageId); emit('damage'); },
+    },
+    settings: { get: () => settings, update: (patch) => { if (patch.lowBatteryThreshold !== undefined && (patch.lowBatteryThreshold < 5 || patch.lowBatteryThreshold > 50) || patch.staleWarningHours !== undefined && (patch.staleWarningHours < 1 || patch.staleWarningHours > 12)) return resultErr('out_of_range'); settings = { ...settings, ...patch }; statusAiOverride = undefined; if (patch.feedEnabled === false) { feedChoice = 'off'; feedState = fixtureFeedState('off'); emit('feed'); } else if (patch.feedEnabled === true && feedState.status === 'off') { feedChoice = 'fresh'; feedState = fixtureFeedState('fresh'); emit('feed'); } emit('settings'); emit('status'); return resultOk(settings); } },
+    history: { list: (limit) => limit === undefined ? history.slice().reverse() : history.slice().reverse().slice(0, limit), clear: () => { history = []; emit('history'); } },
+    evaluation: { summary: (): EvalSummary => EVAL_SUMMARY_FIXTURE },
+    packs: {
+      installed: () => installedPacks,
+      importFromPicker: async () => resultOk(registerPackPreview(makePackPreview())),
+      importFile: async () => resultOk(registerPackPreview(makePackPreview())),
+      apply: async (previewId) => {
+        const preview = packPreviews.get(previewId);
+        if (!preview) return resultErr('schema');
+        const previous = installedPacks.map((pack) => ({ ...pack }));
+        const applied = preview.packs.map((pack) => {
+          const old = installedPacks.find((item) => item.packId === pack.packId);
+          packRollback.set(pack.packId, previous);
+          const installed: InstalledPack = { packId: pack.packId, kind: pack.kind, version: pack.toVersion, installedAt: toManilaIso(now()), ...(old ? { previousVersion: old.version } : {}), ...(pack.guideDate ? { guideDate: pack.guideDate } : {}) };
+          installedPacks = [...installedPacks.filter((item) => item.packId !== pack.packId), installed];
+          return { packId: pack.packId, version: pack.toVersion };
+        });
+        packPreviews.delete(previewId); emit('packs');
+        return resultOk({ applied, guideDate: '2026-10-10' });
+      },
+      rollback: async (packId) => {
+        const previous = packRollback.get(packId);
+        if (!previous) return resultErr('nothing_to_roll_back');
+        installedPacks = previous.map((pack) => ({ ...pack })); packRollback.delete(packId); emit('packs'); return resultOk(undefined);
+      },
+    },
+    updates: {
+      pending: () => pendingUpdate,
+      check: async () => { pendingUpdate = makeUpdatePlan(); emit('updates'); return resultOk(pendingUpdate); },
+      download: async (planId, onProgress, signal) => {
+        if (signal?.aborted) return resultErr('cancelled');
+        const plan = pendingUpdate?.planId === planId ? pendingUpdate : makeUpdatePlan();
+        const steps = speed === 'fast' ? 1 : 3;
+        for (let step = 1; step <= steps; step++) {
+          if (signal?.aborted) return resultErr('cancelled');
+          if (speed === 'fast') await Promise.resolve();
+          else await new Promise<void>((resolve) => setTimeout(resolve, 100));
+          onProgress(Math.floor(plan.totalBytes * step / steps), plan.totalBytes);
+        }
+        pendingUpdate = null; emit('updates');
+        return resultOk(registerPackPreview(makePackPreview(plan.items.map((item) => ({ packId: item.packId, kind: item.kind, toVersion: item.toVersion, sizeBytes: item.blob.size, ...(plan.guideDate ? { guideDate: plan.guideDate } : {}), upserts: 1, deletes: 0 })))));
+      },
+      networkLog: () => [],
+    },
+    debug: {
+      setScenario: (value) => { scenario = value; },
+      setStatus: (patch) => { statusPatch = { ...statusPatch, ...patch }; statusAiOverride = patch.ai; emit('status'); },
+      emit,
+      setPhotoResult: (value) => { photoResult = value; },
+      setLocationResult: (value) => { locationResult = value; },
+      setFeed: (value) => {
+        if (value === 'disabled' || value === 'offline' || value === 'http' || value === 'unknown_key' || value === 'key_expired' || value === 'bad_signature' || value === 'app_too_old' || value === 'rollback' || value === 'hash_mismatch' || value === 'schema') {
+          pendingFeedError = value;
+          emit('feed');
+          return;
+        }
+        pendingFeedError = null;
+        feedChoice = value;
+        const isStormVariant = value === 'near' || value === 'signal_here' || value === 'track_approach' || value === 'left';
+        if (isStormVariant) {
+          feedVariant = fixtureStorm(value);
+          demoFeedVariant = true;
+          feedState = { ...fixtureFeedState('fresh'), latest: cardView(now(), feedVariant.bulletin) };
+        } else {
+          feedState = fixtureFeedState(value);
+          feedVariant = value === 'fresh' || value === 'stale' ? fixtureStorm() : null;
+          demoFeedVariant = false;
+        }
+        const previousPhase = context.phase;
+        applyDecision(decide(), true, false);
+        emit('feed');
+        if (context.phase !== previousPhase) emit('phase');
+      },
+      setModelInstallResult: (value) => { modelInstallResult = value; },
+      reset: () => { profile = fixtureProfile(); hasProfile = true; context = defaultContext(now()); settings = { language: 'tl', lowBatteryThreshold: 15, aiEnabled: true, lowBatteryMode: false, staleWarningHours: 6, feedEnabled: true, autoCheckUpdates: false, wifiOnly: true, topicReportsOptIn: false, damageReportsOptIn: false }; ticks = {}; history = []; statusPatch = {}; statusAiOverride = undefined; scenario = opts.scenario ?? null; photoResult = 'one_face'; locationResult = 'ok'; pendingFeedError = null; feedChoice = 'fresh'; feedState = fixtureFeedState('fresh'); feedVariant = fixtureStorm(); demoFeedVariant = false; modelInstallResult = 'installed'; modelPresent = true; damage = fixtureDamageDrafts(); undo = null; photoDrafts.clear(); photoDraftSources.clear(); installedPacks = []; packPreviews.clear(); packRollback.clear(); pendingUpdate = null; for (const change of ['profiles', 'family', 'phase', 'context', 'checklist', 'settings', 'status', 'feed', 'history', 'damage', 'packs', 'updates'] as const) emit(change); },
+    },
   };
-
   return engine;
 }

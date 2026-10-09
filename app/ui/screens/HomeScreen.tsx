@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import type { ColorLevel, Engine, Phase, TcwsLevel, WarningEntry, WarningInput, WarningKind } from '../../engine';
+import type { ColorLevel, Phase, TcwsLevel, WarningEntry, WarningInput, WarningKind } from '../../engine';
 import { useEngine, useEngineChange } from '../context/useEngine';
 import type { RootTabParamList } from '../navigation/types';
 import { homeStrings } from '../strings/home';
@@ -17,6 +17,7 @@ const phaseKeys: Record<Phase, 'before' | 'during' | 'after'> = { before: 'befor
 
 export function warningInput(warning: WarningEntry): WarningInput {
   if (warning.kind === 'gale') return { kind: 'gale' };
+  if (warning.kind === 'barangay_order') return { kind: 'barangay_order' };
   if (warning.kind === 'tcws') return { kind: 'tcws', level: warning.level as TcwsLevel };
   return { kind: warning.kind, level: warning.level as ColorLevel };
 }
@@ -52,7 +53,6 @@ export function HomeScreen(): JSX.Element {
   const activeProfile = engine.profiles.active();
   const status = engine.status();
   const emergency = showEmergency ? engine.emergency.card() : null;
-  const checklistText = (engine as Engine & { exports?: { checklistText?: () => string } }).exports?.checklistText?.();
   const pickerGroups: { kind: WarningKind; title: string }[] = [
     { kind: 'tcws', title: t.wind },
     { kind: 'rainfall', title: t.rainfall },
@@ -201,7 +201,6 @@ export function HomeScreen(): JSX.Element {
                   <Ionicons name={item.ticked ? 'checkbox' : 'square-outline'} size={24} color={item.ticked ? colors.accent : colors.muted} />
                   <View style={styles.itemText}>
                     <Text style={styles.body}>{item.text}</Text>
-                    {item.quantityText ? <Text style={styles.muted}>{item.quantityText}</Text> : null}
                     {item.forMembers?.map((member) => <Text key={member.id} style={styles.muted}>{member.name}{member.note ? ` · ${member.note}` : ''}</Text>)}
                   </View>
                 </Pressable>
@@ -238,12 +237,6 @@ export function HomeScreen(): JSX.Element {
               <Text style={styles.body}>{engine.engineKind === 'mock' ? t.engineMock : t.engineReal}</Text>
               <Button label={engine.engineKind === 'mock' ? t.switchReal : t.switchMock} onPress={() => engine.switchEngine(engine.engineKind === 'mock' ? 'real' : 'mock')} variant="ghost" />
             </View>
-            {typeof checklistText === 'string' ? (
-              <View>
-                <Text style={styles.groupTitle}>{t.copyChecklist}</Text>
-                <Text selectable style={styles.body}>{checklistText}</Text>
-              </View>
-            ) : null}
           </Card>
         ) : null}
       </View>
