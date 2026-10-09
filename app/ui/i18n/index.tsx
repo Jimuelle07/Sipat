@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { JSX, ReactNode } from 'react';
-import type { UiLanguage } from '../../types';
+import type { UiLanguage } from '../../engine';
 import { useEngine } from '../context/useEngine';
 
 export type Lang = UiLanguage;

@@ -2,13 +2,29 @@ import type { JSX } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { AccessibilityInfo, Animated, FlatList, Keyboard, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import type { AnswerEvent } from '../../engine';
+import { FlatList, Keyboard, KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import type { AccessibilityState } from 'react-native';
+import type { AnswerEvent, TopicGroup } from '../../engine';
 import { useEngine, useEngineChange } from '../context/useEngine';
-import { Button, Card, Chip, SafetyText, Screen } from '../components';
 import { useLang, useT } from '../i18n';
+import { useTheme, useThemedStyles } from '../theme';
+import type { Theme } from '../theme';
+import {
+  AiBlock,
+  AiStatusLine,
+  Button,
+  Chip,
+  ClosingLine,
+  EmergencyCard,
+  EmptyState,
+  FixedReplyCard,
+  PlanAnswerCard,
+  RefusalCard,
+  Screen,
+  SummaryCard,
+  Txt,
+} from '../components';
 import { askStrings } from '../strings/ask';
-import { colors, font, minTouch, radius, space } from '../theme';
 import { cancelEvents, canSubmitQuestion, chatReducer, sourceLine } from './ask/chat';
 import type { ChatMessage } from './ask/chat';
 
@@ -16,44 +32,31 @@ const EXAMPLES = ['example_go_bag', 'example_flood', 'example_evacuation'] as co
 let sessionMessages: ChatMessage[] = [];
 let nextMessageId = 1;
 
-function timeNow(): string {
-  return new Date().toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Manila' });
-}
-
-function IconButton({ icon, label, onPress }: { icon: 'trash-outline' | 'time-outline'; label: string; onPress: () => void }): JSX.Element {
-  return <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={styles.iconButton}><Ionicons name={icon} size={21} color={colors.text} /></Pressable>;
+function IconButton({ icon, label, onPress, accessibilityState }: { icon: 'trash-outline' | 'time-outline'; label: string; onPress: () => void; accessibilityState?: AccessibilityState }): JSX.Element {
+  const theme = useTheme();
+  const styles = useThemedStyles(makeStyles);
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={accessibilityState} onPress={onPress} style={styles.iconButton}>
+      <Ionicons name={icon} size={theme.type.roles.label.fontSize} color={theme.colors.text} />
+    </Pressable>
+  );
 }
 
 function AssistantAvatar(): JSX.Element {
-  return <View style={styles.avatar}><Ionicons name="shield-checkmark" size={17} color={colors.accent} /></View>;
-}
-
-function TypingBubble({ label }: { label: string }): JSX.Element {
-  const dots = useRef([new Animated.Value(0.35), new Animated.Value(0.35), new Animated.Value(0.35)]).current;
-  useEffect(() => {
-    let disposed = false;
-    let animations: Animated.CompositeAnimation[] = [];
-    void AccessibilityInfo.isReduceMotionEnabled().then((reducedMotion) => {
-      if (disposed || reducedMotion) return;
-      animations = dots.map((dot, index) => {
-        const animation = Animated.loop(Animated.sequence([
-          Animated.delay(index * 110),
-          Animated.timing(dot, { toValue: 1, duration: 260, useNativeDriver: false }),
-          Animated.timing(dot, { toValue: 0.35, duration: 260, useNativeDriver: false }),
-          Animated.delay((2 - index) * 110),
-        ]));
-        animation.start();
-        return animation;
-      });
-    }).catch(() => undefined);
-    return () => { disposed = true; animations.forEach((animation) => animation.stop()); };
-  }, [dots]);
-  return <View style={styles.typingBubble}><View style={styles.dots}>{dots.map((opacity, index) => <Animated.Text key={index} style={[styles.dot, { opacity }]}>•</Animated.Text>)}</View><Text style={styles.muted}>{label}</Text></View>;
+  const theme = useTheme();
+  const styles = useThemedStyles(makeStyles);
+  return (
+    <View style={styles.avatar}>
+      <Ionicons name="shield-checkmark" size={theme.type.roles.label.fontSize} color={theme.colors.accentText} />
+    </View>
+  );
 }
 
 export function AskScreen(): JSX.Element {
   const engine = useEngine();
+  const theme = useTheme();
   const t = useT(askStrings);
+  const styles = useThemedStyles(makeStyles);
   const { lang } = useLang();
   useEngineChange(['history', 'status']);
   const [question, setQuestion] = useState('');
@@ -61,6 +64,7 @@ export function AskScreen(): JSX.Element {
   const [running, setRunning] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [openSources, setOpenSources] = useState<Record<string, boolean>>({});
+  const [composerFocused, setComposerFocused] = useState(false);
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const mounted = useRef(true);
   const runId = useRef(0);
@@ -89,11 +93,10 @@ export function AskScreen(): JSX.Element {
     setOpenSources({});
     const questionId = `q-${nextMessageId++}`;
     const answerId = `a-${nextMessageId++}`;
-    const createdAt = timeNow();
     activeId.current = answerId;
     commit([...sessionMessages,
-      { id: questionId, kind: 'question', text, time: createdAt },
-      { id: answerId, kind: 'answer', question: text, time: createdAt, events: [] },
+      { id: questionId, kind: 'question', text },
+      { id: answerId, kind: 'answer', question: text, events: [] },
     ]);
     const id = ++runId.current;
     setRunning(true);
@@ -136,135 +139,353 @@ export function AskScreen(): JSX.Element {
 
   const toggleSource = (id: string): void => setOpenSources((current) => ({ ...current, [id]: !current[id] }));
 
-  const renderSource = (passageId: string): JSX.Element => {
-    const open = openSources[passageId] === true;
-    const detail = open ? engine.guide.passage(passageId) : null;
-    return <View style={styles.sourceBlock}>
-      <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={() => toggleSource(passageId)} style={styles.sourceToggle}>
-        {open ? <Text style={styles.sourceLink}>{t.hideSource}</Text> : <View><Text style={styles.sourceLink}>{engine.copy('source_link')}</Text>{lang === 'en' ? <Text style={styles.sourceTranslation}>{engine.copy('source_link', { lang: 'en' })}</Text> : null}</View>}
-      </Pressable>
-      {open ? detail ? <View style={styles.sourceDetail}>
-        <Text style={styles.text}>{detail.source.agency} · {detail.source.title} · {detail.source.date}</Text>
-        <Text selectable style={styles.url}>{detail.source.url}</Text>
-        <Text style={styles.muted}>{t.reviewedBy}: {detail.reviewedBy} · {t.reviewedAt}: {detail.reviewedAt}</Text>
-      </View> : <Text style={styles.muted}>{t.sourceUnavailable}</Text> : null}
-    </View>;
+  const topicLabel = (topic: string): string => t[`topic_${topic as TopicGroup}`];
+
+  const renderSourceDetail = (passageId: string): JSX.Element => {
+    const detail = engine.guide.passage(passageId);
+    if (detail === null) return <Txt role="bodySmall" tone="muted">{t.sourceUnavailable}</Txt>;
+    return (
+      <View style={styles.sourceDetail}>
+        <Txt role="bodySmall" tone="muted">{detail.source.agency} · {detail.source.title} · {detail.source.date}</Txt>
+        <Txt role="bodySmall" tone="brand" selectable>{detail.source.url}</Txt>
+        <Txt role="bodySmall" tone="muted">{t.reviewedBy}: {detail.reviewedBy} · {t.reviewedAt}: {detail.reviewedAt}</Txt>
+      </View>
+    );
+  };
+
+  const planLines = (event: Extract<AnswerEvent, { type: 'plan_answer' }>): { label: string; value: string }[] => {
+    if (event.field === 'evacuation_center') {
+      const value = event.center ?? event.text;
+      return value ? [{ label: t.planLabel_evacuation_center, value }] : [];
+    }
+    if (event.field === 'meeting_place') {
+      return event.text ? [{ label: t.planLabel_meeting_place, value: event.text }] : [];
+    }
+    if (event.field === 'contacts') {
+      return event.text ? [{ label: t.planLabel_contacts, value: event.text }] : [];
+    }
+    return [];
   };
 
   const renderEvent = (event: AnswerEvent, index: number): JSX.Element | null => {
+    const key = `event-${index}`;
     switch (event.type) {
-      case 'emergency_card': return <View key={`event-${index}`} style={[styles.answerBubble, styles.emergencyBubble]}>
-        <Text style={styles.answerTitle}>{event.card.title}</Text>
-        {event.card.steps.map((step, stepIndex) => <Text key={`${stepIndex}-${step}`} style={styles.text}>{stepIndex + 1}. {step}</Text>)}
-        {event.card.hotlines.map((hotline) => <Pressable key={hotline.id} accessibilityRole="button" onPress={() => { void engine.plan.call(hotline.id); }} style={styles.hotlineRow}>
-          <Ionicons name="call-outline" size={18} color={colors.danger} /><Text style={styles.text}>{hotline.name} · {hotline.number}</Text>
-        </Pressable>)}
-        <Text style={styles.muted}>{sourceLine(event.card.source)}</Text>
-      </View>;
-      case 'fixed_reply': return <View key={`event-${index}`} style={styles.answerBubble}><SafetyText copyKey={event.copyKey} /></View>;
-      case 'refusal': return <View key={`event-${index}`} style={styles.answerBubble}>
-        <SafetyText copyKey={event.copyKey} />
-        {event.suggestions.length ? <View style={styles.suggestions}><Text style={styles.muted}>{t.suggestions}</Text><View style={styles.chips}>{event.suggestions.map((topic) => {
-          const label = t[`topic_${topic}`];
-          return <Chip key={topic} label={label} onPress={() => { void sendQuestion(`${t.askAbout} ${label}?`); }} />;
-        })}</View></View> : null}
-      </View>;
-      case 'plan_answer': return <View key={`event-${index}`} style={styles.answerBubble}>
-        {event.text ? <Text style={styles.text}>{event.text}</Text> : null}
-        {event.center ? <Text style={styles.text}>{event.center}</Text> : null}
-        {event.contacts?.map((contact, i) => <Text key={`${i}-${contact.name}`} style={styles.text}>{contact.name}{contact.phone ? ` · ${contact.phone}` : ''}</Text>)}
-        {event.hotlines?.map((hotline) => <Pressable key={hotline.id} onPress={() => { void engine.plan.call(hotline.id); }} style={styles.hotlineRow}><Ionicons name="call-outline" size={18} color={colors.accent} /><Text style={styles.text}>{hotline.name} · {hotline.number}</Text></Pressable>)}
-        {event.empty ? <Text style={styles.text}>{t.planEmpty}</Text> : null}
-      </View>;
-      case 'summary': return <View key={`event-${index}`} style={[styles.answerBubble, event.pinned && styles.pinnedBubble]}>
-        {event.pinned ? <View style={styles.tag}><Text style={styles.tagText}>{t.pinned}</Text></View> : null}
-        <Text style={styles.answerTitle}>{event.title}</Text><Text style={styles.text}>{event.text}</Text>
-        {renderSource(event.passageId)}
-      </View>;
-      case 'ai_status': if (event.status === 'skipped') return <Text key={`event-${index}`} style={styles.muted}>{event.reason ? t[`aiReason_${event.reason}`] : t.aiSkipped}</Text>;
-        return <TypingBubble key={`event-${index}`} label={event.status === 'loading_model' ? t.aiLoading : t.aiThinking} />;
-      case 'ai_partial': return <View key={`event-${index}`} style={styles.answerBubble}><Text style={styles.aiLabel}>{t.aiLabel}</Text><Text style={styles.text}>{event.text}</Text></View>;
-      case 'ai_final': return <View key={`event-${index}`} style={styles.answerBubble}><Text style={styles.aiLabel}>{t.aiLabel}</Text><Text style={styles.text}>{event.text}</Text>{event.used.map((passageId) => <View key={passageId}>{renderSource(passageId)}</View>)}</View>;
-      case 'ai_rejected': return <View key={`event-${index}`} style={styles.answerBubble}><Text style={styles.muted}>{t.aiRejected}</Text>{renderSource(event.fallbackPassageId)}</View>;
-      case 'closing': return <View key={`event-${index}`} style={styles.closing}><SafetyText copyKey={event.copyKey} /></View>;
-      case 'done': return null;
-      default: return null;
+      case 'emergency_card':
+        return (
+          <View key={key} style={styles.eventBlock}>
+            <EmergencyCard
+              title={event.card.title}
+              steps={event.card.steps}
+              hotlines={event.card.hotlines}
+              callLabel={t.call}
+              onCall={(id) => { void engine.plan.call(id); }}
+            />
+            <Txt role="bodySmall" tone="muted" style={styles.sourceLine}>{sourceLine(event.card.source)}</Txt>
+          </View>
+        );
+      case 'fixed_reply':
+        return <FixedReplyCard key={key} text={event.text} />;
+      case 'plan_answer':
+        return (
+          <PlanAnswerCard
+            key={key}
+            title={t.planAnswerTitle}
+            lines={planLines(event)}
+            calls={event.hotlines?.map((hotline) => ({ id: hotline.id, label: `${hotline.name} · ${hotline.number}` }))}
+            onCall={(id) => { void engine.plan.call(id); }}
+            empty={event.empty}
+            emptyText={t.planEmpty}
+          />
+        );
+      case 'refusal':
+        return (
+          <RefusalCard
+            key={key}
+            text={event.text}
+            suggestions={event.suggestions.map((topic) => ({ topic, label: topicLabel(topic) }))}
+            onSuggestion={(topic) => { void sendQuestion(`${t.askAbout} ${topicLabel(topic)}?`); }}
+          />
+        );
+      case 'summary': {
+        const open = openSources[event.passageId] === true;
+        return (
+          <View key={key} style={styles.eventBlock}>
+            <SummaryCard
+              title={event.title}
+              text={event.text}
+              pinned={event.pinned}
+              pinnedLabel={t.fromGuide}
+              sourceLinkLabel={open ? t.hideSource : engine.copy('source_link')}
+              onSource={() => toggleSource(event.passageId)}
+            />
+            {open ? renderSourceDetail(event.passageId) : null}
+          </View>
+        );
+      }
+      case 'ai_status':
+        return event.status === 'skipped'
+          ? <AiStatusLine key={key} text={event.reason ? t[`aiReason_${event.reason}`] : t.aiSkipped} />
+          : <AiStatusLine key={key} text={event.status === 'loading_model' ? t.aiLoading : t.aiThinking} busy />;
+      case 'ai_partial':
+        return (
+          <AiBlock
+            key={key}
+            state="partial"
+            text={event.text}
+            checkingLabel={t.checking}
+            stopLabel={t.cancel}
+            onStop={cancel}
+            onSource={toggleSource}
+          />
+        );
+      case 'ai_final':
+        return (
+          <View key={key} style={styles.eventBlock}>
+            <AiBlock
+              state="final"
+              text={event.text}
+              checkingLabel={t.checking}
+              sourceLinks={event.used.map((passageId) => ({ id: passageId, label: engine.copy('source_link') }))}
+              onSource={toggleSource}
+            />
+            {event.used.filter((passageId) => openSources[passageId] === true).map((passageId) => (
+              <View key={passageId}>{renderSourceDetail(passageId)}</View>
+            ))}
+          </View>
+        );
+      case 'ai_rejected':
+        return (
+          <AiBlock
+            key={key}
+            state="rejected"
+            rejectedText={t.aiRejected}
+            checkingLabel={t.checking}
+            onSource={toggleSource}
+          />
+        );
+      case 'closing':
+        return <ClosingLine key={key} text={event.text} />;
+      case 'done':
+        return null;
+      default:
+        return null;
     }
   };
 
-  const renderMessage = ({ item }: { item: ChatMessage }): JSX.Element => item.kind === 'question' ? <View style={styles.questionRow}>
-    <View style={styles.questionBubble}><Text style={styles.text}>{item.text}</Text><Text style={styles.questionTime}>{item.time}</Text></View>
-  </View> : <View style={styles.assistantRow}>
-    <AssistantAvatar />
-    <View style={styles.answerColumn}>
-      <Text style={styles.assistantName}>{t.assistantName}</Text>
-      {item.events.map(renderEvent)}
-      {lang === 'en' && item.events.some((event) => event.type === 'summary') ? <Text style={styles.muted}>{t.filipinoNote}</Text> : null}
-      {item.error ? <View style={styles.answerBubble}><Text style={styles.errorText}>{t.failed}</Text><Button label={t.retry} icon="refresh-outline" variant="secondary" onPress={() => retry(item.question)} /></View> : null}
-      <Text style={styles.muted}>{item.time}</Text>
-    </View>
-  </View>;
-
-  const emptyThread = <View style={styles.welcomeWrap}>
-    <AssistantAvatar />
-    <View style={styles.welcomeBubble}><Text style={styles.answerTitle}>{t.assistantName}</Text><Text style={styles.text}>{t.welcome}</Text></View>
-    <Text style={styles.suggestionTitle}>{t.suggestionTitle}</Text>
-    <View style={styles.chips}>{EXAMPLES.map((key) => <Chip key={key} label={t[key]} onPress={() => { void sendQuestion(t[key]); }} />)}</View>
-  </View>;
-
-  const headerRight = <View style={styles.headerActions}>
-    <IconButton icon="time-outline" label={t.historyTitle} onPress={() => setHistoryOpen((open) => !open)} />
-    <IconButton icon="trash-outline" label={t.clearChat} onPress={clearChat} />
-  </View>;
-
-  return <Screen title={t.title} scroll={false} right={headerRight}>
-    {historyOpen ? <View style={styles.historyPanel}>
-      <View style={styles.historyHeader}><Text style={styles.answerTitle}>{t.historyTitle}</Text><Pressable accessibilityRole="button" onPress={() => { engine.history.clear(); }} style={styles.clearHistory}><Text style={styles.sourceLink}>{t.clearHistory}</Text></Pressable></View>
-      {history.length === 0 ? <Text style={styles.muted}>{t.historyEmpty}</Text> : history.map((entry) => <Pressable key={entry.id} onPress={() => { void sendQuestion(entry.question); }} style={styles.historyRow}>
-        <Text numberOfLines={1} style={styles.text}>{entry.question}</Text><Text style={styles.muted}>{t[`outcome_${entry.outcome}`]} · {entry.at}</Text>
-      </Pressable>)}
-    </View> : null}
-    <FlatList ref={listRef} style={styles.thread} contentContainerStyle={messages.length === 0 ? styles.emptyContent : styles.threadContent}
-      data={messages} keyExtractor={(item) => item.id} renderItem={renderMessage} ListEmptyComponent={emptyThread}
-      keyboardShouldPersistTaps="handled" onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })} />
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={0}>
-      <View style={styles.composer}>
-        <View style={styles.inputWrap}>
-          <TextInput accessibilityLabel={t.inputLabel} value={question} onChangeText={setQuestion} maxLength={maxLength}
-            placeholder={t.placeholder} placeholderTextColor={colors.muted} multiline returnKeyType={Platform.OS === 'web' ? 'send' : 'default'}
-            onSubmitEditing={Platform.OS === 'web' ? () => { void sendQuestion(question); } : undefined}
-            style={styles.input} />
-          {question.length > 150 ? <Text style={styles.counter}>{question.length}/{maxLength}</Text> : null}
-        </View>
-        <Pressable accessibilityRole="button" accessibilityLabel={running ? t.cancel : t.ask} disabled={!running && !canSubmitQuestion(question)}
-          onPress={running ? cancel : () => { void sendQuestion(question); }} style={[styles.sendButton, !running && !canSubmitQuestion(question) && styles.sendDisabled]}>
-          <Ionicons name={running ? 'stop' : 'send'} size={20} color={colors.accentText} />
-        </Pressable>
+  const renderMessage = ({ item }: { item: ChatMessage }): JSX.Element => item.kind === 'question' ? (
+    <View style={styles.questionRow}>
+      <View style={styles.questionBubble}>
+        <Txt role="body" color={theme.colors.selected.ink}>{item.text}</Txt>
       </View>
-    </KeyboardAvoidingView>
-  </Screen>;
+    </View>
+  ) : (
+    <View style={styles.assistantRow}>
+      <AssistantAvatar />
+      <View style={styles.answerColumn}>
+        <Txt role="caption" tone="muted" style={styles.assistantName}>{t.assistantName}</Txt>
+        {item.events.map(renderEvent)}
+        {lang === 'en' && item.events.some((event) => event.type === 'summary') ? <Txt role="bodySmall" tone="muted">{t.filipinoNote}</Txt> : null}
+        {item.error ? (
+          <View style={styles.errorTile}>
+            <Txt role="body" tone="muted">{t.failed}</Txt>
+            <Button label={t.retry} icon="refresh-outline" variant="tonal" onPress={() => retry(item.question)} />
+          </View>
+        ) : null}
+      </View>
+    </View>
+  );
+
+  const emptyThread = (
+    <View style={styles.welcomeWrap}>
+      <EmptyState icon="chatbubbles-outline" title={t.assistantName} body={t.welcome} />
+      <Txt role="bodySmall" tone="muted" align="center">{t.suggestionTitle}</Txt>
+      <View style={styles.chips}>
+        {EXAMPLES.map((key) => <Chip key={key} label={t[key]} onPress={() => { void sendQuestion(t[key]); }} />)}
+      </View>
+    </View>
+  );
+
+  const headerRight = (
+    <View style={styles.headerActions}>
+      <IconButton icon="time-outline" label={t.historyTitle} accessibilityState={{ expanded: historyOpen }} onPress={() => setHistoryOpen((open) => !open)} />
+      <IconButton icon="trash-outline" label={t.clearChat} onPress={clearChat} />
+    </View>
+  );
+
+  const disabled = !running && !canSubmitQuestion(question);
+
+  return (
+    <Screen title={t.title} scroll={false} right={headerRight}>
+      {historyOpen ? (
+        <View style={styles.historyPanel}>
+          <View style={styles.historyHeader}>
+            <Txt role="title">{t.historyTitle}</Txt>
+            <Pressable accessibilityRole="button" accessibilityLabel={t.clearHistory} onPress={() => { engine.history.clear(); }} style={styles.clearHistory}>
+              <Txt role="label" tone="brand">{t.clearHistory}</Txt>
+            </Pressable>
+          </View>
+          {history.length === 0 ? <Txt role="bodySmall" tone="muted">{t.historyEmpty}</Txt> : history.map((entry) => (
+            <Pressable key={entry.id} accessibilityRole="button" accessibilityLabel={entry.question} onPress={() => { void sendQuestion(entry.question); }} style={styles.historyRow}>
+              <Txt role="body" numberOfLines={1}>{entry.question}</Txt>
+              <Txt role="bodySmall" tone="muted">{t[`outcome_${entry.outcome}`]} · {entry.at}</Txt>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+      <FlatList
+        ref={listRef}
+        style={styles.thread}
+        contentContainerStyle={messages.length === 0 ? styles.emptyContent : styles.threadContent}
+        data={messages}
+        keyExtractor={(item) => item.id}
+        renderItem={renderMessage}
+        ListEmptyComponent={emptyThread}
+        keyboardShouldPersistTaps="handled"
+        onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
+      />
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={0}>
+        <View style={styles.composer}>
+          <View style={styles.inputWrap}>
+            <TextInput
+              accessibilityLabel={t.inputLabel}
+              value={question}
+              onChangeText={setQuestion}
+              maxLength={maxLength}
+              placeholder={t.placeholder}
+              placeholderTextColor={theme.colors.textMuted}
+              maxFontSizeMultiplier={theme.type.maxFontSizeMultiplier}
+              multiline
+              returnKeyType={Platform.OS === 'web' ? 'send' : 'default'}
+              onSubmitEditing={Platform.OS === 'web' ? () => { void sendQuestion(question); } : undefined}
+              onFocus={() => setComposerFocused(true)}
+              onBlur={() => setComposerFocused(false)}
+              style={[styles.input, composerFocused && styles.inputFocused]}
+            />
+            {question.length > 0 ? <Txt role="caption" tone="muted" style={styles.counter}>{question.length}/{maxLength}</Txt> : null}
+          </View>
+          <Button
+            label={running ? t.cancel : t.ask}
+            accessibilityLabel={running ? t.cancel : t.ask}
+            icon={running ? 'stop' : 'send'}
+            variant={running ? 'outline' : 'highlight'}
+            disabled={disabled}
+            onPress={running ? cancel : () => { void sendQuestion(question); }}
+          />
+        </View>
+      </KeyboardAvoidingView>
+    </Screen>
+  );
 }
 
-const styles = StyleSheet.create({
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
-  iconButton: { width: minTouch, height: minTouch, justifyContent: 'center', alignItems: 'center', borderRadius: radius.pill, backgroundColor: colors.surfaceRaised },
-  thread: { flex: 1 }, threadContent: { gap: space.lg, paddingBottom: space.md }, emptyContent: { flexGrow: 1, justifyContent: 'center' },
-  welcomeWrap: { alignItems: 'center', gap: space.md, paddingVertical: space.xl },
-  welcomeBubble: { maxWidth: '90%', backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: radius.lg, padding: space.lg, gap: space.sm },
-  suggestionTitle: { color: colors.muted, fontSize: font.sm, marginTop: space.md }, chips: { flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap', gap: space.sm },
-  questionRow: { alignItems: 'flex-end' }, questionBubble: { maxWidth: '84%', backgroundColor: colors.accent, borderRadius: radius.lg, borderBottomRightRadius: radius.sm, padding: space.md, gap: space.xs },
-  questionTime: { color: '#16463F', fontSize: font.xs, textAlign: 'right' }, text: { color: colors.text, fontSize: font.md, lineHeight: 25 },
-  assistantRow: { flexDirection: 'row', alignItems: 'flex-start', gap: space.sm }, avatar: { width: 32, height: 32, borderRadius: radius.pill, backgroundColor: colors.surfaceRaised, borderColor: colors.border, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
-  answerColumn: { flex: 1, gap: space.sm, alignItems: 'flex-start' }, assistantName: { color: colors.muted, fontSize: font.xs, fontWeight: '700', marginLeft: 2 },
-  answerBubble: { maxWidth: '100%', alignSelf: 'stretch', backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: radius.lg, borderTopLeftRadius: radius.sm, padding: space.md, gap: space.sm },
-  pinnedBubble: { borderColor: colors.accent }, emergencyBubble: { backgroundColor: colors.dangerSurface, borderColor: colors.danger }, answerTitle: { color: colors.text, fontSize: font.lg, fontWeight: '700' },
-  tag: { alignSelf: 'flex-start', paddingHorizontal: space.sm, paddingVertical: space.xs, borderRadius: radius.pill, backgroundColor: colors.surfaceRaised }, tagText: { color: colors.accent, fontSize: font.xs, fontWeight: '700' },
-  sourceBlock: { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: space.xs }, sourceToggle: { minHeight: minTouch, justifyContent: 'center' }, sourceLink: { color: colors.accent, fontSize: font.sm, fontWeight: '700' }, sourceTranslation: { color: colors.muted, fontSize: font.xs },
-  sourceDetail: { gap: space.xs, paddingVertical: space.sm }, url: { color: colors.accent, fontSize: font.sm }, muted: { color: colors.muted, fontSize: font.sm, lineHeight: 21 },
-  closing: { paddingHorizontal: space.sm }, aiLabel: { color: colors.accent, fontSize: font.xs, fontWeight: '700' }, typingBubble: { flexDirection: 'row', alignItems: 'center', gap: space.sm, borderRadius: radius.lg, backgroundColor: colors.surface, padding: space.md }, dots: { flexDirection: 'row', gap: 2 }, dot: { color: colors.accent, fontSize: font.lg, lineHeight: font.lg },
-  suggestions: { gap: space.xs }, hotlineRow: { minHeight: minTouch, flexDirection: 'row', alignItems: 'center', gap: space.sm }, errorText: { color: colors.danger, fontSize: font.md },
-  composer: { flexDirection: 'row', alignItems: 'flex-end', gap: space.sm, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: space.md }, inputWrap: { flex: 1, minHeight: minTouch, maxHeight: 150, backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: radius.lg, flexDirection: 'row', alignItems: 'flex-end' },
-  input: { flex: 1, minHeight: minTouch, maxHeight: 145, color: colors.text, fontSize: font.md, paddingHorizontal: space.md, paddingTop: space.md, paddingBottom: space.md, textAlignVertical: 'center' }, counter: { color: colors.muted, fontSize: font.xs, alignSelf: 'flex-end', paddingBottom: space.sm, paddingRight: space.sm },
-  sendButton: { width: minTouch, height: minTouch, borderRadius: radius.pill, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' }, sendDisabled: { opacity: 0.42 },
-  historyPanel: { maxHeight: 190, gap: space.sm, backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: radius.md, padding: space.md }, historyHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, clearHistory: { minHeight: minTouch, justifyContent: 'center', paddingHorizontal: space.sm }, historyRow: { minHeight: minTouch, justifyContent: 'center', borderTopWidth: 1, borderTopColor: colors.border, paddingTop: space.xs },
-});
+const makeStyles = (t: Theme) => {
+  const avatar = t.type.roles.title.lineHeight + t.space.md;
+  const inputMax = t.minTouch * 3;
+  return StyleSheet.create({
+    headerActions: { flexDirection: 'row', alignItems: 'center', gap: t.space.xs },
+    iconButton: {
+      width: t.minTouch,
+      height: t.minTouch,
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderRadius: t.radius.pill,
+      backgroundColor: t.colors.surface,
+      borderColor: t.colors.hairline,
+      borderWidth: t.border.hairline,
+    },
+    thread: { flex: 1 },
+    threadContent: { gap: t.space.lg, paddingBottom: t.space.md },
+    emptyContent: { flexGrow: 1, justifyContent: 'center' },
+    welcomeWrap: { alignItems: 'center', gap: t.space.md, paddingVertical: t.space.xl },
+    chips: { flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap', gap: t.space.sm },
+    questionRow: { alignItems: 'flex-end' },
+    questionBubble: {
+      maxWidth: '84%',
+      backgroundColor: t.colors.selected.fill,
+      borderRadius: t.radius.panel,
+      padding: t.space.md,
+      gap: t.space.xs,
+    },
+    assistantRow: { flexDirection: 'row', alignItems: 'flex-start', gap: t.space.sm },
+    avatar: {
+      width: avatar,
+      height: avatar,
+      borderRadius: t.radius.pill,
+      backgroundColor: t.colors.surface,
+      borderColor: t.colors.hairline,
+      borderWidth: t.border.hairline,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    answerColumn: { flex: 1, gap: t.space.sm, alignItems: 'flex-start' },
+    assistantName: { marginLeft: t.space.xs },
+    eventBlock: { alignSelf: 'stretch', gap: t.space.sm },
+    sourceLine: { paddingHorizontal: t.space.xs },
+    sourceDetail: {
+      gap: t.space.xs,
+      padding: t.space.md,
+      backgroundColor: t.colors.surfaceSunken,
+      borderRadius: t.radius.form,
+    },
+    errorTile: {
+      alignSelf: 'stretch',
+      gap: t.space.md,
+      padding: t.space.tile,
+      backgroundColor: t.colors.surface,
+      borderColor: t.colors.danger.fill,
+      borderWidth: t.border.hairline,
+      borderRadius: t.radius.panel,
+    },
+    composer: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      gap: t.space.sm,
+      borderTopWidth: t.border.hairline,
+      borderTopColor: t.colors.hairline,
+      paddingTop: t.space.md,
+    },
+    inputWrap: {
+      flex: 1,
+      minHeight: t.minTouch,
+      maxHeight: inputMax,
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+    },
+    input: {
+      flex: 1,
+      minHeight: t.minTouch,
+      maxHeight: inputMax,
+      color: t.colors.text,
+      fontSize: t.type.roles.body.fontSize,
+      lineHeight: t.type.roles.body.lineHeight,
+      paddingHorizontal: t.space.md,
+      paddingVertical: t.space.md,
+      textAlignVertical: 'top',
+      backgroundColor: t.colors.surfaceSunken,
+      borderColor: t.colors.controlBorder,
+      borderWidth: t.border.control,
+      borderRadius: t.radius.panel,
+    },
+    inputFocused: {
+      borderColor: t.colors.focus,
+    },
+    counter: { alignSelf: 'flex-end', paddingBottom: t.space.sm, paddingRight: t.space.sm },
+    historyPanel: {
+      maxHeight: t.minTouch * 4,
+      gap: t.space.sm,
+      backgroundColor: t.colors.surface,
+      borderColor: t.colors.hairline,
+      borderWidth: t.border.hairline,
+      borderRadius: t.radius.panel,
+      padding: t.space.md,
+    },
+    historyHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    clearHistory: { minHeight: t.minTouch, justifyContent: 'center', paddingHorizontal: t.space.sm },
+    historyRow: {
+      minHeight: t.minTouch,
+      justifyContent: 'center',
+      borderTopWidth: t.border.hairline,
+      borderTopColor: t.colors.hairline,
+      paddingTop: t.space.xs,
+    },
+  });
+};

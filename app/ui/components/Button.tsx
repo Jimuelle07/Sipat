@@ -1,10 +1,133 @@
 import type { JSX } from 'react';
-import { Pressable, StyleSheet, Text } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import type { ComponentProps } from 'react';
-import { colors, font, minTouch, radius, space } from '../theme';
+import { Pressable, StyleSheet } from 'react-native';
+import type { AccessibilityState } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useTheme, useThemedStyles } from '../theme';
+import type { Theme } from '../theme';
+import { Txt } from './Txt';
+
 type IconName = ComponentProps<typeof Ionicons>['name'];
-export function Button({ label, onPress, variant = 'primary', icon, disabled = false, accessibilityLabel }: { label: string; onPress: () => void; variant?: 'primary' | 'secondary' | 'danger' | 'ghost'; icon?: IconName; disabled?: boolean; accessibilityLabel?: string }): JSX.Element {
-  return <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel ?? label} accessibilityState={{ disabled }} disabled={disabled} onPress={onPress} style={[styles.button, styles[variant], disabled && styles.disabled]}>{icon ? <Ionicons name={icon} size={20} color={variant === 'primary' ? colors.accentText : variant === 'danger' ? colors.danger : colors.text} /> : null}<Text style={[styles.label, variant === 'primary' && styles.primaryLabel, variant === 'danger' && styles.dangerLabel]}>{label}</Text></Pressable>;
+
+export type ButtonVariant = 'highlight' | 'primary' | 'tonal' | 'outline' | 'text' | 'danger';
+
+export interface ButtonProps {
+  label: string;
+  onPress: () => void;
+  variant?: ButtonVariant;
+  icon?: IconName;
+  disabled?: boolean;
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
+  accessibilityState?: AccessibilityState;
+  fullWidth?: boolean;
 }
-const styles = StyleSheet.create({ button: { minHeight: minTouch, paddingHorizontal: space.lg, borderWidth: 1, borderRadius: radius.md, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: space.sm }, primary: { backgroundColor: colors.accent, borderColor: colors.accent }, secondary: { backgroundColor: colors.surfaceRaised, borderColor: colors.border }, danger: { backgroundColor: colors.dangerSurface, borderColor: colors.danger }, ghost: { backgroundColor: 'transparent', borderColor: 'transparent' }, disabled: { opacity: 0.45 }, label: { color: colors.text, fontSize: font.md, fontWeight: '700' }, primaryLabel: { color: colors.accentText }, dangerLabel: { color: colors.danger } });
+
+function inkFor(t: Theme, variant: ButtonVariant): string {
+  switch (variant) {
+    case 'highlight':
+      return t.colors.highlight.ink;
+    case 'primary':
+      return t.colors.primary.ink;
+    case 'tonal':
+      return t.colors.capsule.ink;
+    case 'danger':
+      return t.colors.danger.ink;
+    case 'outline':
+      return t.colors.text;
+    case 'text':
+      return t.colors.brand;
+  }
+}
+
+/**
+ * Pill-shaped action button. `highlight` is the one loud action per view; `text` is the quiet
+ * inline action (section headers, banner undo). Used across every screen and inside Capsule,
+ * EmptyState, WarningChip, StaleBanner, SwitchBanner and the CropFrame zoom controls.
+ */
+export function Button({
+  label,
+  onPress,
+  variant = 'primary',
+  icon,
+  disabled = false,
+  accessibilityLabel,
+  accessibilityHint,
+  accessibilityState,
+  fullWidth = false,
+}: ButtonProps): JSX.Element {
+  const t = useTheme();
+  const styles = useThemedStyles(makeStyles);
+  const ink = inkFor(t, variant);
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityHint={accessibilityHint}
+      accessibilityState={{ disabled, ...accessibilityState }}
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.base,
+        styles[variant],
+        fullWidth && styles.fullWidth,
+        disabled && styles.disabled,
+        pressed && !disabled && styles.pressed,
+      ]}
+    >
+      {icon !== undefined ? <Ionicons name={icon} size={t.type.roles.label.fontSize} color={ink} /> : null}
+      <Txt role="label" color={ink} style={styles.label}>{label}</Txt>
+    </Pressable>
+  );
+}
+
+const makeStyles = (t: Theme) => StyleSheet.create({
+  base: {
+    minHeight: t.minTouch,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: t.space.sm,
+    paddingHorizontal: t.space.lg,
+    borderRadius: t.radius.pill,
+    borderWidth: t.border.control,
+  },
+  highlight: {
+    backgroundColor: t.colors.highlight.fill,
+    borderColor: t.colors.highlight.fill,
+  },
+  primary: {
+    backgroundColor: t.colors.primary.fill,
+    borderColor: t.colors.primary.fill,
+  },
+  tonal: {
+    backgroundColor: t.colors.capsule.fill,
+    borderColor: t.colors.capsule.fill,
+  },
+  outline: {
+    backgroundColor: 'transparent',
+    borderColor: t.colors.controlBorder,
+  },
+  text: {
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    paddingHorizontal: t.space.xs,
+  },
+  danger: {
+    backgroundColor: t.colors.danger.fill,
+    borderColor: t.colors.danger.fill,
+  },
+  fullWidth: {
+    alignSelf: 'stretch',
+  },
+  disabled: {
+    opacity: 0.45,
+  },
+  pressed: {
+    opacity: 0.86,
+  },
+  label: {
+    flexShrink: 1,
+  },
+})
