@@ -31,6 +31,7 @@ import { createUpdateClient, type FetchLike } from '../services/updates.ts';
 import { runAskPipeline } from './askPipeline.ts';
 import { copyText } from './copy.ts';
 import { EVAL_SUMMARY_FIXTURE } from './fixtures/eval.ts';
+import { createDemoUpdateClient, demoContent, demoSeedEnabled, demoStore } from './demoSeed.ts';
 // The laptop evaluation report, bundled at build time (`npm run eval` writes it). Never read at runtime.
 import evalReport from '../../eval/results/latest.json';
 
@@ -151,6 +152,8 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
   const packs = createPackManager({ store, now: () => iso(now()), readFile: readFileBytes, appVersion: APP_VERSION });
   const pinnedHost = updateHost();
   const online = pinnedHost !== null;
+  // Demo builds (`EXPO_PUBLIC_DEMO_SEED=1`) get seeded data and an in-memory feed; see docs/seed_data.md.
+  const demo = demoSeedEnabled();
   const realFetch: FetchLike = (url, init) => (globalThis.fetch as unknown as FetchLike)(url, init);
   const updates: UpdateClient | undefined = overrides.updates ?? (pinnedHost
     ? createUpdateClient({
@@ -158,7 +161,7 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
       province: () => provincePsgc(),
       importArchive: (files) => packs.importArchive(files),
     })
-    : undefined);
+    : demo ? createDemoUpdateClient(now) : undefined);
   // The household's province PSGC, or null (e.g. NCR has none). At most the province code ever
   // reaches a request (AGENTS rule 6); names, notes, photos and coordinates never do.
   function provincePsgc(): string | null {
@@ -911,12 +914,21 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
   const engine: Engine = {
     async init() {
       try {
-        const raw = overrides.content ? { ...rawContent, ...overrides.content } : rawContent;
+        const bundledRaw = overrides.content ? { ...rawContent, ...overrides.content } : rawContent;
+        const raw = demo ? { ...bundledRaw, ...demoContent(bundledRaw, iso(now())) } : bundledRaw;
         const checked = validateContent(raw);
         if (!checked.ok) return err('content_invalid', checked.error.message);
         content = checked.value;
         rawMap = raw;
         index = createIndex(content.passages);
+        // First launch of a demo build: seed the household, checklist ticks and feed once; edits persist.
+        if (demo && !(store.get('profiles') ?? []).length) {
+          const seed = demoStore(now());
+          save('profiles', seed.profiles);
+          save('activeProfileId', seed.activeProfileId);
+          save('feed', seed.feed);
+          save(keyFor(seed.activeProfileId), seed.checklist);
+        }
         profiles = (store.get('profiles') ?? []).slice(0, 1);
         activeId = profiles[0]?.id ?? null;
         const storedContext = store.get('context');
