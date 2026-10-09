@@ -69,21 +69,21 @@ export function AccountScreen(): JSX.Element {
         <View style={styles.links}>
           {mode === 'signIn' ? (
             <>
-              <Pressable accessibilityRole="link" onPress={() => switchMode('signUp')} style={styles.linkButton}>
+              <Pressable accessibilityRole="link" accessibilityLabel={t.noAccount} onPress={() => switchMode('signUp')} style={styles.linkButton}>
                 <Txt role="body" tone="brand">{t.noAccount}</Txt>
               </Pressable>
-              <Pressable accessibilityRole="link" onPress={() => switchMode('forgot')} style={styles.linkButton}>
+              <Pressable accessibilityRole="link" accessibilityLabel={t.forgotLink} onPress={() => switchMode('forgot')} style={styles.linkButton}>
                 <Txt role="body" tone="brand">{t.forgotLink}</Txt>
               </Pressable>
             </>
           ) : null}
           {mode === 'signUp' ? (
-            <Pressable accessibilityRole="link" onPress={() => switchMode('signIn')} style={styles.linkButton}>
+            <Pressable accessibilityRole="link" accessibilityLabel={t.haveAccount} onPress={() => switchMode('signIn')} style={styles.linkButton}>
               <Txt role="body" tone="brand">{t.haveAccount}</Txt>
             </Pressable>
           ) : null}
           {mode === 'forgot' ? (
-            <Pressable accessibilityRole="link" onPress={() => switchMode('signIn')} style={styles.linkButton}>
+            <Pressable accessibilityRole="link" accessibilityLabel={t.backToSignIn} onPress={() => switchMode('signIn')} style={styles.linkButton}>
               <Txt role="body" tone="brand">{t.backToSignIn}</Txt>
             </Pressable>
           ) : null}

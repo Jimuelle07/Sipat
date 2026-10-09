@@ -10,8 +10,9 @@ import type { Theme } from '../theme';
  * Stale-warning reminder shown on Home (and reused wherever live data may be out of date).
  * A calm alert surface with an optional action such as reconfirming the warning.
  */
-export function StaleBanner({ text, actionLabel, onAction }: {
+export function StaleBanner({ text, translation, actionLabel, onAction }: {
   text: string;
+  translation?: string;
   actionLabel?: string;
   onAction?: () => void;
 }): JSX.Element {
@@ -29,7 +30,10 @@ export function StaleBanner({ text, actionLabel, onAction }: {
         size={t.type.roles.lead.fontSize}
         color={t.colors.dangerSurface.ink}
       />
-      <Txt role="body" color={t.colors.dangerSurface.ink} style={styles.text}>{text}</Txt>
+      <View style={styles.copy}>
+        <Txt role="body" color={t.colors.dangerSurface.ink}>{text}</Txt>
+        {translation !== undefined ? <Txt role="bodySmall" color={t.colors.dangerSurface.ink}>{translation}</Txt> : null}
+      </View>
       {actionLabel !== undefined && onAction !== undefined ? (
         <Button label={actionLabel} onPress={onAction} variant="tonal" />
       ) : null}
@@ -45,7 +49,8 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     padding: t.space.lg,
     borderRadius: t.radius.menu,
   },
-  text: {
+  copy: {
     flex: 1,
+    gap: t.space.xs,
   },
 })

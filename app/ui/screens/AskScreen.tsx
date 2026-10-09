@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { FlatList, Keyboard, KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import type { AccessibilityState } from 'react-native';
 import type { AnswerEvent, TopicGroup } from '../../engine';
 import { useEngine, useEngineChange } from '../context/useEngine';
 import { useLang, useT } from '../i18n';
@@ -31,15 +32,11 @@ const EXAMPLES = ['example_go_bag', 'example_flood', 'example_evacuation'] as co
 let sessionMessages: ChatMessage[] = [];
 let nextMessageId = 1;
 
-function timeNow(): string {
-  return new Date().toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Manila' });
-}
-
-function IconButton({ icon, label, onPress }: { icon: 'trash-outline' | 'time-outline'; label: string; onPress: () => void }): JSX.Element {
+function IconButton({ icon, label, onPress, accessibilityState }: { icon: 'trash-outline' | 'time-outline'; label: string; onPress: () => void; accessibilityState?: AccessibilityState }): JSX.Element {
   const theme = useTheme();
   const styles = useThemedStyles(makeStyles);
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={styles.iconButton}>
+    <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={accessibilityState} onPress={onPress} style={styles.iconButton}>
       <Ionicons name={icon} size={theme.type.roles.label.fontSize} color={theme.colors.text} />
     </Pressable>
   );
@@ -67,6 +64,7 @@ export function AskScreen(): JSX.Element {
   const [running, setRunning] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [openSources, setOpenSources] = useState<Record<string, boolean>>({});
+  const [composerFocused, setComposerFocused] = useState(false);
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const mounted = useRef(true);
   const runId = useRef(0);
@@ -95,11 +93,10 @@ export function AskScreen(): JSX.Element {
     setOpenSources({});
     const questionId = `q-${nextMessageId++}`;
     const answerId = `a-${nextMessageId++}`;
-    const createdAt = timeNow();
     activeId.current = answerId;
     commit([...sessionMessages,
-      { id: questionId, kind: 'question', text, time: createdAt },
-      { id: answerId, kind: 'answer', question: text, time: createdAt, events: [] },
+      { id: questionId, kind: 'question', text },
+      { id: answerId, kind: 'answer', question: text, events: [] },
     ]);
     const id = ++runId.current;
     setRunning(true);
@@ -279,7 +276,6 @@ export function AskScreen(): JSX.Element {
     <View style={styles.questionRow}>
       <View style={styles.questionBubble}>
         <Txt role="body" color={theme.colors.selected.ink}>{item.text}</Txt>
-        <Txt role="caption" color={theme.colors.selected.ink} align="right">{item.time}</Txt>
       </View>
     </View>
   ) : (
@@ -295,7 +291,6 @@ export function AskScreen(): JSX.Element {
             <Button label={t.retry} icon="refresh-outline" variant="tonal" onPress={() => retry(item.question)} />
           </View>
         ) : null}
-        <Txt role="caption" tone="muted">{item.time}</Txt>
       </View>
     </View>
   );
@@ -312,7 +307,7 @@ export function AskScreen(): JSX.Element {
 
   const headerRight = (
     <View style={styles.headerActions}>
-      <IconButton icon="time-outline" label={t.historyTitle} onPress={() => setHistoryOpen((open) => !open)} />
+      <IconButton icon="time-outline" label={t.historyTitle} accessibilityState={{ expanded: historyOpen }} onPress={() => setHistoryOpen((open) => !open)} />
       <IconButton icon="trash-outline" label={t.clearChat} onPress={clearChat} />
     </View>
   );
@@ -330,7 +325,7 @@ export function AskScreen(): JSX.Element {
             </Pressable>
           </View>
           {history.length === 0 ? <Txt role="bodySmall" tone="muted">{t.historyEmpty}</Txt> : history.map((entry) => (
-            <Pressable key={entry.id} accessibilityRole="button" onPress={() => { void sendQuestion(entry.question); }} style={styles.historyRow}>
+            <Pressable key={entry.id} accessibilityRole="button" accessibilityLabel={entry.question} onPress={() => { void sendQuestion(entry.question); }} style={styles.historyRow}>
               <Txt role="body" numberOfLines={1}>{entry.question}</Txt>
               <Txt role="bodySmall" tone="muted">{t[`outcome_${entry.outcome}`]} · {entry.at}</Txt>
             </Pressable>
@@ -346,7 +341,7 @@ export function AskScreen(): JSX.Element {
         renderItem={renderMessage}
         ListEmptyComponent={emptyThread}
         keyboardShouldPersistTaps="handled"
-        onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
+        onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
       />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={0}>
         <View style={styles.composer}>
@@ -362,9 +357,11 @@ export function AskScreen(): JSX.Element {
               multiline
               returnKeyType={Platform.OS === 'web' ? 'send' : 'default'}
               onSubmitEditing={Platform.OS === 'web' ? () => { void sendQuestion(question); } : undefined}
-              style={styles.input}
+              onFocus={() => setComposerFocused(true)}
+              onBlur={() => setComposerFocused(false)}
+              style={[styles.input, composerFocused && styles.inputFocused]}
             />
-            {question.length > 150 ? <Txt role="caption" tone="muted" style={styles.counter}>{question.length}/{maxLength}</Txt> : null}
+            {question.length > 0 ? <Txt role="caption" tone="muted" style={styles.counter}>{question.length}/{maxLength}</Txt> : null}
           </View>
           <Button
             label={running ? t.cancel : t.ask}
@@ -450,10 +447,6 @@ const makeStyles = (t: Theme) => {
       flex: 1,
       minHeight: t.minTouch,
       maxHeight: inputMax,
-      backgroundColor: t.colors.surfaceSunken,
-      borderColor: t.colors.controlBorder,
-      borderWidth: t.border.control,
-      borderRadius: t.radius.panel,
       flexDirection: 'row',
       alignItems: 'flex-end',
     },
@@ -465,9 +458,15 @@ const makeStyles = (t: Theme) => {
       fontSize: t.type.roles.body.fontSize,
       lineHeight: t.type.roles.body.lineHeight,
       paddingHorizontal: t.space.md,
-      paddingTop: t.space.md,
-      paddingBottom: t.space.md,
-      textAlignVertical: 'center',
+      paddingVertical: t.space.md,
+      textAlignVertical: 'top',
+      backgroundColor: t.colors.surfaceSunken,
+      borderColor: t.colors.controlBorder,
+      borderWidth: t.border.control,
+      borderRadius: t.radius.panel,
+    },
+    inputFocused: {
+      borderColor: t.colors.focus,
     },
     counter: { alignSelf: 'flex-end', paddingBottom: t.space.sm, paddingRight: t.space.sm },
     historyPanel: {

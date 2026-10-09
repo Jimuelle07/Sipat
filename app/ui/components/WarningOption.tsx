@@ -62,7 +62,7 @@ export function WarningOption({ label, tone, selected, onPress, levelGlyph }: {
 
 const makeStyles = (t: Theme) => StyleSheet.create({
   option: {
-    flexGrow: 1,
+    alignSelf: 'stretch',
     minHeight: t.minTouch * 2,
     alignItems: 'center',
     justifyContent: 'center',

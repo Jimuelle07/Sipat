@@ -1,8 +1,8 @@
 import type { AnswerEvent, SourceRef } from '../../../engine';
 
 export type ChatMessage =
-  | { id: string; kind: 'question'; text: string; time: string }
-  | { id: string; kind: 'answer'; question: string; time: string; events: AnswerEvent[]; error?: boolean };
+  | { id: string; kind: 'question'; text: string }
+  | { id: string; kind: 'answer'; question: string; events: AnswerEvent[]; error?: boolean };
 
 const AI_REPLACED: ReadonlySet<AnswerEvent['type']> = new Set(['ai_partial', 'ai_final', 'ai_rejected']);
 

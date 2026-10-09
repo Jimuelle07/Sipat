@@ -224,7 +224,7 @@ function HouseholdTile({ engine, profile, t, base }: { engine: EngineContextValu
     ...(profile.petsCount > 0 ? [`${profile.petsCount} ${base.petsCount}`] : []),
   ];
   return <Tile>
-    <SectionHeader title={t.householdSummary} action={{ label: editing ? t.doneEditing : t.editHousehold, onPress: () => { setEditing((value) => !value); setErrors([]); } }} />
+    <SectionHeader title={t.householdSummary} action={{ label: editing ? t.doneEditing : t.editHousehold, accessibilityState: { expanded: editing }, onPress: () => { setEditing((value) => !value); setErrors([]); } }} />
     {!editing ? <>
       <Txt role="title">{profile.name}</Txt>
       <Txt role="bodySmall" tone="muted">{profile.headcount} {t.headcount}</Txt>
@@ -233,8 +233,8 @@ function HouseholdTile({ engine, profile, t, base }: { engine: EngineContextValu
       <Field label={base.householdName} value={draft.name} onChangeText={(value) => patch({ name: value })} error={firstFieldError(errors, 'name', t, base)} />
       <View style={styles.stepper}>
         <Txt role="label" style={styles.stepperLabel}>{base.petsCount}: {draft.petsCount}</Txt>
-        <Button label={base.decrease} variant="tonal" onPress={() => patch({ petsCount: clampNumber(draft.petsCount - 1, MIN_PETS, MAX_PETS) })} accessibilityLabel={`${base.decrease} ${base.petsCount}`} />
-        <Button label={base.increase} variant="tonal" onPress={() => patch({ petsCount: clampNumber(draft.petsCount + 1, MIN_PETS, MAX_PETS) })} accessibilityLabel={`${base.increase} ${base.petsCount}`} />
+        <Button label={base.decrease} variant="tonal" icon="remove" onPress={() => patch({ petsCount: clampNumber(draft.petsCount - 1, MIN_PETS, MAX_PETS) })} accessibilityLabel={`${base.decrease} ${base.petsCount}`} />
+        <Button label={base.increase} variant="tonal" icon="add" onPress={() => patch({ petsCount: clampNumber(draft.petsCount + 1, MIN_PETS, MAX_PETS) })} accessibilityLabel={`${base.increase} ${base.petsCount}`} />
       </View>
       <Txt role="label">{base.homeTags}</Txt>
       <Selector>{HOME_TAGS.map((tag) => <Chip key={tag} label={dynamicCopy(base, `home_${tag}`)} selected={draft.home.includes(tag)} onPress={() => patch({ home: toggleInList(draft.home, tag) })} />)}</Selector>
@@ -243,7 +243,7 @@ function HouseholdTile({ engine, profile, t, base }: { engine: EngineContextValu
       <Field label={t.meetingPlace} value={draft.meetingPlace} onChangeText={(value) => patch({ meetingPlace: value })} error={firstFieldError(errors, 'meetingPlace', t, base)} />
       <Txt role="label">{t.contacts}</Txt>
       {draft.contacts.length === 0 ? <Txt role="bodySmall" tone="muted">{t.noContacts}</Txt> : null}
-      {draft.contacts.map((contact, index) => <View key={`contact-${index}`} style={styles.nestedCard}>
+      {draft.contacts.map((contact, index) => <View key={`contact-${index}`} style={styles.contactEditor}>
         <Field label={t.contactName} value={contact.name} onChangeText={(value) => updateContact(index, { name: value })} error={firstFieldError(errors, 'contacts', t, base)} />
         <Field label={t.contactPhone} value={contact.phone} onChangeText={(value) => updateContact(index, { phone: value })} keyboardType="phone-pad" error={firstFieldError(errors, 'phone', t, base)} />
         <Field label={t.contactRelation} value={contact.relation ?? ''} onChangeText={(value) => updateContact(index, { relation: value })} />
@@ -305,7 +305,8 @@ function MembersSection({ engine, profile, t, base }: { engine: EngineContextVal
       </View>
     </View>)}
     {generalError ? <InlineError message={generalError} /> : null}
-    {!draft ? <Button label={t.addMember} onPress={() => { setDraft(blankMemberDraft()); setErrors([]); }} icon="add" /> : <Tile title={editing ? t.edit : t.addMember}>
+    {!draft ? <Button label={t.addMember} onPress={() => { setDraft(blankMemberDraft()); setErrors([]); }} icon="add" /> : <View style={styles.memberEditor}>
+      <Txt role="title">{editing ? t.edit : t.addMember}</Txt>
       <Field label={base.memberName} value={draft.name} onChangeText={(value) => setDraft((current) => current ? { ...current, name: value } : current)} error={firstFieldError(errors, 'name', t, base)} />
       <Txt role="label">{base.relation}</Txt>
       <Selector>{RELATIONS.filter((item) => item !== 'self').map((item) => <Chip key={item} label={dynamicCopy(base, `relation_${item}`)} selected={draft.relation === item} onPress={() => setDraft((current) => current ? { ...current, relation: item } : current)} />)}</Selector>
@@ -320,7 +321,7 @@ function MembersSection({ engine, profile, t, base }: { engine: EngineContextVal
         <Button label={t.cancelEdit} variant="tonal" onPress={() => { setDraft(null); setErrors([]); }} />
         <Button label={busy ? t.saving : t.saveMember} onPress={() => { void submit(); }} disabled={busy} icon="checkmark" />
       </View>
-    </Tile>}
+    </View>}
   </Tile>;
 }
 
@@ -364,9 +365,9 @@ function SettingStepper({ label, value, suffix, stepDown, stepUp, onStep }: { la
   const styles = useThemedStyles(makeStyles);
   return <View style={styles.stepper}>
     <Txt role="label" style={styles.stepperLabel}>{label}</Txt>
-    <Button label={base.decrease} variant="tonal" onPress={() => onStep(-1)} accessibilityLabel={stepDown} />
+    <Button label={base.decrease} variant="tonal" icon="remove" onPress={() => onStep(-1)} accessibilityLabel={stepDown} />
     <Txt role="title" align="center" accessibilityLiveRegion="polite" style={styles.stepValue}>{value}{suffix}</Txt>
-    <Button label={base.increase} variant="tonal" onPress={() => onStep(1)} accessibilityLabel={stepUp} />
+    <Button label={base.increase} variant="tonal" icon="add" onPress={() => onStep(1)} accessibilityLabel={stepUp} />
   </View>;
 }
 
@@ -396,7 +397,8 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   stepper: { minHeight: t.minTouch, flexDirection: 'row', alignItems: 'center', gap: t.space.sm },
   stepperLabel: { flex: 1 },
   stepValue: { minWidth: t.space.xxxl + t.space.xl },
-  nestedCard: { gap: t.space.sm, padding: t.space.md, borderRadius: t.radius.form, backgroundColor: t.colors.surfaceSunken },
+  contactEditor: { gap: t.space.sm, paddingTop: t.space.md, borderTopWidth: t.border.hairline, borderTopColor: t.colors.hairline },
+  memberEditor: { gap: t.space.md, paddingTop: t.space.md, borderTopWidth: t.border.hairline, borderTopColor: t.colors.hairline },
   memberRow: { flexDirection: 'row', alignItems: 'center', gap: t.space.md, paddingVertical: t.space.md, borderTopWidth: t.border.hairline, borderTopColor: t.colors.hairline },
   memberInfo: { flex: 1, gap: t.space.xs },
   iconActions: { flexDirection: 'row', alignItems: 'center', gap: t.space.xs },

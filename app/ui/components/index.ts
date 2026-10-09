@@ -17,6 +17,7 @@ export { MascotSlot, MASCOT_SLOT_TEST_ID } from './MascotSlot';
 export { PhaseSelector } from './PhaseSelector';
 export { SwitchBanner } from './SwitchBanner';
 export { WarningChip } from './WarningChip';
+export { OptionGrid } from './OptionGrid';
 export { WarningOption } from './WarningOption';
 export { PendingReminder } from './PendingReminder';
 export { StaleBanner } from './StaleBanner';

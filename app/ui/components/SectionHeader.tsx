@@ -1,4 +1,5 @@
 import type { JSX } from 'react';
+import type { AccessibilityState } from 'react-native';
 import { View, StyleSheet } from 'react-native';
 import { useThemedStyles } from '../theme';
 import type { Theme } from '../theme';
@@ -7,7 +8,7 @@ import { Txt } from './Txt';
 
 export interface SectionHeaderProps {
   title: string;
-  action?: { label: string; onPress: () => void };
+  action?: { label: string; onPress: () => void; accessibilityState?: AccessibilityState };
 }
 
 /**
@@ -21,7 +22,7 @@ export function SectionHeader({ title, action }: SectionHeaderProps): JSX.Elemen
     <View style={styles.row}>
       <Txt role="headline" accessibilityRole="header" style={styles.title}>{title}</Txt>
       {action !== undefined ? (
-        <Button label={action.label} onPress={action.onPress} variant="text" />
+        <Button label={action.label} onPress={action.onPress} variant="text" accessibilityState={action.accessibilityState} />
       ) : null}
     </View>
   );

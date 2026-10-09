@@ -51,7 +51,7 @@ export function Tile({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
+      accessibilityLabel={accessibilityLabel ?? title}
       onPress={onPress}
       style={({ pressed }) => [...surface, pressed && styles.pressed]}
     >

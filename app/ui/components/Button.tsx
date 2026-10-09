@@ -1,6 +1,7 @@
 import type { JSX } from 'react';
 import type { ComponentProps } from 'react';
 import { Pressable, StyleSheet } from 'react-native';
+import type { AccessibilityState } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, useThemedStyles } from '../theme';
 import type { Theme } from '../theme';
@@ -18,6 +19,7 @@ export interface ButtonProps {
   disabled?: boolean;
   accessibilityLabel?: string;
   accessibilityHint?: string;
+  accessibilityState?: AccessibilityState;
   fullWidth?: boolean;
 }
 
@@ -51,6 +53,7 @@ export function Button({
   disabled = false,
   accessibilityLabel,
   accessibilityHint,
+  accessibilityState,
   fullWidth = false,
 }: ButtonProps): JSX.Element {
   const t = useTheme();
@@ -62,7 +65,7 @@ export function Button({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityHint={accessibilityHint}
-      accessibilityState={{ disabled }}
+      accessibilityState={{ disabled, ...accessibilityState }}
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [

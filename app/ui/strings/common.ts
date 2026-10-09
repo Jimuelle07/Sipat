@@ -15,6 +15,8 @@ export const commonStrings = defineStrings({
     tabHotlines: 'Hotline',
     tabProfile: 'Pamilya',
     tabAccount: 'Account',
+    languageTag_tl: 'Tagalog',
+    languageTag_en: 'English',
 
     phase_before: 'Bago ang bagyo',
     phase_during: 'Habang may bagyo',
@@ -42,8 +44,8 @@ export const commonStrings = defineStrings({
     needs: 'Mga pangangailangan',
     remove: 'Alisin',
     emptyPlan: 'Walang nakatalang impormasyon.',
-    decrease: '−',
-    increase: '+',
+    decrease: 'Bawasan',
+    increase: 'Dagdagan',
     doneMark: 'Tapos',
     todoMark: 'Gagawin',
 
@@ -91,6 +93,8 @@ export const commonStrings = defineStrings({
     tabHotlines: 'Hotlines',
     tabProfile: 'Family',
     tabAccount: 'Account',
+    languageTag_tl: 'Tagalog',
+    languageTag_en: 'English',
 
     phase_before: 'Before the storm',
     phase_during: 'During the storm',
@@ -118,8 +122,8 @@ export const commonStrings = defineStrings({
     needs: 'Needs',
     remove: 'Remove',
     emptyPlan: 'No information is listed.',
-    decrease: '−',
-    increase: '+',
+    decrease: 'Decrease',
+    increase: 'Increase',
     doneMark: 'Done',
     todoMark: 'To do',
 

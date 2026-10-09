@@ -1,5 +1,5 @@
 import type { JSX } from 'react';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Button } from './Button';
 import { Tile } from './Tile';
 import { Txt } from './Txt';
@@ -30,17 +30,19 @@ export function SummaryCard({ title, text, pinned = false, pinnedLabel, sourceLi
     >
       <Txt
         role="body"
-        tone={pinned ? 'text' : 'muted'}
+        tone="text"
         style={pinned ? styles.pinnedText : undefined}
       >
         {text}
       </Txt>
-      <Button
-        label={sourceLinkLabel}
-        icon="document-text-outline"
-        variant="text"
-        onPress={onSource}
-      />
+      <View style={styles.sourceLink}>
+        <Button
+          label={sourceLinkLabel}
+          icon="document-text-outline"
+          variant="text"
+          onPress={onSource}
+        />
+      </View>
     </Tile>
   );
 }
@@ -48,5 +50,8 @@ export function SummaryCard({ title, text, pinned = false, pinnedLabel, sourceLi
 const makeStyles = (_t: Theme) => StyleSheet.create({
   pinnedText: {
     fontWeight: '700' as const,
+  },
+  sourceLink: {
+    alignSelf: 'flex-start',
   },
 })

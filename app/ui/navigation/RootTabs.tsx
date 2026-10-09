@@ -2,6 +2,8 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import type { JSX } from 'react';
 import { StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Txt } from '../components';
 import { commonStrings } from '../strings/common';
 import { useT } from '../i18n';
 import { useTheme, useThemedStyles } from '../theme';
@@ -20,14 +22,22 @@ export function RootTabs(): JSX.Element {
   const t = useT(commonStrings);
   const theme = useTheme();
   const styles = useThemedStyles(makeStyles);
+  const insets = useSafeAreaInsets();
 
   return (
     <Tab.Navigator screenOptions={{
       headerShown: false,
       tabBarActiveTintColor: theme.colors.accentText,
       tabBarInactiveTintColor: theme.colors.textMuted,
-      tabBarStyle: styles.tabBar,
-      tabBarLabelStyle: styles.label,
+      // Icon row + one caption line + breathing room, plus the gesture-bar inset.
+      tabBarStyle: [styles.tabBar, {
+        height: theme.minTouch + theme.type.roles.caption.lineHeight + theme.space.md + insets.bottom,
+        paddingBottom: insets.bottom + theme.space.xs,
+      }],
+      // Six destinations share a phone width: shrink a long label instead of truncating it.
+      tabBarLabel: ({ color, children }) => (
+        <Txt role="caption" color={color} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{children}</Txt>
+      ),
     }}>
       <Tab.Screen name="Home" component={HomeScreen} options={{ title: t.tabHome, tabBarIcon: ({ color, size }) => <Ionicons name="home-outline" color={color} size={size} /> }} />
       <Tab.Screen name="Ask" component={AskScreen} options={{ title: t.tabAsk, tabBarIcon: ({ color, size }) => <Ionicons name="chatbubble-ellipses-outline" color={color} size={size} /> }} />
@@ -41,15 +51,10 @@ export function RootTabs(): JSX.Element {
 
 const makeStyles = (theme: Theme) => StyleSheet.create({
   tabBar: {
-    minHeight: theme.minTouch,
     backgroundColor: theme.colors.surface,
+    borderTopLeftRadius: theme.radius.panel,
+    borderTopRightRadius: theme.radius.panel,
     borderTopColor: theme.colors.hairline,
     borderTopWidth: theme.border.hairline,
-  },
-  label: {
-    fontSize: theme.type.roles.caption.fontSize,
-    lineHeight: theme.type.roles.caption.lineHeight,
-    fontWeight: theme.type.roles.caption.fontWeight,
-    letterSpacing: theme.type.roles.caption.letterSpacing,
   },
 });

@@ -32,7 +32,7 @@ export function ChecklistRow({ text, ticked, onToggle, tag, critical = false, cr
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}
     >
       <View style={[styles.box, ticked && styles.boxTicked]}>
-        {ticked ? <Ionicons name="checkmark" size={18} color={t.colors.selected.ink} /> : null}
+        {ticked ? <Ionicons name="checkmark" size={t.type.roles.label.fontSize} color={t.colors.selected.ink} /> : null}
       </View>
       <View style={styles.content}>
         <Txt role="body" tone={ticked ? 'muted' : 'text'} style={ticked ? styles.struck : undefined}>
@@ -63,8 +63,8 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   },
   pressed: { opacity: 0.86 },
   box: {
-    width: 24,
-    height: 24,
+    width: t.minTouch / 2,
+    height: t.minTouch / 2,
     borderRadius: t.space.md,
     borderWidth: t.border.control,
     borderColor: t.colors.controlBorder,

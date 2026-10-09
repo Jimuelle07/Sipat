@@ -15,11 +15,12 @@ import {
   ChecklistRow,
   EmptyState,
   MascotSlot,
+  OptionGrid,
   PhaseSelector,
   ProgressBar,
-  SafetyText,
   Screen,
   SectionHeader,
+  StaleBanner,
   Tile,
   Txt,
   WarningChip,
@@ -28,7 +29,6 @@ import {
 import { useTheme, useThemedStyles } from '../theme';
 import type { Theme, Tone } from '../theme';
 
-const phases = ['before', 'during', 'after'] as const satisfies readonly Phase[];
 const phaseKeys: Record<Phase, 'phaseShort_before' | 'phaseShort_during' | 'phaseShort_after'> = {
   before: 'phaseShort_before',
   during: 'phaseShort_during',
@@ -51,28 +51,14 @@ export function warningInput(warning: WarningEntry): WarningInput {
   return { kind: warning.kind, level: warning.level as ColorLevel };
 }
 
-function warningTone(warning: Pick<WarningEntry, 'kind' | 'level'>, theme: Theme): Tone {
+function warningTone(warning: WarningEntry, theme: Theme): Tone {
   if (warning.kind === 'tcws') {
-    const level = typeof warning.level === 'number' ? warning.level as TcwsLevel : 1;
-    return theme.warning.tcws[level];
+    return theme.warning.tcws[warning.level as TcwsLevel];
   }
   if (warning.kind === 'rainfall' || warning.kind === 'surge') {
-    const level = warning.level === 'yellow' || warning.level === 'orange' || warning.level === 'red'
-      ? warning.level
-      : 'yellow';
-    return theme.warning.color[level];
+    return theme.warning.color[warning.level as ColorLevel];
   }
   return theme.warning.onOff;
-}
-
-function warningLevelGlyph(warning: Pick<WarningEntry, 'kind' | 'level'>): number | undefined {
-  if (warning.kind === 'tcws') return typeof warning.level === 'number' ? warning.level : 1;
-  if (warning.kind === 'rainfall' || warning.kind === 'surge') {
-    if (warning.level === 'yellow') return 1;
-    if (warning.level === 'orange') return 2;
-    if (warning.level === 'red') return 3;
-  }
-  return undefined;
 }
 
 export function warningPickerLabel(warning: WarningEntry): string {
@@ -113,7 +99,7 @@ export function HomeScreen(): JSX.Element {
     }
   })();
   const batteryStatus = status.battery
-    ? `${Math.round(status.battery.level)}% · ${status.battery.charging ? t.charging : t.notCharging} · ${status.battery.saver ? t.saverOn : t.saverOff}`
+    ? `${Math.round(status.battery.level)}${t.percentSign} · ${status.battery.charging ? t.charging : t.notCharging} · ${status.battery.saver ? t.saverOn : t.saverOff}`
     : t.unknownBattery;
   const modelStatus = {
     absent: t.model_absent,
@@ -155,6 +141,7 @@ export function HomeScreen(): JSX.Element {
       <Button
         label={t.emergency}
         onPress={() => setShowEmergency((visible) => !visible)}
+        accessibilityState={{ expanded: showEmergency }}
         variant="danger"
         icon="alert-circle"
       />
@@ -182,14 +169,13 @@ export function HomeScreen(): JSX.Element {
         ) : (
           <View style={styles.warningRows}>
             {checklist.warningCards.map((warning) => {
-              const entry = warnings.find((item) => item.id === warning.warningId)
-                ?? { kind: warning.kind, level: warning.kind === 'gale' ? 'on' : warning.kind === 'tcws' ? 1 : 'yellow' };
+              const entry = warnings.find((item) => item.id === warning.warningId);
+              if (entry === undefined) return null;
               return (
                 <WarningChip
                   key={warning.warningId}
                   label={warning.label}
                   tone={warningTone(entry, theme)}
-                  levelGlyph={warningLevelGlyph(entry)}
                   clearLabel={`${t.clearWarning}: ${warning.label}`}
                   onClear={() => engine.context.clearWarning(warning.kind)}
                 />
@@ -197,20 +183,15 @@ export function HomeScreen(): JSX.Element {
             })}
           </View>
         )}
-        {status.stale ? (
-          <View style={styles.staleNotice}>
-            <SafetyText
-              text={engine.copy('stale_warning')}
-              translation={lang === 'en' ? engine.copy('stale_warning', 'en') : undefined}
-            />
-            <Button
-              label={t.reconfirmWarning}
-              onPress={() => engine.context.reconfirmWarning(status.stale!.kind)}
-              variant="tonal"
-            />
-          </View>
-        ) : null}
       </Tile>
+      {status.stale ? (
+        <StaleBanner
+          text={engine.copy('stale_warning')}
+          translation={lang === 'en' ? engine.copy('stale_warning', 'en') : undefined}
+          actionLabel={t.reconfirmWarning}
+          onAction={() => engine.context.reconfirmWarning(status.stale!.kind)}
+        />
+      ) : null}
 
       <Tile>
         <SectionHeader title={t.chooseWarning} />
@@ -224,14 +205,13 @@ export function HomeScreen(): JSX.Element {
           return (
             <View key={kind} style={styles.pickerGroup}>
               <Txt role="label" tone="muted">{title}</Txt>
-              <View style={styles.optionRows}>
+              <OptionGrid columns={3}>
                 {entries.map((warning) => (
                   <WarningOption
                     key={warning.id}
                     label={warningPickerLabel(warning)}
                     tone={warningTone(warning, theme)}
                     selected={isSelected(warning)}
-                    levelGlyph={warningLevelGlyph(warning)}
                     onPress={() => {
                       if (kind === 'gale' && context.warnings.gale !== undefined) {
                         engine.context.clearWarning('gale');
@@ -241,7 +221,7 @@ export function HomeScreen(): JSX.Element {
                     }}
                   />
                 ))}
-              </View>
+              </OptionGrid>
             </View>
           );
         })}
@@ -365,19 +345,8 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     flexWrap: 'wrap',
     gap: t.space.sm,
   },
-  staleNotice: {
-    gap: t.space.sm,
-    borderLeftWidth: t.border.emphasis,
-    borderLeftColor: t.colors.dangerSurface.ink,
-    paddingLeft: t.space.md,
-  },
   pickerGroup: {
     gap: t.space.xs,
-  },
-  optionRows: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: t.space.sm,
   },
   checklistGroup: {
     gap: t.space.xs,

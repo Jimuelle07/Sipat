@@ -4,7 +4,7 @@ import { Animated, View, StyleSheet } from 'react-native';
 import { Button } from './Button';
 import { Tag } from './Tag';
 import { Txt } from './Txt';
-import { useTheme, useThemedStyles } from '../theme';
+import { useMinimalMotion, useTheme, useThemedStyles } from '../theme';
 import type { Theme } from '../theme';
 
 export interface AiSourceLink {
@@ -30,9 +30,14 @@ export function AiBlock({ state, text, checkingLabel, rejectedText, sourceLinks,
 }): JSX.Element {
   const t = useTheme();
   const styles = useThemedStyles(makeStyles);
+  const minimal = useMinimalMotion();
   const opacity = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
+    if (minimal) {
+      opacity.setValue(1);
+      return undefined;
+    }
     opacity.setValue(0);
     const fade = Animated.timing(opacity, {
       toValue: 1,
@@ -41,7 +46,7 @@ export function AiBlock({ state, text, checkingLabel, rejectedText, sourceLinks,
     });
     fade.start();
     return () => fade.stop();
-  }, [state, t.motion.fast, opacity]);
+  }, [state, minimal, t.motion.fast, opacity]);
 
   if (state === 'partial') {
     return (

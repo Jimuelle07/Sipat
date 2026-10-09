@@ -4,7 +4,7 @@ import { useEngine, useEngineChange } from './useEngine';
 
 export function PhaseTheme({ children }: { children: ReactNode }): JSX.Element {
   const engine = useEngine();
-  // The current EngineChange contract emits context when the phase changes.
+  // The v2 contract adds 'phase'; add it to this list when that change kind is available.
   useEngineChange(['context']);
   const phase = engine.context.get().phase;
 
