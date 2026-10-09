@@ -3,3 +3,7 @@ node_modules/
 dist/
 models/
 *.gguf
+
+# signing keys and publish output (never commit private keys)
+keys/
+out/
