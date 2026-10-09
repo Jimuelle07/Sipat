@@ -24,13 +24,18 @@
         "kailan darating ang bagyo",
         "track ng bagyo",
         "signal ngayon",
-        "may pasok"
+        "may pasok",
+        "pasok ba",
+        "walang pasok"
       ],
       "reply_key": "no_live_data"
     },
     "medical_dose": {
       "phrases": [
         "ilang tableta",
+        "ilang tablet",
+        "ilang kapsula",
+        "ilang beses iinumin",
         "dosis",
         "ilang mg",
         "ilang ml",
@@ -56,6 +61,20 @@
         "hotline",
         "numero ng barangay"
       ]
+    },
+    "phase_cues": {
+      "before": {
+        "strong": ["may paparating na bagyo"],
+        "weak": []
+      },
+      "during": {
+        "strong": ["signal # na dito", "nandito na ang bagyo"],
+        "weak": ["lumalakas na ang hangin", "tumataas na ang tubig"]
+      },
+      "after": {
+        "strong": ["humupa na ang bagyo", "wala na ang bagyo"],
+        "weak": ["tumigil na ang ulan"]
+      }
     },
     "emergency_cards": [
       {

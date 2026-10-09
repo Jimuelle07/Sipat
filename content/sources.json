@@ -191,6 +191,24 @@
       "date": "undated",
       "url": "https://bicol.doh.gov.ph/advisories/leptospirosis",
       "retrieved_at": "2026-10-09"
+    },
+    {
+      "id": "psa-psgc-2022-06-30",
+      "agency": "Philippine Statistics Authority (PSA)",
+      "title": "PSGC names and hierarchy, mirror of the 30 June 2022 release (confirm against the PSA PSGC release)",
+      "date": "2022-06-30",
+      "url": "https://psgc.gitlab.io/api/",
+      "retrieved_at": "2026-10-10",
+      "notes": "Community mirror of the PSA PSGC publication file. The mirror states 'Current data is as of June 30, 2022'. Official PSA page: https://psa.gov.ph/classification/psgc/. Used for content/places.json names and parents only (no centroids). Confirm the release and any later PSA updates before release."
+    },
+    {
+      "id": "barangay-order-wording",
+      "agency": "(fill in: reviewed source for the barangay evacuation order)",
+      "title": "(fill in: reviewed source for the barangay-order meaning and actions)",
+      "date": "(fill in)",
+      "url": "(fill in)",
+      "retrieved_at": "2026-10-10",
+      "notes": "Placeholder source so the required warnings.json 'barangay-order' entry validates. Replace with a reviewed source before the wording ships."
     }
   ]
 }
