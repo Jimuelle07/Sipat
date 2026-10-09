@@ -47,6 +47,7 @@ export function ChecklistScreen(): JSX.Element {
   return (
     <Screen
       title={t.title}
+      hideLanguage
       back={{ label: t.back, onPress: navigation.goBack }}
       banner={<AppBanners />}
     >

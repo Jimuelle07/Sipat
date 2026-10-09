@@ -130,7 +130,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     flexShrink: 1,
   },
   rowValue: {
-    flexShrink: 0,
+    flex: 1,
     textAlign: 'right',
   },
   entry: {

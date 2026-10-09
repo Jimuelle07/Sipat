@@ -88,14 +88,11 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   photo: { width: '100%', height: '100%' },
   lines: { gap: t.space.sm },
   line: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: t.space.lg,
+    gap: t.space.xs,
     paddingVertical: t.space.xs,
     borderTopWidth: t.border.hairline,
     borderTopColor: t.colors.hairline,
   },
-  lineValue: { textAlign: 'right', flexShrink: 1 },
+  lineValue: { flexShrink: 1 },
   footer: { alignItems: 'center' },
 })

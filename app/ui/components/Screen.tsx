@@ -2,6 +2,8 @@ import type { JSX, ReactNode } from 'react';
 import { Pressable, ScrollView, View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRoute } from '@react-navigation/native';
+import { DevPanelEntry } from '../context/DevPanel';
 import { useTheme, useThemedStyles } from '../theme';
 import type { Theme } from '../theme';
 import { LanguageToggle } from './LanguageToggle';
@@ -30,7 +32,9 @@ export interface ScreenProps {
 export function Screen({ title, children, scroll = true, right, mascot, back, banner, hideLanguage = false }: ScreenProps): JSX.Element {
   const t = useTheme();
   const styles = useThemedStyles(makeStyles);
+  const route = useRoute();
   const headerMascot = t.mascot.placement === 'headerEnd' ? mascot : null;
+  const showDevEntry = route.name === 'Settings';
 
   const body = scroll ? (
     <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
@@ -54,15 +58,18 @@ export function Screen({ title, children, scroll = true, right, mascot, back, ba
             <Ionicons name="arrow-back" size={t.type.roles.title.fontSize} color={t.colors.text} />
           </Pressable>
         ) : null}
-        <Txt role="headline" accessibilityRole="header" numberOfLines={1} style={styles.title}>
+        <Txt role="headline" accessibilityRole="header" numberOfLines={2} style={styles.title}>
           {title}
         </Txt>
-        <View style={styles.actions}>
-          {headerMascot}
-          {hideLanguage ? null : <LanguageToggle />}
-          {right}
-        </View>
       </View>
+      {!hideLanguage || headerMascot || right || showDevEntry ? (
+        <View style={styles.statusRow}>
+          {hideLanguage ? null : <LanguageToggle />}
+          {headerMascot}
+          {right}
+          {showDevEntry ? <DevPanelEntry /> : null}
+        </View>
+      ) : null}
       {banner ? <View style={styles.banner}>{banner}</View> : null}
       {body}
     </SafeAreaView>
@@ -96,10 +103,13 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     paddingHorizontal: t.space.gutter,
     gap: t.space.sm,
   },
-  actions: {
+  statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'flex-end',
+    flexWrap: 'wrap',
     gap: t.space.sm,
+    paddingHorizontal: t.space.gutter,
   },
   body: {
     padding: t.space.gutter,

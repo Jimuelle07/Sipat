@@ -28,6 +28,7 @@ export const profileStrings = defineStrings({
 
     memberAddTitle: 'Bagong miyembro',
     memberEditTitle: 'I-edit ang miyembro',
+    memberScreenTitle: 'Miyembro',
     memberNote: 'Tala (opsyonal)',
     memberPhone: 'Telepono (opsyonal)',
     saveMember: 'I-save ang miyembro',
@@ -74,6 +75,7 @@ export const profileStrings = defineStrings({
 
     memberAddTitle: 'New member',
     memberEditTitle: 'Edit member',
+    memberScreenTitle: 'Member',
     memberNote: 'Note (optional)',
     memberPhone: 'Phone (optional)',
     saveMember: 'Save member',

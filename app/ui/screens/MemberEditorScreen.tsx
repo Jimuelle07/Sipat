@@ -91,7 +91,7 @@ export function MemberEditorScreen(): JSX.Element {
 
   if (memberId !== undefined && member === undefined) {
     return (
-      <Screen title={t.memberEditTitle} back={{ label: t.back, onPress: navigation.goBack }} banner={<AppBanners />}>
+      <Screen title={t.memberScreenTitle} back={{ label: t.back, onPress: navigation.goBack }} banner={<AppBanners />}>
         <Tile>
           <InlineError message={errorMessage(lang, 'family', 'not_found') ?? ''} />
           <Button label={t.back} variant="tonal" onPress={navigation.goBack} />
@@ -101,7 +101,7 @@ export function MemberEditorScreen(): JSX.Element {
   }
 
   return (
-    <Screen title={title} back={{ label: t.back, onPress: navigation.goBack }} banner={<AppBanners />}>
+    <Screen title={t.memberScreenTitle} back={{ label: t.back, onPress: navigation.goBack }} banner={<AppBanners />}>
       <Tile title={title}>
         <Field
           label={common.memberName}

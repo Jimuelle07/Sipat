@@ -114,7 +114,7 @@ export function CropFrame({
             <View pointerEvents="none" style={[styles.scrim, { left: px.left + px.width, top: px.top, right: 0, height: px.height }]} />
           </>
         ) : null}
-        {ready
+        {ready && !failed
           ? (faces ?? []).map((face, index) => {
               const box = toPixels(face, layout.width, layout.height);
               return (

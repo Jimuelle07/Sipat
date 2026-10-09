@@ -7,7 +7,7 @@ import { EngineProvider } from './context/EngineProvider';
 import { LanguageProvider } from './i18n';
 import { PhaseTheme } from './context/PhaseTheme';
 import { DevOverridesProvider } from './context/AppChrome';
-import { DevPanel } from './context/DevPanel';
+import { DevPanel, DevPanelProvider } from './context/DevPanel';
 import { useTheme } from './theme';
 
 function ThemedNavigation(): JSX.Element {
@@ -33,7 +33,7 @@ function ThemedNavigation(): JSX.Element {
         backgroundColor={theme.colors.canvas}
       />
       <RootStack />
-      <DevPanel />
+      <DevPanel global />
     </NavigationContainer>
   );
 }
@@ -45,7 +45,9 @@ export default function App(): JSX.Element {
         <LanguageProvider>
           <DevOverridesProvider>
             <PhaseTheme>
-              <ThemedNavigation />
+              <DevPanelProvider>
+                <ThemedNavigation />
+              </DevPanelProvider>
             </PhaseTheme>
           </DevOverridesProvider>
         </LanguageProvider>

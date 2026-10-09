@@ -220,9 +220,23 @@ export function AskScreen(): JSX.Element {
   const aiNode = (ai: AnswerPlan['ai']): ReactNode => {
     switch (ai.state) {
       case 'loading_model':
-        return <AiStatusLine busy text={errorMessage(lang, 'model_state', 'loading') ?? t.aiSkipped} />;
+        return (
+          <AiStatusLine
+            busy
+            text={errorMessage(lang, 'model_state', 'loading') ?? t.aiSkipped}
+            stopLabel={canStop(plan) ? t.stop : undefined}
+            onStop={() => engine.ask.cancel()}
+          />
+        );
       case 'thinking':
-        return <AiStatusLine busy text={errorMessage(lang, 'model_state', 'generating') ?? t.aiSkipped} />;
+        return (
+          <AiStatusLine
+            busy
+            text={errorMessage(lang, 'model_state', 'generating') ?? t.aiSkipped}
+            stopLabel={canStop(plan) ? t.stop : undefined}
+            onStop={() => engine.ask.cancel()}
+          />
+        );
       case 'skipped':
         return (
           <AiStatusLine

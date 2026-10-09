@@ -120,7 +120,7 @@ export function PhotoScreen(): JSX.Element {
           <View style={styles.step}>
             <View style={styles.stage} accessible accessibilityRole="image" accessibilityLabel={t.previewLabel}>
               <View style={styles.scrimWash} pointerEvents="none" />
-              <Ionicons name="person" size={theme.minTouch * 2} color={theme.colors.textMuted} />
+              <Ionicons name="person" size={theme.minTouch * 2} color={theme.colors.highlight.fill} />
               <View style={styles.guideRing} pointerEvents="none" />
             </View>
             <View style={styles.copy}>
@@ -192,7 +192,6 @@ export function PhotoScreen(): JSX.Element {
   return (
     <Screen
       title={t.photoTitle}
-      scroll={false}
       hideLanguage
       back={{ label: t.back, onPress: navigation.goBack }}
     >
@@ -208,9 +207,10 @@ export function PhotoScreen(): JSX.Element {
 const makeStyles = (t: Theme) => {
   const ring = t.minTouch * 3;
   return StyleSheet.create({
-    step: { flex: 1, gap: t.space.lg },
+    step: { gap: t.space.lg },
     stage: {
-      flex: 1,
+      width: '100%',
+      aspectRatio: 1,
       alignItems: 'center',
       justifyContent: 'center',
       borderRadius: t.radius.panel,

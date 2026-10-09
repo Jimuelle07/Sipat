@@ -9,8 +9,8 @@ export const commonStrings = defineStrings({
     loading: 'Inihahanda ang Bagyo Buddy…',
     failed: 'Hindi mabuksan ang app',
     fatal: 'May problema sa app. Isara at buksan muli.',
-    tabHome: 'Tahanan',
-    tabAsk: 'Magtanong',
+    tabHome: 'Bahay',
+    tabAsk: 'Tanong',
     tabGuide: 'Gabay',
     tabHotlines: 'Hotline',
     tabProfile: 'Pamilya',
@@ -36,6 +36,7 @@ export const commonStrings = defineStrings({
     aiUnavailable: 'Buod muna',
     aiPreparing: 'Inihahanda ang AI',
     lowBattery: 'Mahina ang baterya',
+    batterySaver: 'Tipid-baterya',
     aiReasonHint: 'Dahilan: {reason}',
     staleReconfirm: 'Pareho pa rin',
 
@@ -121,6 +122,7 @@ export const commonStrings = defineStrings({
     aiUnavailable: 'Summary only',
     aiPreparing: 'Preparing AI',
     lowBattery: 'Low battery',
+    batterySaver: 'Battery saver',
     aiReasonHint: 'Reason: {reason}',
     staleReconfirm: 'Still the same',
 

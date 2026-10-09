@@ -150,7 +150,6 @@ export function SetupScreen(): JSX.Element {
       case 'ownerPhoto':
         return (
           <Tile title={t.ownerPhotoTitle} subtitle={t.ownerPhotoBody}>
-            <Txt role="body">{engine.copy('photo_required')}</Txt>
             <View style={styles.ownerRow}>
               <MemberAvatar
                 photoUri={owner?.photo?.uri}
@@ -167,7 +166,11 @@ export function SetupScreen(): JSX.Element {
               icon="camera"
               onPress={() => { if (owner) navigation.navigate('Photo', { memberId: owner.id }); }}
             />
-            <Button label={t.continue} variant="text" onPress={() => setStep((current) => nextStep(current))} />
+            <Button
+              label={owner?.photoStatus === 'done' ? t.continue : t.later}
+              variant="text"
+              onPress={() => setStep((current) => nextStep(current))}
+            />
           </Tile>
         );
 

@@ -154,7 +154,7 @@ export function HomeScreen(): JSX.Element {
         {pickerGroups(options).map(({ kind, entries }) => (
           <View key={kind} style={styles.pickerGroup}>
             <Txt role="label" tone="muted">{t[`kind_${kind}`]}</Txt>
-            <OptionGrid columns={3}>
+            <OptionGrid columns={2}>
               {entries.map((entry) => {
                 const selected = isOptionActive(context, entry);
                 return (

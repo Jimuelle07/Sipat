@@ -6,21 +6,22 @@ import { defineStrings } from '../i18n';
  */
 export const setupStrings = defineStrings({
   tl: {
-    screenTitle: 'Ihanda ang sambahayan',
-    intro: 'Apat na hakbang para makilala ng app ang pamilya mo, kahit walang signal.',
+    screenTitle: 'Paghahanda',
+    intro: 'Kilalanin ang pamilya mo sa limang hakbang, kahit walang signal.',
     continue: 'Magpatuloy',
     back: 'Bumalik',
+    later: 'Mamaya na',
     skip: 'Laktawan muna',
     progressLabel: 'Hakbang',
 
     householdTitle: 'Sambahayan at pangunahing tao',
-    householdBody: 'Pangalanan ang bahay, tapos ang pangunahing tao na magsisigaw para sa pamilya.',
+    householdBody: 'Pangalanan ang sambahayan at ang pangunahing taong mag-aasikaso nito.',
 
     ownerPhotoTitle: 'Litrato ng pangunahing tao',
-    ownerPhotoBody: 'Bawat miyembro ay may litrato ng mukha. Mababago ito anumang oras, kaya puwedeng mamaya na.',
+    ownerPhotoBody: 'Kailangan ng bawat miyembro ang litrato ng mukha. Puwede itong idagdag mamaya.',
 
     membersTitle: 'Mga miyembro ng pamilya',
-    membersBody: 'Idagdag ang lahat ng kasama sa bahay. Dagdagan ng litrato ang bawat isa mamaya.',
+    membersBody: 'Idagdag ang lahat ng kasama sa bahay. Maaaring kunan ng litrato ang bawat isa mamaya.',
 
     areaTitle: 'Lugar ng tirahan',
     areaBody: 'Piliin ang barangay para makuha ang tamang gabay at mga babala.',
@@ -35,10 +36,11 @@ export const setupStrings = defineStrings({
     photoPending: 'Kulang pa ang litrato',
   },
   en: {
-    screenTitle: 'Set up your household',
-    intro: 'Four steps so the app knows your family, even without signal.',
+    screenTitle: 'Set up',
+    intro: 'Let the app know your family in five steps, even without signal.',
     continue: 'Continue',
     back: 'Back',
+    later: 'Later',
     skip: 'Skip for now',
     progressLabel: 'Step',
 

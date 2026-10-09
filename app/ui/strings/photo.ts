@@ -28,7 +28,7 @@ export const photoStrings = defineStrings({
     saved: 'Nai-save ang litrato.',
     previewLabel: 'Preview ng litrato',
     ownerLabel: 'Pangunahing tao',
-    centerLabel: 'Evacuation center',
+    centerLabel: 'Sentro ng paglikas',
     meetingLabel: 'Tagpuan',
     share: 'Ibahagi',
     callOwner: 'Tawagan si {name}',

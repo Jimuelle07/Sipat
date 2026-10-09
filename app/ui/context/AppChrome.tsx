@@ -57,7 +57,9 @@ export function AppBanners(): JSX.Element | null {
 
   if (!seen) throw new Error('AppBanners must be used inside DevOverridesProvider');
 
-  const showSwitch = shouldShowSwitch(lastSwitch, seen.seenAt);
+  const showSwitch = shouldShowSwitch(lastSwitch, seen.seenAt)
+    && lastSwitch?.to === context.phase
+    && context.phaseSource !== 'manual';
   if (!showSwitch && stale === undefined) return null;
 
   const dismissSwitch = (): void => {
@@ -74,6 +76,7 @@ export function AppBanners(): JSX.Element | null {
       {showSwitch && lastSwitch ? (
         <SwitchBanner
           text={engine.copy('phase_switched', { lang, vars: { phase: engine.copy(phaseCopyKey, { lang }) } })}
+          reason={context.reason.text}
           emphasis={engine.copy(phaseCopyKey, { lang })}
           undoLabel={t.undo}
           onUndo={undoSwitch}
@@ -100,7 +103,9 @@ export function StatusBadges(): JSX.Element {
   const styles = useThemedStyles(makeStyles);
   useEngineChange(['status', 'settings']);
   const status = engine.status();
-  const lowBattery = engine.settings.get().lowBatteryMode || (!status.ai.allowed && status.ai.reason === 'low_battery');
+  const manualLowBattery = engine.settings.get().lowBatteryMode;
+  const saverOn = status.battery?.saver === true;
+  const lowBattery = manualLowBattery || saverOn || (!status.ai.allowed && status.ai.reason === 'low_battery');
   const busy = status.model === 'loading' || status.model === 'generating';
   const available = status.ai.allowed && (status.model === 'ready' || status.model === 'generating');
   const reason = !status.ai.allowed ? errorMessage(lang, 'ai', status.ai.reason) : null;
@@ -112,12 +117,12 @@ export function StatusBadges(): JSX.Element {
       <View accessible accessibilityRole="text" accessibilityLabel={aiLabel} accessibilityHint={aiHint}>
         <StatusBadge label={aiLabel} state={busy ? 'busy' : available ? 'on' : 'off'} icon={busy ? undefined : 'sparkles'} />
       </View>
-      {lowBattery ? <StatusBadge label={t.lowBattery} state="off" icon="battery-dead" /> : null}
+      {lowBattery ? <StatusBadge label={saverOn && !manualLowBattery ? t.batterySaver : t.lowBattery} state="off" icon="battery-dead" /> : null}
     </View>
   );
 }
 
 const makeStyles = (t: Theme) => StyleSheet.create({
   banners: { gap: t.space.sm },
-  badges: { flexDirection: 'row', alignItems: 'center', gap: t.space.xs },
+  badges: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap', gap: t.space.xs },
 });

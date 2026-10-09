@@ -103,7 +103,7 @@ export function AreaPicker({ onPicked }: AreaPickerProps): JSX.Element {
             onPress={() => choose(place)}
             style={({ pressed }) => [styles.row, styles.option, pressed && styles.pressed]}
           >
-            <Txt role="body" style={styles.rowLabel} numberOfLines={1}>{place.name}</Txt>
+            <Txt role="body" style={styles.rowLabel}>{place.name}</Txt>
             <Ionicons
               name={place.level === 'barangay' ? 'checkmark' : 'chevron-forward'}
               size={theme.type.roles.title.fontSize}

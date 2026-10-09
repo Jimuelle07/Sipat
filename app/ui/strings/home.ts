@@ -3,7 +3,7 @@ import { defineStrings } from '../i18n';
 export const homeStrings = defineStrings({
   tl: {
     title: 'Tahanan',
-    emergency: 'Emergency',
+    emergency: 'Agarang tulong',
     activeWarnings: 'Mga kasalukuyang babala',
     noWarnings: 'Wala pang napiling babala.',
     chooseWarning: 'Ano ang narinig mo?',

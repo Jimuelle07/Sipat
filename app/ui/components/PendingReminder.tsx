@@ -41,12 +41,9 @@ export function PendingReminder({ title, items, actionLabel, onAddPhoto }: {
 
 const makeStyles = (t: Theme) => StyleSheet.create({
   row: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: t.space.md,
     minHeight: t.minTouch,
   },
-  text: {
-    flex: 1,
-  },
+  text: {},
 })

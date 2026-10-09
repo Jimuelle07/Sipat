@@ -1,15 +1,50 @@
-import { useState } from 'react';
-import type { JSX } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
-import { Button, Chip, Tile, Txt } from '../components';
+import { createContext, useContext, useState } from 'react';
+import type { JSX, ReactNode } from 'react';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { Button } from '../components/Button';
+import { Chip } from '../components/Chip';
+import { Tile } from '../components/Tile';
+import { Txt } from '../components/Txt';
 import { useT } from '../i18n';
 import { devStrings } from '../strings/dev';
 import { useDevOverrides } from './AppChrome';
 import { useEngine } from './useEngine';
-import { useThemedStyles } from '../theme';
+import { useTheme, useThemedStyles } from '../theme';
 import type { Theme } from '../theme';
 import type { FaceDetection, FeedError, LocationError, MockEngine, MockScenario, ModelInstallError, PhotoError } from '../../engine';
-import type { ReactNode } from 'react';
+
+const DevPanelContext = createContext<{ expanded: boolean; setExpanded: (value: boolean) => void } | null>(null);
+
+export function DevPanelProvider({ children }: { children: ReactNode }): JSX.Element {
+  const [expanded, setExpanded] = useState(false);
+  return <DevPanelContext.Provider value={{ expanded, setExpanded }}>{children}</DevPanelContext.Provider>;
+}
+
+function useDevPanelState(): { expanded: boolean; setExpanded: (value: boolean) => void } {
+  const value = useContext(DevPanelContext);
+  if (!value) throw new Error('DevPanel must be used inside DevPanelProvider');
+  return value;
+}
+
+export function DevPanelEntry(): JSX.Element | null {
+  const engine = useEngine();
+  const t = useT(devStrings);
+  const theme = useTheme();
+  const styles = useThemedStyles(makeStyles);
+  const { setExpanded } = useDevPanelState();
+  if (!('debug' in engine)) return null;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={t.open}
+      onPress={() => setExpanded(true)}
+      style={styles.entry}
+    >
+      <Ionicons name="construct-outline" size={theme.type.roles.title.fontSize} color={theme.colors.accentText} />
+    </Pressable>
+  );
+}
 
 type LabelKey = keyof typeof devStrings.tl;
 
@@ -17,12 +52,12 @@ function ControlSection({ title, children }: { title: string; children: ReactNod
   return <Tile title={title}>{children}</Tile>;
 }
 
-export function DevPanel(): JSX.Element | null {
+export function DevPanel({ global = false }: { global?: boolean }): JSX.Element | null {
   const engine = useEngine();
   const t = useT(devStrings);
   const styles = useThemedStyles(makeStyles);
   const overrides = useDevOverrides();
-  const [expanded, setExpanded] = useState(false);
+  const { expanded, setExpanded } = useDevPanelState();
   const [scenario, setScenario] = useState<MockScenario | 'keyword'>('keyword');
   const [statusPreset, setStatusPreset] = useState<'battery' | 'saver' | 'lite' | 'none' | 'clear'>('clear');
   const [photoPreset, setPhotoPreset] = useState<FaceDetection | PhotoError>('one_face');
@@ -30,7 +65,7 @@ export function DevPanel(): JSX.Element | null {
   const [feedPreset, setFeedPreset] = useState<'off' | 'empty' | 'fresh' | 'stale' | 'near' | 'signal_here' | 'track_approach' | 'left' | FeedError>('fresh');
   const [locationPreset, setLocationPreset] = useState<'ok' | LocationError>('ok');
 
-  if (!('debug' in engine)) return null;
+  if (!global || !('debug' in engine)) return null;
   const debug = (engine as typeof engine & { debug: MockEngine['debug'] }).debug;
 
   const scenarioItems: { value: MockScenario | 'keyword'; label: LabelKey }[] = [
@@ -110,9 +145,10 @@ export function DevPanel(): JSX.Element | null {
     { value: 'clear', label: 'statusClear', onPress: () => setStatus('clear') },
   ];
 
+  if (!expanded) return null;
+
   return (
-    <View pointerEvents="box-none" style={styles.anchor}>
-      {expanded ? (
+    <View style={styles.anchor}>
         <View style={styles.panel}>
           <View style={styles.panelHeader}>
             <Txt role="title">{t.title}</Txt>
@@ -156,20 +192,15 @@ export function DevPanel(): JSX.Element | null {
             </ControlSection>
           </ScrollView>
         </View>
-      ) : (
-        <View style={styles.launcher}>
-          <Button label={t.open} onPress={() => setExpanded(true)} variant="tonal" icon="construct-outline" />
-        </View>
-      )}
     </View>
   );
 }
 
 const makeStyles = (t: Theme) => StyleSheet.create({
-  anchor: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 20 },
-  launcher: { alignSelf: 'flex-end', margin: t.space.gutter },
+  anchor: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, zIndex: 20, justifyContent: 'flex-end' },
+  entry: { minWidth: t.minTouch, minHeight: t.minTouch, alignItems: 'center', justifyContent: 'center' },
   panel: {
-    maxHeight: '78%',
+    height: '78%',
     padding: t.space.gutter,
     gap: t.space.md,
     backgroundColor: t.colors.canvas,
@@ -179,7 +210,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     borderWidth: t.border.hairline,
   },
   panelHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: t.space.md },
-  scroll: { flexGrow: 0 },
+  scroll: { flex: 1 },
   sections: { gap: t.space.gutter, paddingBottom: t.space.gutter },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.sm },
 });

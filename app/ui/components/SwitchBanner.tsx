@@ -12,8 +12,9 @@ import type { Theme } from '../theme';
  * word by word and sweeps a highlighter under the emphasis word. It re-runs when `revealKey`
  * changes (the caller passes the switch timestamp).
  */
-export function SwitchBanner({ text, emphasis, undoLabel, onUndo, dismissLabel, onDismiss, revealKey }: {
+export function SwitchBanner({ text, reason, emphasis, undoLabel, onUndo, dismissLabel, onDismiss, revealKey }: {
   text: string;
+  reason?: string;
   emphasis?: string;
   undoLabel?: string;
   onUndo?: () => void;
@@ -129,6 +130,7 @@ export function SwitchBanner({ text, emphasis, undoLabel, onUndo, dismissLabel, 
           );
         })}
       </View>
+      {reason ? <Txt role="bodySmall" color={t.colors.capsule.ink}>{reason}</Txt> : null}
       <View style={styles.actions}>
         {undoLabel !== undefined && onUndo !== undefined ? (
           <Button label={undoLabel} onPress={onUndo} variant="text" />

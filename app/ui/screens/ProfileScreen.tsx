@@ -100,8 +100,8 @@ function HouseholdTile({ engine, profile }: { engine: EngineContextValue; profil
         onChangeText={(value) => patch({ name: value })}
         error={messages['name']}
       />
+      <Txt role="label">{common.petsCount}</Txt>
       <View style={styles.stepper}>
-        <Txt role="label" style={styles.stepperLabel}>{common.petsCount}</Txt>
         <Button
           label={common.decrease}
           variant="tonal"
@@ -251,8 +251,7 @@ function IconButton({ label, icon, onPress }: { label: string; icon: IconName; o
 const makeStyles = (t: Theme) => StyleSheet.create({
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.sm },
   actions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: t.space.sm },
-  stepper: { minHeight: t.minTouch, flexDirection: 'row', alignItems: 'center', gap: t.space.sm },
-  stepperLabel: { flex: 1 },
+  stepper: { minHeight: t.minTouch, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: t.space.sm },
   stepperValue: { minWidth: t.space.xxxl + t.space.xl },
   memberRow: {
     minHeight: t.minTouch,
