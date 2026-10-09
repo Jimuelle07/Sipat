@@ -22,13 +22,12 @@ const outcomeKeys: Record<Outcome, keyof typeof evaluationStrings.tl> = {
   cancelled: 'outcome_cancelled',
 };
 
-function TableRow({ label, value, emphasis = false }: { label: string; value: string; emphasis?: boolean }): JSX.Element {
-  const theme = useTheme();
+function TableRow({ label, value }: { label: string; value: string }): JSX.Element {
   const styles = useThemedStyles(makeStyles);
   return (
     <View style={styles.row}>
       <Txt role="bodySmall" tone="muted" style={styles.rowLabel}>{label}</Txt>
-      <Txt role="body" color={emphasis ? theme.colors.danger.fill : undefined} style={styles.rowValue}>{value}</Txt>
+      <Txt role="body" style={styles.rowValue}>{value}</Txt>
     </View>
   );
 }
@@ -86,7 +85,6 @@ export function EvaluationScreen(): JSX.Element {
               <TableRow
                 label={t.wrongDirection}
                 value={String(summary.phase.wrongDirection)}
-                emphasis={summary.phase.wrongDirection > 0}
               />
               {summary.phase.wrongDirection > 0 ? <Tag label={t.wrongDirectionAlert} tone={theme.colors.dangerSurface} /> : null}
             </Tile>

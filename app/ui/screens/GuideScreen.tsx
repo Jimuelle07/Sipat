@@ -1,5 +1,5 @@
 import type { JSX } from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -36,7 +36,8 @@ export function GuideScreen(): JSX.Element {
   const labels = useT(guideTopicLabels);
   const theme = useTheme();
   const styles = useThemedStyles(makeStyles);
-  useEngineChange(['packs', 'phase']);
+  const guideRevision = useEngineChange(['packs', 'phase']);
+  const previousRevision = useRef(guideRevision);
 
   const routeTopic = route.params?.topic;
   const [view, setView] = useState<GuideView>(
@@ -46,6 +47,13 @@ export function GuideScreen(): JSX.Element {
   useEffect(() => {
     if (route.params?.topic !== undefined) setView({ kind: 'topic', topic: route.params.topic });
   }, [route.params?.topic]);
+
+  useEffect(() => {
+    if (previousRevision.current !== guideRevision) {
+      previousRevision.current = guideRevision;
+      setView({ kind: 'topics' });
+    }
+  }, [guideRevision]);
 
   const topics = engine.guide.topics();
 

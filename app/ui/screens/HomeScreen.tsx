@@ -107,7 +107,7 @@ export function HomeScreen(): JSX.Element {
           }}
         />
       ) : null}
-      {theme.mascot.placement === 'heroBelow' ? <MascotSlot /> : null}
+      {theme.mascot.placement === 'heroBelow' ? <View style={styles.heroMascot}><MascotSlot /></View> : null}
     </View>
   );
 
@@ -246,7 +246,7 @@ export function HomeScreen(): JSX.Element {
   };
 
   return (
-    <Screen title={t.title} banner={<AppBanners />} right={<StatusBadges />} mascot={<MascotSlot />}>
+    <Screen title={t.title} banner={<AppBanners />} right={<StatusBadges />} mascot={theme.mascot.placement === 'headerEnd' ? <MascotSlot /> : undefined}>
       <View style={styles.sections}>
         {homeSections(theme.home.order, availableSections).map((section) => (
           <Fragment key={section}>{sections[section] ?? null}</Fragment>
@@ -272,6 +272,9 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   heroCopy: {
     flex: 1,
     gap: t.space.xs,
+  },
+  heroMascot: {
+    alignItems: 'center',
   },
   section: {
     gap: t.space.gutter,

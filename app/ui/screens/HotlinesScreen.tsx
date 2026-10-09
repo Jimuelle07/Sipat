@@ -14,7 +14,7 @@ import { useThemedStyles } from '../theme';
 import type { Theme } from '../theme';
 import type { RootNavigation } from '../navigation/types';
 
-const MAX_CONTACTS = 5;
+const MAX_CONTACTS_TO_CHECK = 6;
 
 export interface PlanDraft {
   evacuationCenter: string;
@@ -168,9 +168,6 @@ export function HotlinesScreen(): JSX.Element {
         onChangeText={(value) => setDraft({ ...draft, meetingPlace: value })}
       />
       <Txt role="label">{t.contacts}</Txt>
-      {hasContactsError(errors) ? (
-        <InlineError message={errorMessage(lang, 'validation', 'too_many_contacts') ?? ''} />
-      ) : null}
       {draft.contacts.map((contact, index) => (
         <View key={`contact-${index}`} style={styles.contactEditor}>
           <Field label={t.contactName} value={contact.name} onChangeText={(value) => patchContact(index, { name: value })} />
@@ -190,7 +187,7 @@ export function HotlinesScreen(): JSX.Element {
           />
         </View>
       ))}
-      {draft.contacts.length < MAX_CONTACTS ? (
+      {draft.contacts.length < MAX_CONTACTS_TO_CHECK ? (
         <Button
           label={t.addContact}
           variant="tonal"
@@ -199,6 +196,9 @@ export function HotlinesScreen(): JSX.Element {
         />
       ) : null}
       {saved ? <Txt role="bodySmall" tone="muted">{t.saved}</Txt> : null}
+      {hasContactsError(errors) ? (
+        <InlineError message={errorMessage(lang, 'validation', 'too_many_contacts') ?? ''} />
+      ) : null}
       <View style={styles.actions}>
         <Button
           label={t.cancel}
@@ -247,7 +247,7 @@ export function HotlinesScreen(): JSX.Element {
   ) : null;
 
   return (
-    <Screen title={t.title} banner={<AppBanners />} right={<StatusBadges />}>
+    <Screen key={editing ? 'editing' : 'view'} title={t.title} banner={<AppBanners />} right={<StatusBadges />}>
       <SectionHeader
         title={t.familyPlan}
         action={profile !== null

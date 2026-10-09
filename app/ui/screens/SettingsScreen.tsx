@@ -1,7 +1,7 @@
 import type { JSX } from 'react';
 import { useReducer, useRef, useState } from 'react';
 import type { ComponentProps } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import type { DeviceTier, Settings } from '../../engine';
@@ -249,25 +249,30 @@ function Stepper({ label, value, suffix, onStep, decreaseLabel, increaseLabel }:
   decreaseLabel: string;
   increaseLabel: string;
 }): JSX.Element {
+  const theme = useTheme();
   const styles = useThemedStyles(makeStyles);
   return (
     <View style={styles.stepper}>
       <Txt role="label" style={styles.stepperLabel}>{label}</Txt>
-      <Button
-        label={decreaseLabel}
-        variant="tonal"
-        icon="remove"
-        onPress={() => onStep(-1)}
-        accessibilityLabel={`${decreaseLabel} ${label}`}
-      />
-      <Txt role="title" align="center" accessibilityLiveRegion="polite" style={styles.stepperValue}>{value}{suffix}</Txt>
-      <Button
-        label={increaseLabel}
-        variant="tonal"
-        icon="add"
-        onPress={() => onStep(1)}
-        accessibilityLabel={`${increaseLabel} ${label}`}
-      />
+      <View style={styles.stepperControls}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${decreaseLabel} ${label}`}
+          onPress={() => onStep(-1)}
+          style={styles.stepperButton}
+        >
+          <Ionicons name="remove" size={theme.type.roles.title.fontSize} color={theme.colors.capsule.ink} />
+        </Pressable>
+        <Txt role="title" align="center" accessibilityLiveRegion="polite" style={styles.stepperValue}>{value}{suffix}</Txt>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${increaseLabel} ${label}`}
+          onPress={() => onStep(1)}
+          style={styles.stepperButton}
+        >
+          <Ionicons name="add" size={theme.type.roles.title.fontSize} color={theme.colors.capsule.ink} />
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -335,16 +340,26 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     textAlign: 'right',
   },
   stepper: {
-    minHeight: t.minTouch,
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: t.space.sm,
   },
+  stepperControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: t.space.md,
+  },
   stepperLabel: {
-    flex: 1,
+    flexShrink: 1,
+  },
+  stepperButton: {
+    minWidth: t.minTouch,
+    minHeight: t.minTouch,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: t.radius.pill,
+    backgroundColor: t.colors.capsule.fill,
   },
   stepperValue: {
-    minWidth: t.space.xxxl + t.space.xxl,
+    flex: 1,
   },
   confirmBlock: {
     gap: t.space.md,

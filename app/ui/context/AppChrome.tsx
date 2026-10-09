@@ -1,13 +1,13 @@
 import { createContext, useContext, useMemo, useState } from 'react';
 import type { JSX, ReactNode } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { StatusBadge, StaleBanner, SwitchBanner } from '../components';
+import { Button, StatusBadge, StaleBanner, SwitchBanner } from '../components';
 import { useLang, useT } from '../i18n';
 import { errorMessage } from '../strings/errors';
 import { commonStrings } from '../strings/common';
 import { fill } from '../strings/format';
 import { shouldShowSwitch } from '../screens/home/homeModel';
-import { useThemedStyles } from '../theme';
+import { useTheme, useThemedStyles } from '../theme';
 import type { Theme } from '../theme';
 import { useEngine, useEngineChange } from './useEngine';
 
@@ -48,6 +48,7 @@ export function AppBanners(): JSX.Element | null {
   const engine = useEngine();
   const lang = useLang().lang;
   const t = useT(commonStrings);
+  const theme = useTheme();
   const styles = useThemedStyles(makeStyles);
   const seen = useContext(SeenSwitchContext);
   useEngineChange(['phase', 'context', 'status', 'settings']);
@@ -86,11 +87,12 @@ export function AppBanners(): JSX.Element | null {
         />
       ) : null}
       {stale ? (
-        <StaleBanner
-          text={engine.copy('stale_warning', { lang })}
-          actionLabel={t.staleReconfirm}
-          onAction={() => engine.context.reconfirmWarning(stale.kind)}
-        />
+        <View style={[styles.staleWrap, { backgroundColor: theme.colors.dangerSurface.fill }]}>
+          <StaleBanner text={engine.copy('stale_warning', { lang })} />
+          <View style={styles.staleAction}>
+            <Button label={t.staleReconfirm} onPress={() => engine.context.reconfirmWarning(stale.kind)} variant="tonal" />
+          </View>
+        </View>
       ) : null}
     </View>
   );
@@ -124,5 +126,7 @@ export function StatusBadges(): JSX.Element {
 
 const makeStyles = (t: Theme) => StyleSheet.create({
   banners: { gap: t.space.sm },
+  staleWrap: { borderRadius: t.radius.menu },
+  staleAction: { alignItems: 'flex-end', paddingHorizontal: t.space.lg, paddingBottom: t.space.lg },
   badges: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap', gap: t.space.xs },
 });

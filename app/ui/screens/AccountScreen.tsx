@@ -44,7 +44,7 @@ export function AccountScreen(): JSX.Element {
     const problem = validate(mode, email, password, confirm, t);
     if (problem) { setError(problem); setNotice(null); return; }
     setError(null);
-    setNotice(mode === 'forgot' ? t.resetSent : t.demoNote);
+    setNotice(t.demoNote);
     setPassword(''); setConfirm('');
   };
 

@@ -9,7 +9,7 @@ import { Txt } from '../components/Txt';
 import { useT } from '../i18n';
 import { devStrings } from '../strings/dev';
 import { useDevOverrides } from './AppChrome';
-import { useEngine } from './useEngine';
+import { useEngine, useEngineChange } from './useEngine';
 import { useTheme, useThemedStyles } from '../theme';
 import type { Theme } from '../theme';
 import type { FaceDetection, FeedError, LocationError, MockEngine, MockScenario, ModelInstallError, PhotoError } from '../../engine';
@@ -57,6 +57,7 @@ export function DevPanel({ global = false }: { global?: boolean }): JSX.Element 
   const t = useT(devStrings);
   const styles = useThemedStyles(makeStyles);
   const overrides = useDevOverrides();
+  useEngineChange(['context', 'status']);
   const { expanded, setExpanded } = useDevPanelState();
   const [scenario, setScenario] = useState<MockScenario | 'keyword'>('keyword');
   const [statusPreset, setStatusPreset] = useState<'battery' | 'saver' | 'lite' | 'none' | 'clear'>('clear');
@@ -67,6 +68,7 @@ export function DevPanel({ global = false }: { global?: boolean }): JSX.Element 
 
   if (!global || !('debug' in engine)) return null;
   const debug = (engine as typeof engine & { debug: MockEngine['debug'] }).debug;
+  const firstWarning = engine.context.cards()[0];
 
   const scenarioItems: { value: MockScenario | 'keyword'; label: LabelKey }[] = [
     { value: 'keyword', label: 'keyword' },
@@ -160,6 +162,19 @@ export function DevPanel({ global = false }: { global?: boolean }): JSX.Element 
             </ControlSection>
             <ControlSection title={t.status}>
               <View style={styles.chips}>{stateItems.map((item) => <Chip key={item.value} label={t[item.label]} selected={statusPreset === item.value} onPress={item.onPress} />)}</View>
+              <View style={styles.chips}>
+                <Button
+                  label={t.markStale}
+                  onPress={() => {
+                    if (firstWarning) debug.setStatus({ stale: { kind: firstWarning.kind, hoursSinceSet: firstWarning.hoursSinceSet } });
+                  }}
+                  disabled={!firstWarning}
+                  accessibilityHint={!firstWarning ? t.staleNeedsWarning : undefined}
+                  variant="tonal"
+                />
+                <Button label={t.clearStale} onPress={() => debug.setStatus({ stale: undefined })} variant="outline" />
+              </View>
+              {!firstWarning ? <Txt role="bodySmall" tone="muted">{t.staleNeedsWarning}</Txt> : null}
             </ControlSection>
             <ControlSection title={t.photo}>
               {chips(photoItems, photoPreset, (value) => { setPhotoPreset(value); debug.setPhotoResult(value); })}

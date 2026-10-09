@@ -81,7 +81,7 @@ export function EmergencyScreen(): JSX.Element {
               >
                 <Ionicons name="call" size={theme.type.roles.title.fontSize} color={ink} />
                 <View style={styles.pillCopy}>
-                  <Txt role="label" color={ink} numberOfLines={1}>{hotline.name}</Txt>
+                  <Txt role="label" color={ink}>{hotline.name}</Txt>
                   <Txt role="title" color={ink} style={styles.number}>{hotline.number}</Txt>
                 </View>
               </Pressable>
