@@ -51,6 +51,10 @@ export interface ModelFiles {
   copyWithSha256(
     srcUri: string, destPath: string, onProgress: (bytes: number, total: number) => void, signal?: AbortSignal,
   ): Promise<string>;
+  /** Downloads `url` to `destPath` and hashes the result. Throws `cancelled` or `download_failed`. */
+  downloadWithSha256(
+    url: string, destPath: string, onProgress: (bytes: number, total: number) => void, signal?: AbortSignal,
+  ): Promise<{ sha256: string; bytes: number }>;
   remove(path: string): Promise<void>;
   move(srcPath: string, destPath: string): Promise<void>;
 }
@@ -61,13 +65,18 @@ export function defaultModelFiles(): ModelFiles | null {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const fs = require('expo-file-system') as {
       Paths: { document: unknown; availableDiskSpace: number };
-      File: new (...parts: unknown[]) => {
+      File: (new (...parts: unknown[]) => {
         uri: string; exists: boolean; size: number; open(mode?: string): {
           size: number | null; readBytes(length: number): Uint8Array; writeBytes(bytes: Uint8Array): void; close(): void;
         };
         create(options?: { intermediates?: boolean; overwrite?: boolean }): void;
         delete(): void;
         move(destination: unknown): void;
+      }) & {
+        downloadFileAsync(url: string, destination: unknown, options: {
+          idempotent?: boolean; signal?: AbortSignal;
+          onProgress?: (data: { bytesWritten: number; totalBytes: number }) => void;
+        }): Promise<{ size: number }>;
       };
       Directory: new (...parts: unknown[]) => {
         create(options?: { intermediates?: boolean; idempotent?: boolean }): void;
@@ -115,6 +124,36 @@ export function defaultModelFiles(): ModelFiles | null {
           input.close();
           output.close();
         }
+      },
+      downloadWithSha256: async (url, destPath, onProgress, signal) => {
+        new fs.Directory(fs.Paths.document, 'models').create({ intermediates: true, idempotent: true });
+        const dest = fileFor(destPath);
+        if (dest.exists) dest.delete();
+        try {
+          await fs.File.downloadFileAsync(url, dest, {
+            idempotent: true,
+            signal,
+            onProgress: ({ bytesWritten, totalBytes }) => onProgress(bytesWritten, totalBytes),
+          });
+        } catch {
+          throw new Error(signal?.aborted ? 'cancelled' : 'download_failed');
+        }
+        // Hash the finished file in chunks: the 0.81 GB model never sits in memory at once.
+        const input = fileFor(destPath).open('r');
+        const hash = crypto.createHash('sha256');
+        let bytes = 0;
+        try {
+          for (;;) {
+            if (signal?.aborted) throw new Error('cancelled');
+            const chunk = input.readBytes(chunkSize);
+            if (chunk.byteLength === 0) break;
+            hash.update(chunk);
+            bytes += chunk.byteLength;
+          }
+        } finally {
+          input.close();
+        }
+        return { sha256: hash.digest('hex'), bytes };
       },
       remove: async (path) => { const file = fileFor(path); if (file.exists) file.delete(); },
       move: async (srcPath, destPath) => {
@@ -201,7 +240,7 @@ export function createModelManager(deps: {
   readTier: () => Promise<DeviceTier>;
   nCtx?: number;
   idleUnloadMs?: number;
-  expected?: { file_name: string; size: number; sha256: string };
+  expected?: { file_name: string; size: number; sha256: string; url?: string };
   installMarginBytes?: number;
   onBackground?: (cb: () => void) => () => void;
   instructionPrefix?: () => BuiltPrompt['messages'];
@@ -335,9 +374,8 @@ export function createModelManager(deps: {
     (idleTimer as unknown as { unref?: () => void }).unref?.();
   };
 
-  const install = async (
-    file: PickedFile, onProgress: (bytes: number, total: number) => void, signal?: AbortSignal,
-  ): Promise<Result<void, ModelInstallError>> => {
+  /** Tier, file access and free space: the checks before either install path writes anything. */
+  const preflight = async (): Promise<Result<ModelFiles, ModelInstallError>> => {
     let tier: DeviceTier;
     try { tier = await deps.readTier(); } catch { return ierr('tier', 'Could not read device tier'); }
     if (tier === 'none') return ierr('tier', 'This device tier does not support AI');
@@ -345,22 +383,60 @@ export function createModelManager(deps: {
     let freeBytes: number;
     try { freeBytes = await files.freeBytes(); } catch { return ierr('io', 'Could not check free storage'); }
     if (freeBytes < expected.size + (deps.installMarginBytes ?? 64 * 1024 * 1024)) return ierr('no_space', 'Not enough free storage for the model');
+    return iok(files);
+  };
+
+  const install = async (
+    file: PickedFile, onProgress: (bytes: number, total: number) => void, signal?: AbortSignal,
+  ): Promise<Result<void, ModelInstallError>> => {
+    const ready = await preflight();
+    if (!ready.ok) return ready;
+    const store = ready.value;
     if (file.name !== expected.file_name || file.size !== expected.size) return ierr('wrong_file', 'The selected file is not the bundled model');
     try {
       if (signal?.aborted) throw new Error('cancelled');
-      const digest = await files.copyWithSha256(file.uri, partialPath, onProgress, signal);
+      const digest = await store.copyWithSha256(file.uri, partialPath, onProgress, signal);
       if (signal?.aborted) throw new Error('cancelled');
       if (digest.toLowerCase() !== expected.sha256.toLowerCase()) {
-        await files.remove(partialPath);
+        await store.remove(partialPath);
         return ierr('hash_mismatch', 'The selected file hash does not match');
       }
-      await files.move(partialPath, modelPath);
+      await store.move(partialPath, modelPath);
       setState('unloaded');
       return iok(undefined);
     } catch (error) {
-      try { await files.remove(partialPath); } catch { /* cleanup is best effort */ }
+      try { await store.remove(partialPath); } catch { /* cleanup is best effort */ }
       if (signal?.aborted || (error instanceof Error && error.message === 'cancelled')) return ierr('cancelled', 'Install was cancelled');
       return ierr('io', 'Could not copy the model file');
+    }
+  };
+
+  const download = async (
+    onProgress: (bytes: number, total: number) => void, signal?: AbortSignal,
+  ): Promise<Result<{ bytes: number }, ModelInstallError>> => {
+    const url = expected.url;
+    if (!url) return ierr('download_failed', 'No download URL for this model');
+    const ready = await preflight();
+    if (!ready.ok) return ready;
+    const store = ready.value;
+    try {
+      if (signal?.aborted) throw new Error('cancelled');
+      const got = await store.downloadWithSha256(url, partialPath, onProgress, signal);
+      if (signal?.aborted) throw new Error('cancelled');
+      // A short or swapped file never becomes the model: size and SHA-256 must both match.
+      if (got.bytes !== expected.size || got.sha256.toLowerCase() !== expected.sha256.toLowerCase()) {
+        await store.remove(partialPath);
+        return ierr('hash_mismatch', 'The downloaded file does not match the expected model');
+      }
+      await store.move(partialPath, modelPath);
+      setState('unloaded');
+      return iok({ bytes: got.bytes });
+    } catch (error) {
+      try { await store.remove(partialPath); } catch { /* cleanup is best effort */ }
+      const message = error instanceof Error ? error.message : '';
+      if (signal?.aborted || message === 'cancelled') return ierr('cancelled', 'Download was cancelled');
+      if (message === 'download_failed') return ierr('download_failed', 'The model could not be downloaded');
+      return ierr('io', 'Could not save the model file');
     }
   };
 
@@ -427,7 +503,7 @@ export function createModelManager(deps: {
   };
 
   return {
-    state: () => current, tier: deps.readTier, warm, generate, stop, unload, present, install, remove,
+    state: () => current, tier: deps.readTier, warm, generate, stop, unload, present, install, download, remove,
     onStateChange(listener) { listeners.add(listener); return () => listeners.delete(listener); },
   };
 }

@@ -103,7 +103,8 @@ export interface EngineOverrides { // tests and the Node evaluation only
 
 export type AccountError = 'invalid_email' | 'weak_password' | 'offline' | 'http' | 'demo_only';
 export type ModelInstallError =
-  | 'tier' | 'no_space' | 'wrong_file' | 'hash_mismatch' | 'cancelled' | 'io';
+  | 'tier' | 'no_space' | 'wrong_file' | 'hash_mismatch' | 'cancelled' | 'io'
+  | 'download_failed'; // download(): no connection, or the host refused or cut off the file
 
 export type EngineChange =
   | 'profiles'  // household, plan fields, location
@@ -123,7 +124,7 @@ export interface EngineInfo {
   passagesCount: number;
   sourcesCount: number;
   packs: InstalledPack[];
-  online: boolean;   // false until the build ships the online stretch (no INTERNET permission)
+  online: boolean;   // false until the pinned update host is configured (feed and packs); the model download does not depend on it
   model: { fileName: string; sizeBytes: number; present: boolean; attribution: 'Built with Llama' };
 }
 
@@ -364,6 +365,9 @@ export interface AccountApi {
 }
 
 export interface ModelApi {
+  /** Settings "I-download ang AI": fetches the GGUF from Hugging Face (logged in `updates.networkLog()`), checks size and SHA-256. */
+  download(onProgress: (bytes: number, total: number) => void, signal?: AbortSignal):
+    Promise<Result<'installed', ModelInstallError>>;
   installFromPicker(onProgress: (bytes: number, total: number) => void, signal?: AbortSignal):
     Promise<Result<'installed' | null, ModelInstallError>>;
   remove(): Promise<void>;

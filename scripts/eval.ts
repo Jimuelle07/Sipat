@@ -39,6 +39,7 @@ async function loadNodeModel(path: string): Promise<Pick<ModelManager, 'generate
       exists: async (p: string) => existsSync(p),
       size: async (p: string) => (existsSync(p) ? statSync(p).size : null),
       copyWithSha256: async () => { throw new Error('unsupported in eval'); },
+      downloadWithSha256: async () => { throw new Error('unsupported in eval'); },
       remove: async () => undefined,
       move: async () => { throw new Error('unsupported in eval'); },
     };

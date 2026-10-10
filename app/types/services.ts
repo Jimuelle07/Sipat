@@ -60,6 +60,9 @@ export interface ModelManager {
   onStateChange(listener: (s: ModelState) => void): () => void;
   install(file: PickedFile, onProgress: (bytes: number, total: number) => void, signal?: AbortSignal):
     Promise<Result<void, ModelInstallError>>;
+  /** Downloads the GGUF from `BUNDLED_MODEL.url`, checks size and SHA-256, then installs it. */
+  download(onProgress: (bytes: number, total: number) => void, signal?: AbortSignal):
+    Promise<Result<{ bytes: number }, ModelInstallError>>;
   remove(): Promise<void>;
 }
 

@@ -11,6 +11,7 @@ import { Button, InlineError, LanguageToggle, ProgressBar, Screen, Tag, Tile, To
 import { useLang, useT } from '../i18n';
 import { commonStrings } from '../strings/common';
 import { errorMessage } from '../strings/errors';
+import { fill } from '../strings/format';
 import { settingsStrings } from '../strings/settings';
 import type { RootNavigation } from '../navigation/types';
 import { useTheme, useThemedStyles } from '../theme';
@@ -46,6 +47,7 @@ export function SettingsScreen(): JSX.Element {
   const [stepError, setStepError] = useState<{ key: 'lowBatteryThreshold' | 'staleWarningHours'; message: string } | null>(null);
   const [install, dispatch] = useReducer(installReducer, { kind: 'idle' } as InstallState);
   const controllerRef = useRef<AbortController | null>(null);
+  const [installSource, setInstallSource] = useState<'download' | 'file'>('download');
   const [removing, setRemoving] = useState(false);
   const [confirm, setConfirm] = useState<ConfirmTarget>(null);
   const [historyDone, setHistoryDone] = useState(false);
@@ -66,15 +68,16 @@ export function SettingsScreen(): JSX.Element {
     const message = errorMessage(lang, 'settings', result.error.code);
     setStepError(message === null ? null : { key, message });
   };
-  const startInstall = async (): Promise<void> => {
+  const startInstall = async (source: 'download' | 'file'): Promise<void> => {
+    setInstallSource(source);
     dispatch({ type: 'start' });
     const controller = new AbortController();
     controllerRef.current = controller;
     try {
-      const result = await engine.model.installFromPicker(
-        (bytes, total) => dispatch({ type: 'progress', bytes, total }),
-        controller.signal,
-      );
+      const onProgress = (bytes: number, total: number): void => dispatch({ type: 'progress', bytes, total });
+      const result = source === 'download'
+        ? await engine.model.download(onProgress, controller.signal)
+        : await engine.model.installFromPicker(onProgress, controller.signal);
       if (!result.ok && result.error.code === 'cancelled') dispatch({ type: 'reset' });
       else dispatch({ type: 'result', result });
     } catch {
@@ -146,18 +149,30 @@ export function SettingsScreen(): JSX.Element {
           </View>
         ) : install.kind === 'copying' ? (
           <View style={styles.block}>
-            <ProgressBar value={progressFraction(install)} label={t.modelInstalling} />
+            <ProgressBar value={progressFraction(install)} label={installSource === 'download' ? t.modelDownloading : t.modelInstalling} />
             <Button label={t.modelStop} variant="tonal" icon="stop-circle-outline" onPress={stopInstall} />
           </View>
         ) : (
           <View style={styles.block}>
             <Tag label={t.modelMissing} />
-            <Txt role="bodySmall" tone="muted">{t.modelMissingHint}</Txt>
-            {install.kind === 'installed' ? <Txt role="bodySmall" tone="accent">{t.modelInstalled}</Txt> : null}
-            {install.kind === 'error' && install.code !== 'cancelled' ? (
-              <InlineError message={errorMessage(lang, 'model_install', install.code) ?? ''} />
-            ) : null}
-            <Button label={t.modelInstall} icon="download-outline" onPress={() => { void startInstall(); }} />
+            {status.tier === 'none' ? (
+              <Txt role="bodySmall" tone="muted">{errorMessage(lang, 'model_install', 'tier')}</Txt>
+            ) : (
+              <>
+                <Txt role="bodySmall" tone="muted">{t.modelMissingHint}</Txt>
+                {install.kind === 'installed' ? <Txt role="bodySmall" tone="accent">{t.modelInstalled}</Txt> : null}
+                {install.kind === 'error' && install.code !== 'cancelled' ? (
+                  <InlineError message={errorMessage(lang, 'model_install', install.code) ?? ''} />
+                ) : null}
+                <Button
+                  label={fill(t.modelDownload, { size: `${(model.sizeBytes / 1e9).toFixed(2)} GB` })}
+                  variant="highlight"
+                  icon="cloud-download-outline"
+                  onPress={() => { void startInstall('download'); }}
+                />
+                <Button label={t.modelInstall} variant="text" icon="folder-open-outline" onPress={() => { void startInstall('file'); }} />
+              </>
+            )}
           </View>
         )}
         <Txt role="caption" tone="muted">{model.attribution}</Txt>

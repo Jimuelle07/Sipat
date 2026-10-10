@@ -237,6 +237,23 @@ export function createMockEngine(opts: MockOptions = {}): MockEngine {
     packs: installedPacks, online: false,
     model: { fileName: MODEL_FILE, sizeBytes: 810_000_000, present: modelPresent, attribution: 'Built with Llama' },
   });
+  /** Fake progress for both install paths (download and file), then the model counts as present. */
+  const simulateModelInstall = async (
+    onProgress: (bytes: number, total: number) => void, signal?: AbortSignal,
+  ): Promise<Result<'installed', ModelInstallError>> => {
+    const total = 810_000_000;
+    const steps = speed === 'fast' ? 1 : 30;
+    for (let step = 1; step <= steps; step++) {
+      if (signal?.aborted) return resultErr('cancelled');
+      if (speed === 'fast') await Promise.resolve();
+      else await new Promise<void>((resolve) => setTimeout(resolve, 100));
+      onProgress(Math.floor(total * step / steps), total);
+    }
+    modelPresent = true;
+    statusAiOverride = undefined;
+    emit('status');
+    return resultOk('installed');
+  };
   const warningCards = (): WarningCard[] => {
     const view = checklistView();
     return view.warningCards.map((warning) => ({ ...warning,
@@ -948,24 +965,20 @@ export function createMockEngine(opts: MockOptions = {}): MockEngine {
       setSync: () => resultErr('not_signed_in'),
     },
     model: {
+      download: async (onProgress, signal) => {
+        if (status().tier === 'none') return resultErr('tier');
+        const result = modelInstallResult;
+        modelInstallResult = 'installed';
+        if (result !== 'installed') return resultErr(result);
+        return simulateModelInstall(onProgress, signal);
+      },
       installFromPicker: async (onProgress, signal) => {
         if (status().tier === 'none') return resultErr('tier');
         const result = modelInstallResult;
         modelInstallResult = 'installed';
         if (result === 'cancelled') return resultOk(null);
         if (result !== 'installed') return resultErr(result);
-        const total = 810_000_000;
-        const steps = speed === 'fast' ? 1 : 30;
-        for (let step = 1; step <= steps; step++) {
-          if (signal?.aborted) return resultErr('cancelled');
-          if (speed === 'fast') await Promise.resolve();
-          else await new Promise<void>((resolve) => setTimeout(resolve, 100));
-          onProgress(Math.floor(total * step / steps), total);
-        }
-        modelPresent = true;
-        statusAiOverride = undefined;
-        emit('status');
-        return resultOk('installed');
+        return simulateModelInstall(onProgress, signal);
       },
       remove: async () => {
         modelPresent = false;

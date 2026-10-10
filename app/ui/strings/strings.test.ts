@@ -78,7 +78,7 @@ const REQUIRED: Record<ErrorSource, string[]> = {
   feed: ['empty', 'disabled', 'offline', 'http', 'unknown_key', 'bad_signature', 'key_expired', 'app_too_old'],
   updates: ['offline', 'http', 'not_allowed', 'unknown_key', 'bad_signature', 'key_expired', 'app_too_old', 'hash_mismatch', 'schema', 'failed'],
   packs: ['bad_archive', 'unknown_key', 'bad_signature', 'key_expired', 'app_too_old', 'rollback', 'hash_mismatch', 'schema', 'io', 'nothing_to_roll_back'],
-  model_install: ['tier', 'no_space', 'wrong_file', 'hash_mismatch', 'io', 'failed'],
+  model_install: ['tier', 'no_space', 'wrong_file', 'hash_mismatch', 'io', 'failed', 'download_failed'],
   account: ['demo_only', 'invalid_email', 'weak_password', 'offline', 'http'],
   damage: ['io', 'invalid', 'too_many_photos', 'not_opted_in', 'offline', 'http'],
 };

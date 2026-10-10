@@ -14,7 +14,7 @@ const NO_SPACE = 'Hindi na-save. Tingnan kung may espasyo pa ang phone.';
 const RETRY = 'Hindi nagawa. Subukan muli.';
 const SERVER = 'Hindi maabot ang server. Subukan muli mamaya.';
 const OFFLINE = 'Walang internet.';
-const PACKS_AUTH = 'Hindi galing sa Bagyo Buddy ang file na ito. Hindi ito ii-install.';
+const PACKS_AUTH = 'Hindi galing sa Sipat ang file na ito. Hindi ito ii-install.';
 const PACKS_DAMAGED = 'Sira ang file. Humingi ng bagong kopya.';
 const FEED_AUTH = 'Hindi ma-verify ang balita. Ipinapakita ang huling na-download.';
 
@@ -25,7 +25,7 @@ const NO_SPACE_EN = 'It was not saved. Check if the phone still has space.';
 const RETRY_EN = 'It did not work. Try again.';
 const SERVER_EN = 'The server cannot be reached. Try again later.';
 const OFFLINE_EN = 'No internet.';
-const PACKS_AUTH_EN = 'This file did not come from Bagyo Buddy. It will not be installed.';
+const PACKS_AUTH_EN = 'This file did not come from Sipat. It will not be installed.';
 const PACKS_DAMAGED_EN = 'The file is damaged. Ask for a new copy.';
 const FEED_AUTH_EN = 'The news could not be verified. Showing the last download.';
 
@@ -59,7 +59,7 @@ export const errorStrings = defineStrings({
     'ai.battery_saver': 'Naka-on ang battery saver, kaya buod lang ang ipinapakita.',
     'ai.ai_off': 'Naka-off ang AI sa Settings.',
     'ai.tier': 'Hindi kaya ng phone na ito ang AI. Buod mula sa gabay ang ipinapakita.',
-    'ai.no_model': 'Wala pang AI model sa phone na ito.',
+    'ai.no_model': 'Wala pang AI sa phone na ito. I-download ito sa Settings.',
 
     'model_state.loading': 'Inihahanda ang AI…',
     'model_state.generating': 'Sumusulat ng sagot…',
@@ -143,6 +143,7 @@ export const errorStrings = defineStrings({
     'model_install.hash_mismatch': 'Hindi ito ang tamang AI model file.',
     'model_install.io': NO_SPACE,
     'model_install.failed': RETRY,
+    'model_install.download_failed': 'Hindi na-download ang AI. Tingnan ang internet at subukan muli.',
 
     'account.demo_only': 'Demo pa lang ito. Gumagana ang app kahit walang account.',
     'account.invalid_email': 'Tingnan muli ang email.',
@@ -167,7 +168,7 @@ export const errorStrings = defineStrings({
     'ai.battery_saver': 'Battery saver is on, so only the summary is shown.',
     'ai.ai_off': 'AI is off in Settings.',
     'ai.tier': 'This phone cannot run the AI. The summary from the guide is shown.',
-    'ai.no_model': 'There is no AI model on this phone yet.',
+    'ai.no_model': 'There is no AI on this phone yet. Download it in Settings.',
 
     'model_state.loading': 'Preparing the AI…',
     'model_state.generating': 'Writing an answer…',
@@ -251,6 +252,7 @@ export const errorStrings = defineStrings({
     'model_install.hash_mismatch': 'This is not the right AI model file.',
     'model_install.io': NO_SPACE_EN,
     'model_install.failed': RETRY_EN,
+    'model_install.download_failed': 'The AI could not be downloaded. Check the internet and try again.',
 
     'account.demo_only': 'This is demo only. The app works even without an account.',
     'account.invalid_email': 'Check the email again.',

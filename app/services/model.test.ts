@@ -25,6 +25,7 @@ function fakeFiles(over: Partial<ModelFiles> = {}): ModelFiles & { files: Set<st
     exists: vi.fn(async (path) => files.has(path)),
     size: vi.fn(async (path) => files.has(path) ? 100 : null),
     copyWithSha256: vi.fn(async (_src, dest, onProgress) => { files.add(dest); onProgress(100, 100); return 'abc'; }),
+    downloadWithSha256: vi.fn(async (_url, dest, onProgress) => { files.add(dest); onProgress(100, 100); return { sha256: 'abc', bytes: 100 }; }),
     remove: vi.fn(async (path) => { files.delete(path); }),
     move: vi.fn(async (src, dest) => { files.delete(src); files.add(dest); moved.push([src, dest]); }),
     ...over,
@@ -125,7 +126,7 @@ describe('ModelManager', () => {
   });
 });
 
-const INSTALL_EXPECTED = { file_name: 'model.gguf', size: 100, sha256: 'abc' };
+const INSTALL_EXPECTED = { file_name: 'model.gguf', size: 100, sha256: 'abc', url: 'https://example.invalid/model.gguf' };
 const picked = { uri: 'file:///picked/model.gguf', name: 'model.gguf', size: 100 };
 
 function installManager(options: {
@@ -191,6 +192,44 @@ describe('ModelManager install', () => {
   });
 });
 
+describe('ModelManager download', () => {
+  it('downloads, checks size and hash, then moves the model into place', async () => {
+    const { files, manager } = installManager();
+    const progress: [number, number][] = [];
+    expect(await manager.download((bytes, total) => progress.push([bytes, total]))).toEqual({ ok: true, value: { bytes: 100 } });
+    expect(files.downloadWithSha256).toHaveBeenCalledWith('https://example.invalid/model.gguf', '/models/model.gguf.part', expect.any(Function), undefined);
+    expect(progress).toEqual([[100, 100]]);
+    expect(files.moved).toEqual([['/models/model.gguf.part', '/models/model.gguf']]);
+  });
+
+  it('never installs a file whose size or hash differs, and deletes it', async () => {
+    const short = fakeFiles({ downloadWithSha256: async (_url, dest) => { short.files.add(dest); return { sha256: 'abc', bytes: 99 }; } });
+    expect(await installManager({ files: short }).manager.download(() => undefined)).toMatchObject({ ok: false, error: { code: 'hash_mismatch' } });
+    expect(short.files.has('/models/model.gguf.part')).toBe(false);
+    expect(short.moved).toEqual([]);
+
+    const swapped = fakeFiles({ downloadWithSha256: async (_url, dest) => { swapped.files.add(dest); return { sha256: 'nope', bytes: 100 }; } });
+    expect(await installManager({ files: swapped }).manager.download(() => undefined)).toMatchObject({ ok: false, error: { code: 'hash_mismatch' } });
+    expect(swapped.moved).toEqual([]);
+  });
+
+  it('reports a failed or cancelled download and cleans up the partial file', async () => {
+    const offline = fakeFiles({ downloadWithSha256: async (_url, dest) => { offline.files.add(dest); throw new Error('download_failed'); } });
+    expect(await installManager({ files: offline }).manager.download(() => undefined)).toMatchObject({ ok: false, error: { code: 'download_failed' } });
+    expect(offline.files.has('/models/model.gguf.part')).toBe(false);
+
+    const cancelled = fakeFiles({ downloadWithSha256: async (_url, dest) => { cancelled.files.add(dest); throw new Error('cancelled'); } });
+    expect(await installManager({ files: cancelled }).manager.download(() => undefined)).toMatchObject({ ok: false, error: { code: 'cancelled' } });
+    expect(cancelled.files.has('/models/model.gguf.part')).toBe(false);
+  });
+
+  it('makes no request on a phone that cannot run the model', async () => {
+    const { files, manager } = installManager({ tier: 'none' });
+    expect(await manager.download(() => undefined)).toMatchObject({ ok: false, error: { code: 'tier' } });
+    expect(files.downloadWithSha256).not.toHaveBeenCalled();
+  });
+});
+
 it.skipIf(!existsSync(resolve(process.cwd(), 'models', BUNDLED_MODEL.file_name)))(
   'streams the bundled GGUF through Node and matches its documented size and SHA-256', async () => {
     const path = resolve(process.cwd(), 'models', BUNDLED_MODEL.file_name);
@@ -208,6 +247,7 @@ it.skipIf(!existsSync(resolve(process.cwd(), 'models', BUNDLED_MODEL.file_name))
           onProgress(bytes, info.size);
         }).on('error', reject).on('end', () => resolveHash(hash.digest('hex')));
       }),
+      downloadWithSha256: async () => { throw new Error('unused'); },
       remove: async () => undefined,
       move: async () => undefined,
     };

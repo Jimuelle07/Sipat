@@ -130,6 +130,14 @@ function createFakeModel(readTier: () => Promise<DeviceTier>) {
       onProgress(size, size);
       return hash;
     },
+    async downloadWithSha256(_url, dest, onProgress, signal) {
+      if (signal?.aborted) throw new Error('cancelled');
+      const size = fileSetting === 'wrong_size' ? BUNDLED_MODEL.size + 1 : BUNDLED_MODEL.size;
+      const sha256 = fileSetting === 'wrong_hash' ? '0'.repeat(64) : BUNDLED_MODEL.sha256;
+      files.set(dest, { size, hash: sha256 });
+      onProgress(size, size);
+      return { sha256, bytes: size };
+    },
     async remove(path) { files.delete(path); },
     async move(srcPath, destPath) {
       const found = files.get(srcPath);
