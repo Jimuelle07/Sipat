@@ -134,7 +134,19 @@ function parse(raw: string): ModelOutput | null {
   if (typeof o.in_guide !== 'boolean' || typeof o.answer !== 'string') return null;
   const hint = o.phase_hint;
   if (hint !== null && !(typeof hint === 'string' && PHASES.includes(hint))) return null;
-  return { used: o.used as string[], in_guide: o.in_guide, phase_hint: hint as ModelOutput['phase_hint'], answer: o.answer };
+  return { used: o.used as string[], in_guide: o.in_guide, phase_hint: hint as ModelOutput['phase_hint'], answer: finishedSentences(o.answer) };
+}
+
+/**
+ * The schema's `maxLength` (and `n_predict`) can stop the answer mid-sentence. Keep only the
+ * finished sentences so the screen never shows a cut-off word; an answer with no finished
+ * sentence is kept as written. This only removes model text, never adds any.
+ */
+function finishedSentences(answer: string): string {
+  const text = answer.trimEnd();
+  if (/[.!?]$/.test(text)) return text;
+  const lastEnd = Math.max(text.lastIndexOf('. '), text.lastIndexOf('! '), text.lastIndexOf('? '));
+  return lastEnd === -1 ? text : text.slice(0, lastEnd + 1);
 }
 
 /** `lang` is the answer language the prompt asked for; `wrong_language` fires when the answer is not in it. */

@@ -1858,15 +1858,15 @@ Targets and the question mix are in [solution.md](solution.md).
 
 Backend-internal. The frontend sees only the resulting `ai_*` events and, through `decidePhase`, any `phase_change`. The model is Llama 3.2 1B on the phone; there is no cloud model.
 
-**Message layout.** The fixed part comes first so it can be cached as a session prefix. The two worked examples are written from real guide passages before the build.
+**Message layout.** The fixed part comes first so it can be cached as a session prefix. The two worked examples are written from real guide passages before the build. The refusal example comes first and the answered example last: measured with the bundled 1B GGUF, the model copied the nearest example, and with the refusal last it marked guide-backed answers `"in_guide": false`.
 
 ```ts
 const messages: ChatMessage[] = [
   { role: 'system', content: SYSTEM_TL },
-  { role: 'user', content: EXAMPLE_1_USER },      // (fill in from the guide)
-  { role: 'assistant', content: EXAMPLE_1_JSON },
   { role: 'user', content: EXAMPLE_2_USER },      // a question the passage does not answer
   { role: 'assistant', content: EXAMPLE_2_JSON }, // shows "in_guide": false
+  { role: 'user', content: EXAMPLE_1_USER },      // (fill in from the guide)
+  { role: 'assistant', content: EXAMPLE_1_JSON },
   { role: 'user', content: userTurn },            // the only variable part
 ];
 ```
@@ -1915,7 +1915,7 @@ export function answerSchema(ids: string[]) {
       used: { type: 'array', items: { enum: ids }, minItems: 1, maxItems: ids.length },
       in_guide: { type: 'boolean' },
       phase_hint: { enum: ['before', 'during', 'after', null] },
-      answer: { type: 'string', maxLength: 400 },
+      answer: { type: 'string', maxLength: 240 }, // fits n_predict 110; at 400 long answers ran past the cap mid-string
     },
     required: ['used', 'in_guide', 'phase_hint', 'answer'],
     additionalProperties: false,
