@@ -1,6 +1,7 @@
 import type { JSX, ReactNode } from 'react';
 import { useRef, useState } from 'react';
-import { Animated, Pressable, View, StyleSheet } from 'react-native';
+import { Animated, Image, Pressable, RefreshControl, View, StyleSheet } from 'react-native';
+import logo from '../../../assets/agi-sipat-logo.png';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useDockInset } from '../context/DockInset';
@@ -24,6 +25,8 @@ export interface ScreenProps {
   masthead?: ReactNode;
   /** Hides the language toggle (full-bleed screens such as the photo studio). */
   hideLanguage?: boolean;
+  /** Pull to refresh on scrolling screens (the feed); the caller owns the request. */
+  refresh?: { refreshing: boolean; onRefresh: () => void };
 }
 
 /**
@@ -33,7 +36,7 @@ export interface ScreenProps {
  * compact actions wrap to a deliberate second line, right-aligned, only when they cannot sit
  * beside the title. In the "during" (essentials) theme the mascot sits at the header end.
  */
-export function Screen({ title, children, scroll = true, right, mascot, back, banner, masthead, hideLanguage = false }: ScreenProps): JSX.Element {
+export function Screen({ title, children, scroll = true, right, mascot, back, banner, masthead, hideLanguage = false, refresh }: ScreenProps): JSX.Element {
   const t = useTheme();
   const styles = useThemedStyles(makeStyles);
   // The tab dock floats over the screen, so tab screens reserve its height at the end of the body.
@@ -67,6 +70,15 @@ export function Screen({ title, children, scroll = true, right, mascot, back, ba
       showsVerticalScrollIndicator={false}
       scrollEventThrottle={16}
       onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}
+      refreshControl={refresh ? (
+        <RefreshControl
+          refreshing={refresh.refreshing}
+          onRefresh={refresh.onRefresh}
+          progressViewOffset={overlayHeight}
+          tintColor={t.colors.accentText}
+          colors={[t.colors.accentText]}
+        />
+      ) : undefined}
     >
       {titleRow}
       {children}
@@ -94,6 +106,7 @@ export function Screen({ title, children, scroll = true, right, mascot, back, ba
               <Ionicons name="arrow-back" size={t.type.roles.title.fontSize} color={t.colors.ink} />
             </Pressable>
           ) : null}
+          <Image source={logo} accessibilityIgnoresInvertColors style={styles.logo} />
           {hideLanguage ? null : <LanguageToggle />}
           <View pointerEvents="box-none" style={styles.actionsEnd}>
             {right}
@@ -135,6 +148,11 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   },
   title: {
     flexShrink: 1,
+  },
+  logo: {
+    width: t.minTouch * 0.75,
+    height: t.minTouch * 0.75,
+    borderRadius: t.radius.pill,
   },
   back: {
     width: t.minTouch,

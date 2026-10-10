@@ -32,6 +32,7 @@ export { FixedReplyCard } from './FixedReplyCard';
 export { RefusalCard } from './RefusalCard';
 export { PlanAnswerCard } from './PlanAnswerCard';
 export { BulletinCard } from './BulletinCard';
+export { StormTrack } from './StormTrack';
 export { PhaseChangeLine } from './PhaseChangeLine';
 export { ClosingLine } from './ClosingLine';
 export { AiStatusLine } from './AiStatusLine';

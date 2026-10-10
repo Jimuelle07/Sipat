@@ -10,6 +10,7 @@ import { guideStrings, guideTopicLabels } from './guide';
 import { homeStrings } from './home';
 import { hotlineStrings } from './hotlines';
 import { profileStrings } from './profile';
+import { stormStrings } from './storm';
 
 interface StringTable {
   tl: Record<string, string>;
@@ -31,6 +32,7 @@ const TABLES: ReadonlyArray<readonly [string, StringTable]> = [
   table('homeStrings', homeStrings),
   table('hotlineStrings', hotlineStrings),
   table('profileStrings', profileStrings),
+  table('stormStrings', stormStrings),
 ];
 
 const ENTRIES: Array<readonly [string, string, string, string]> = [];

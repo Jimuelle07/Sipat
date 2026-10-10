@@ -7,16 +7,18 @@ import type { RootNavigation } from '../navigation/types';
 import type { ColorLevel, Phase, TcwsLevel, WarningEntry, WarningInput } from '../../engine';
 import { useEngine, useEngineChange } from '../context/useEngine';
 import { AppBanners, StatusBadges } from '../context/AppChrome';
-import { Button, CenterTile, MascotSlot, Marquee, Sticker, OptionGrid, PendingReminder, PhaseSelector, Screen, Tile, ToggleRow, Txt, WarningChip, WarningOption } from '../components';
+import { Button, CenterTile, MascotSlot, Marquee, Sticker, OptionGrid, PendingReminder, PhaseSelector, Screen, Tag, Tile, ToggleRow, Txt, WarningChip, WarningOption } from '../components';
 import { useLang, useT } from '../i18n';
 import { commonStrings } from '../strings/common';
 import { errorMessage } from '../strings/errors';
 import { fill } from '../strings/format';
 import { homeStrings } from '../strings/home';
+import { stormStrings } from '../strings/storm';
 import { Float, Pop, SpringIn } from '../motion/spring';
 import { palette, useTheme, useThemedStyles } from '../theme';
 import type { HomeSection, Theme } from '../theme';
 import { cardLevel, homeSections, isOptionActive, pickerGroups, warningTone } from './home/homeModel';
+import { kmText } from './storm/stormModel';
 
 const phaseShortKeys: Record<Phase, 'phaseShort_before' | 'phaseShort_during' | 'phaseShort_after'> = {
   before: 'phaseShort_before',
@@ -37,7 +39,7 @@ const phaseNameKeys: Record<Phase, 'phase_before' | 'phase_during' | 'phase_afte
 };
 
 const availableSections: ReadonlySet<HomeSection> = new Set([
-  'hero', 'emergency', 'warnings', 'center', 'pendingPhotos', 'checklist', 'ask', 'guide', 'hotlines', 'battery',
+  'hero', 'emergency', 'warnings', 'storm', 'center', 'pendingPhotos', 'checklist', 'ask', 'guide', 'hotlines', 'battery',
 ]);
 
 export function warningInput(warning: WarningEntry): WarningInput {
@@ -62,10 +64,11 @@ export function HomeScreen(): JSX.Element {
   const navigation = useNavigation<RootNavigation>();
   const t = useT(homeStrings);
   const common = useT(commonStrings);
+  const storm = useT(stormStrings);
   const { lang } = useLang();
   const theme = useTheme();
   const styles = useThemedStyles(makeStyles);
-  useEngineChange(['phase', 'context', 'family', 'profiles', 'status', 'settings']);
+  useEngineChange(['phase', 'context', 'family', 'profiles', 'status', 'settings', 'feed']);
 
   const [undoHidden, setUndoHidden] = useState(false);
   const [openKind, setOpenKind] = useState<string | null>(null);
@@ -76,7 +79,9 @@ export function HomeScreen(): JSX.Element {
   const pending = engine.family.pending();
   const status = engine.status();
   const settings = engine.settings.get();
-  const center = engine.evacuation.view().householdCenter;
+  const evacuation = engine.evacuation.view();
+  const center = evacuation.householdCenter;
+  const meetingPlace = engine.profiles.active()?.plan.meetingPlace;
   const phaseLabels = {
     before: common[phaseShortKeys.before],
     during: common[phaseShortKeys.during],
@@ -220,10 +225,49 @@ export function HomeScreen(): JSX.Element {
     </View>
   );
 
+  const bulletin = evacuation.bulletin;
+  const fix = evacuation.storm?.now;
+  const signalHere = evacuation.storm?.signalHere ?? null;
+  const stormSection = (
+    <Tile
+      title={bulletin ? bulletin.bulletin.storm.name : storm.title}
+      onPress={() => navigation.navigate('Storm')}
+      accessibilityLabel={storm.homeTileHint}
+    >
+      <View style={styles.shortcutBody}>
+        <View style={styles.stormFacts}>
+          {bulletin ? (
+            <>
+              <Txt role="bodySmall">
+                {`${storm[`category_${bulletin.bulletin.storm.category}`]} (${bulletin.bulletin.storm.category})`}
+              </Txt>
+              {signalHere !== null ? (
+                <Tag label={fill(storm.signalHere, { level: signalHere })} icon="warning" tone={theme.warning.tcws[signalHere]} />
+              ) : null}
+              {fix ? (
+                <Txt role="title" tone="accent">
+                  {fill(storm.trackNow, { km: kmText(fix.distanceKm), direction: storm[`dir_${fix.direction}`] })}
+                </Txt>
+              ) : null}
+              {bulletin.stale ? <Txt role="caption" tone="muted">{engine.copy('stale_warning', { lang })}</Txt> : null}
+            </>
+          ) : (
+            <Txt role="bodySmall" tone="muted">{engine.copy('no_live_data', { lang })}</Txt>
+          )}
+          <Txt role="caption" tone="muted">{storm.homeTileHint}</Txt>
+        </View>
+        <View style={[styles.iconDisc, { backgroundColor: theme.colors.danger.fill }]}>
+          <Ionicons name="thunderstorm" size={theme.type.roles.title.fontSize} color={theme.colors.danger.ink} />
+        </View>
+      </View>
+    </Tile>
+  );
+
   const centerSection = (
     <CenterTile
       title={t.centerTitle}
       name={center ?? ''}
+      meetingPlace={meetingPlace}
       emptyText={center ? undefined : t.centerEmpty}
       actionLabel={center ? undefined : t.openHotlines}
       onAction={center ? undefined : () => navigation.navigate('Tabs', { screen: 'Hotlines' })}
@@ -283,6 +327,7 @@ export function HomeScreen(): JSX.Element {
     hero,
     emergency,
     warnings,
+    storm: stormSection,
     center: centerSection,
     pendingPhotos,
     checklist,
@@ -393,6 +438,10 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   hint: {
     flex: 1,
     color: t.colors.ink,
+  },
+  stormFacts: {
+    flex: 1,
+    gap: t.space.sm,
   },
   iconDisc: {
     width: 52,

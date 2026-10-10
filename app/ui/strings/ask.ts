@@ -29,11 +29,6 @@ export const askStrings = defineStrings({
     planFill: 'Punan ang plano',
     planCenter: 'Sentro ng paglikas',
     planMeeting: 'Tagpuan',
-    bulletinName: 'Bagyo',
-    bulletinCategory: 'Kategorya',
-    bulletinPosition: 'Kinalalagyan',
-    bulletinMovement: 'Galaw',
-    bulletinSignal: 'Signal {level}',
   },
   en: {
     title: 'Ask',
@@ -59,10 +54,5 @@ export const askStrings = defineStrings({
     planFill: 'Fill in the plan',
     planCenter: 'Evacuation center',
     planMeeting: 'Meeting place',
-    bulletinName: 'Storm',
-    bulletinCategory: 'Category',
-    bulletinPosition: 'Position',
-    bulletinMovement: 'Movement',
-    bulletinSignal: 'Signal {level}',
   },
 });

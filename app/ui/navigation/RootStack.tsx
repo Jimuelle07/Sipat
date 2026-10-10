@@ -13,6 +13,7 @@ import { PassageScreen } from '../screens/PassageScreen';
 import { PhotoScreen } from '../screens/PhotoScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { SetupScreen } from '../screens/SetupScreen';
+import { StormScreen } from '../screens/StormScreen';
 import { useEngine, useEngineChange } from '../context/useEngine';
 import { useMinimalMotion } from '../theme';
 import { RootTabs } from './RootTabs';
@@ -49,6 +50,7 @@ export function RootStack(): JSX.Element {
       <Stack.Screen name="Photo" component={PhotoScreen} />
       <Stack.Screen name="MemberCard" component={MemberCardScreen} />
       <Stack.Screen name="Checklist" component={ChecklistScreen} />
+      <Stack.Screen name="Storm" component={StormScreen} />
       <Stack.Screen name="Emergency" component={EmergencyScreen} />
       <Stack.Screen name="Passage" component={PassageScreen} />
       <Stack.Screen name="Settings" component={SettingsScreen} />
