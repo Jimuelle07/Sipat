@@ -1,5 +1,6 @@
 import type { FaceBox, FaceDetection, Result } from '../types/index.ts';
 import type { CropRect, PhotoService, PickedPhoto } from '../types/index.ts';
+import { createWebPhotoService } from './photosWeb.ts';
 
 /** Square side of the stored member photo, in pixels. */
 export const PHOTO_SIZE = 512;
@@ -70,8 +71,15 @@ function toPicked(result: {
   return ok({ uri: asset.uri, width: asset.width ?? 0, height: asset.height ?? 0 });
 }
 
-/** Production PhotoService: expo-image-picker, ML Kit face detection and expo-image-manipulator. */
+/**
+ * Production PhotoService: expo-image-picker, ML Kit face detection and expo-image-manipulator on
+ * phones; the browser camera and canvas on web (desktop and phone browsers), see photosWeb.ts.
+ */
 export function createPhotoService(): PhotoService {
+  // React Native has no `document`; a browser does.
+  if (typeof document !== 'undefined') {
+    return createWebPhotoService({ size: PHOTO_SIZE, quality: PHOTO_QUALITY, toPixels: cropToPixels });
+  }
   const imageSize = async (uri: string): Promise<{ width: number; height: number }> => {
     const { ImageManipulator } = require('expo-image-manipulator') as {
       ImageManipulator: { manipulate: (source: string) => { renderAsync: () => Promise<{ width: number; height: number }> } };
