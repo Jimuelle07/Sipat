@@ -42,7 +42,7 @@ export interface ColorRoles {
   primary: Tone;           // filled primary button
   capsule: Tone;           // the CTA capsule container
   selected: Tone;          // selected chip or segment
-  brand: string;           // Bagyo Buddy blue: links, wordmark; ≥4.5:1 on surface and canvas
+  brand: string;           // Sipat blue: links, wordmark; ≥4.5:1 on surface and canvas
   focus: string;           // focus ring; ≥3:1 on surface and canvas
   danger: Tone;            // emergency fill (alert)
   dangerSurface: Tone;     // calm alert surface: tinted fill with alert ink

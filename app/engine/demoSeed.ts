@@ -31,10 +31,10 @@ const DEMO_CENTROIDS: Record<string, { lat: number; lon: number }> = {
 
 const DEMO_SOURCE: Source = {
   id: DEMO_SOURCE_ID,
-  agency: 'Bagyo Buddy (DEMO)',
+  agency: 'Sipat (DEMO)',
   title: 'DEMO seed data – hindi opisyal, para sa demo lamang',
   date: '2026-10-10',
-  url: 'https://example.invalid/bagyo-buddy-demo',
+  url: 'https://example.invalid/sipat-demo',
   retrieved_at: '2026-10-10',
   notes: 'Invented for demos. Not from PAGASA, NDRRMC, an LGU or any agency.',
 };

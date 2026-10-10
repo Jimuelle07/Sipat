@@ -84,7 +84,7 @@ function loadMmkv(id: string): MMKVLike | null {
  * MMKV-backed store. Returns null when the native module is unavailable (Node, web,
  * or a device without it), so callers can fall back to memory.
  */
-export function createMmkvStore(id = 'bagyo-buddy'): Store | null {
+export function createMmkvStore(id = 'sipat'): Store | null {
   const storage = loadMmkv(id);
   if (!storage) return null;
   return makeStore(

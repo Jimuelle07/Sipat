@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import withSecureScreen from './withSecureScreen.js';
 
-const MAIN_ACTIVITY = `package ph.bagyobuddy.app;
+const MAIN_ACTIVITY = `package ph.sipat.app;
 
 import android.os.Bundle;
 import com.facebook.react.ReactActivity;
@@ -30,7 +30,7 @@ describe('withSecureScreen', () => {
 
     const contents = result.modResults.contents as string;
 
-    expect(contents).toContain('import ph.bagyobuddy.app.BuildConfig;');
+    expect(contents).toContain('import ph.sipat.app.BuildConfig;');
     expect(contents).toContain('android.view.WindowManager.LayoutParams.FLAG_SECURE');
     expect(contents).toContain('if (!BuildConfig.DEBUG)');
   });
