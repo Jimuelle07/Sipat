@@ -1,6 +1,6 @@
-# Solution: Bagyo Buddy
+# Solution: Sipat
 
-Bagyo Buddy turns the warning a family hears on the radio into steps fitted to their household. It answers their Taglish questions only from official guides that ship inside the app, and it works with no signal.
+Sipat turns the warning a family hears on the radio into steps fitted to their household. It answers their Taglish questions only from official guides that ship inside the app, and it works with no signal.
 
 Related: [README.md](README.md) (shared names) · [features.md](features.md) (feature source of truth) · [problem.md](problem.md) · [system-design.md](system-design.md) · [api-layer.md](api-layer.md) · [BMC.md](BMC.md)
 
@@ -8,7 +8,7 @@ Related: [README.md](README.md) (shared names) · [features.md](features.md) (fe
 
 **One-liner.** Tap the warning you heard on the radio and see what your household should do now, even with no signal.
 
-**30-second pitch.** When a typhoon takes out power and signal, the guidance a family needs is online or buried in a long PDF. Bagyo Buddy puts it on the phone. The family sets up a profile once: who is at home, what kind of house it is, and whether a river or the sea is close. During the storm they tap the warning they heard (wind signal, rainfall, storm surge or gale) and get a checklist for their household. They can ask "kailangan na ba naming lumikas kung malapit kami sa ilog?" and get a short answer drawn only from PAGASA, NDRRMC, OCD and DOH guidance, with the source one tap away. A small model on the phone puts the answer in plain words. When the battery runs low, the app keeps working without it. Alerts tell you a storm is coming. Bagyo Buddy tells your household what to do, even with no signal.
+**30-second pitch.** When a typhoon takes out power and signal, the guidance a family needs is online or buried in a long PDF. Sipat puts it on the phone. The family sets up a profile once: who is at home, what kind of house it is, and whether a river or the sea is close. During the storm they tap the warning they heard (wind signal, rainfall, storm surge or gale) and get a checklist for their household. They can ask "kailangan na ba naming lumikas kung malapit kami sa ilog?" and get a short answer drawn only from PAGASA, NDRRMC, OCD and DOH guidance, with the source one tap away. A small model on the phone puts the answer in plain words. When the battery runs low, the app keeps working without it. Alerts tell you a storm is coming. Sipat tells your household what to do, even with no signal.
 
 ## 2. Design principles
 
@@ -16,7 +16,7 @@ These seven rules hold in every release. When a feature conflicts with one, the 
 
 | # | Principle | What it means in practice |
 | :-- | :-- | :-- |
-| 1 | Offline core, online extras | Setup, phases and themes, warnings, checklists, hotlines, the guide and Ask all work in airplane mode and never wait on the network. The online extras (bulletin feed, forecast, recommended evacuation centers, guide and hotline updates) are MVP stretch: fetched only while the app is open, from one host (our server), then read from the cache with their age shown. Until the stretch lands, the release build has no INTERNET permission ([features.md, hybrid](features.md#how-to-read-this)). |
+| 1 | Offline core, online extras | Setup, phases and themes, warnings, checklists, hotlines, the guide and Ask all work in airplane mode and never wait on the network. The online extras (bulletin feed, forecast, recommended evacuation centers, guide and hotline updates) are MVP stretch: fetched only while the app is open, from one host (our server), then read from the cache with their age shown. The release build keeps the INTERNET permission because the AI model is downloaded once from Hugging Face when the user taps "I-download ang AI" in Settings (owner-approved exception to the one host, verified by size and SHA-256, shown in the network log). Nothing is fetched in the background ([features.md, hybrid](features.md#how-to-read-this)). |
 | 2 | The guide is the product; the model only rephrases it | The model reads only the one or two passages that search found. It never answers from its own memory. If search finds no good passage, the model is never called. |
 | 3 | Safety is enforced by code | Emergency words, live-data questions, medicine doses, numbers, phone numbers, phase switches and the closing line are handled by code rules, not by the prompt. |
 | 4 | Every answer shows its source | "Saan galing ito?" opens the passage with its agency, document and date. A bulletin card shows PAGASA's issued time and source link. |
@@ -30,7 +30,7 @@ The app has three phases, Bago, Habang and Pagkatapos ng bagyo, and the phase is
 
 ### Setup (once, before the storm)
 
-1. **Install.** Get the app from Google Play. The guide ships inside the app. The model is an optional pack: a sideloaded file for the hackathon and a Google Play AI pack later ([Play for On-device AI](https://developer.android.com/google/play/on-device-ai)). Phones in the `none` tier skip the model and lose only the AI wording.
+1. **Install.** Get the app from Google Play. The guide ships inside the app. The model is optional: the user downloads it once in Settings ("I-download ang AI", from Hugging Face) or imports the file from the phone; a Google Play AI pack may replace this later ([Play for On-device AI](https://developer.android.com/google/play/on-device-ai)). Until then, and on phones in the `none` tier, Ask uses vetted summaries and loses only the AI wording.
 2. **Set up the family, starting with the main person.** There is no sign-up and no password; everything stays on this phone.
    - **The main person first.** Name or nickname, age group, needs, phone number. Their relation is "self", and their number goes on every member's card.
    - **Then each member, one at a time.** Name or nickname (required), relation (asawa, anak, magulang, lolo o lola, apo, kapatid, kamag-anak, iba pa), age group (sanggol, bata, teen, adult, senior), needs (buntis, may kapansanan, may maintenance na gamot), an optional note of up to 80 characters such as medicine names or allergies, and an optional phone number.
@@ -116,15 +116,15 @@ The full catalog, with every row's release tag and details, is in [features.md](
 
 | Release | What it covers |
 | :-- | :-- |
-| MVP (core) | Household setup with a required face photo per member and "Mamaya na"; PSGC household location; three phases with full themes; automatic phase switching from warnings and Ask cues, with undo; warning picker and cards; stale-warning prompt; Ask in Taglish (summary first, AI second, phase-aware, sources, refusal); safety router and verifier; phase checklists, "Gawin ngayon", go-bag ticks; Hotlines screen; typed-in evacuation center; 120 reviewed passages (gas safety, first aid and psychosocial included); low-battery mode and device tiers; About and the evaluation screen; no INTERNET permission until the online stretch lands |
-| MVP | Face check and crop; "Hinahanap" card; family contacts and meeting place; barangay evacuation order; health pointers; browse by topic; model install from a file and load/unload; large text and dark variants; FLAG_SECURE screen capture protection (release builds); static sign-up, login and forgot-password screens (no backend); Settings |
+| MVP (core) | Household setup with a required face photo per member and "Mamaya na"; PSGC household location; three phases with full themes; automatic phase switching from warnings and Ask cues, with undo; warning picker and cards; stale-warning prompt; Ask in Taglish (summary first, AI second, phase-aware, sources, refusal); safety router and verifier; phase checklists, "Gawin ngayon", go-bag ticks; Hotlines screen; typed-in evacuation center; 120 reviewed passages (gas safety, first aid and psychosocial included); low-battery mode and device tiers; About and the evaluation screen; no network request except the user-tapped model download |
+| MVP | Face check and crop; "Hinahanap" card; family contacts and meeting place; barangay evacuation order; health pointers; browse by topic; model download in Settings (Hugging Face, size and SHA-256 checked, logged in the network log) or install from a file, and load/unload; large text and dark variants; FLAG_SECURE screen capture protection (release builds); static sign-up, login and forgot-password screens (no backend); Settings |
 | MVP stretch | Online: bulletin feed and card, track view, phase from bulletin distance, recommended evacuation centers, scraper with hotline and center review queue, updated hotlines, cloud guide updates (Smart Update), network log, optional GPS. Offline: mascot slot, offline light and SOS screen, import a signed pack from a file. Content: damage documentation and assistance topics |
 | Pilot | LGU pack (Bantay tier) with LGU hotlines and verified centers, scraped source watch, LGU DRRMO review, per-member medicine list, Google Play AI pack, opt-in topic reports and the DRRM dashboard, damage reports to the LGU |
 | Later | The real optional family account (sign-in, profile backup sync while online, toggle in Settings), one-turn follow-ups in Ask, voice input through on-device speech-to-text, AI-assisted content drafting with a reviewed cloud model |
 
 ## 6. What makes it different
 
-| Option | What it does well | What Bagyo Buddy adds |
+| Option | What it does well | What Sipat adds |
 | :-- | :-- | :-- |
 | Cell-broadcast alerts ([RA 10639](https://en.wikipedia.org/wiki/Emergency_Cell_Broadcast_System)) | Free alerts to every phone in the area | What this household should do next, even after the tower goes down |
 | PAGASA bulletins | The official forecast and warnings | Turns the warning the family heard into steps for their household; when online, shows the latest bulletin verbatim with the bagyo's distance from home and the nearest evacuation centers, then keeps it readable offline |
@@ -231,7 +231,7 @@ Code enforces every rule below, not the prompt. How it works is in [system-desig
 | Reads any answer | Sees "Sundin ang utos ng barangay at ng mga awtoridad." at the end |
 | Leaves a warning set for hours | Sees "Makinig muli sa radyo. Baka nagbago na ang signal." after 3 hours |
 
-The About screen states that Bagyo Buddy is a preparedness aid, not an emergency service or a forecast.
+The About screen states that Sipat is a preparedness aid, not an emergency service or a forecast.
 
 ## 9. Live demo (about 4 minutes, budget phone mirrored to the projector)
 
@@ -259,14 +259,14 @@ There are four tracks, one person each. The core logic is pure TypeScript in `ap
 | 0 to 1 | Expo development build with llama.rn running on the target phone; the three phase themes stubbed (colors, Home order) | Model loads; schema-valid JSON; tokens stream; prompt and generation speed measured | Official documents listed in `sources.json`; tag list agreed; `phase_rules.json` with the warning rule and placeholder bands | First 40 evaluation questions with their expected passage IDs; first `decidePhase` fixtures |
 | 1 to 4 | Setup and member editor with the required photo (camera or gallery, manual crop, "Mamaya na", pending reminder); PSGC location picker; Home with phase selector, themes and undo banner; warning picker and checklist screens | Prompt; schema with `used`, `in_guide`, `phase_hint` before `answer`; prefix cache; Q4_K_M vs Q4_0; device tier check | The 30 demo-critical passages first, then on toward 120; phase checklist items; `warnings.json`; `hotlines.json`; `places.json` | `normalize`, synonyms, MiniSearch with tag boosts, `gate`; `decidePhase` from warnings and `phaseCue`; phase cue lists in `intents.json`; the Node evaluation runner |
 | 4 to 7 | Ask screen (summary first, streaming, "Saan galing ito?"), emergency card, refusal with topic buttons, Hotlines screen, low-battery mode; face check and "Hinahanap" card (MVP); static Account screen (sign-up, login, forgot password, no backend); FLAG_SECURE plugin, release builds only | `verify` (citations, numbers including Tagalog number words, phone numbers), critical pinning, `phase_hint` check, fallbacks, load, warm-up and unload | Finish passages, summaries, critical flags and reviews; gas safety, first aid and psychosocial passages | Intent router rules; all 120 questions; phase-switch fixtures; tune the gate threshold; first metrics |
-| 7 to 9 | About and evaluation screens; polish; confirm no INTERNET permission in the core build. Stretch: `UpdateClient`, bulletin card, track view, recommended centers, network log, GPS button | Latency, RAM and battery numbers on the phone | Fix the passages the evaluation flags. Stretch: scraper in `scripts/scrape/` publishing a signed feed; hotline and center review queue | Final metrics; blind test with 3 to 5 outsiders. Stretch: `measureStorm` and `rankCenters` fixtures |
+| 7 to 9 | About and evaluation screens; polish; confirm the core build makes no request except the Settings model download. Stretch: `UpdateClient`, bulletin card, track view, recommended centers, network log, GPS button | Latency, RAM and battery numbers on the phone | Fix the passages the evaluation flags. Stretch: scraper in `scripts/scrape/` publishing a signed feed; hotline and center review queue | Final metrics; blind test with 3 to 5 outsiders. Stretch: `measureStorm` and `rankCenters` fixtures |
 | 9 to 10 | Everyone: rehearse the demo twice and record the backup video | | | |
 
 **Sync points**
 
 - **Hour 1:** the model runs on the phone, its speed is known and the tag list is frozen.
 - **Hour 4:** one question goes end to end on the phone: route, search, summary, AI answer; a warning tap switches the phase and theme.
-- **Hour 7: feature freeze.** Every MVP (core) and MVP row is done or cut. MVP stretch items, including every online feature, start only if every MVP row is green. The core build keeps no INTERNET permission unless the online stretch lands.
+- **Hour 7: feature freeze.** Every MVP (core) and MVP row is done or cut. MVP stretch items, including every online feature, start only if every MVP row is green. The core build keeps the INTERNET permission for the Settings model download only.
 - **Hour 9:** code freeze; the release APK is built.
 
 **With three people.** The AI owner also takes search (`normalize`, MiniSearch, `gate`). The Content owner also writes the evaluation questions and phase-switch fixtures. Whoever is free first after hour 4 builds the Node evaluation runner.

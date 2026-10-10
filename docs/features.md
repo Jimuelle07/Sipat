@@ -1,4 +1,4 @@
-# Features: Bagyo Buddy
+# Features: Sipat
 
 What the app does, grouped by area and tagged by release. This is the feature source of truth: [solution.md](solution.md) tells the story around it, [system-design.md](system-design.md) explains how each feature works and [api-layer.md](api-layer.md) has the data shapes. Where they disagree, this file wins.
 
@@ -23,7 +23,7 @@ The phone talks to one host only: our own server, which runs the scraper ([secti
 | D1 | Every member needs a face photo. The photo step has no skip button; "Mamaya na" saves the member as pending and Home reminds until every member has one | Optional photo with "Laktawan" (MVP stretch) |
 | D2 | The bagyo phase (Bago, Habang, Pagkatapos) is the app's main mode. Switching it changes the whole UI theme, not only the checklist | Phase as a checklist filter |
 | D3 | The phase can switch automatically: from the warnings the user taps, from what they tell the assistant, and (online) from how close the latest PAGASA bulletin puts the bagyo to the household. Code decides; the user can always undo | Manual phase buttons only |
-| D4 | The app is hybrid. Online features (bulletin feed, forecast, evacuation centers, cloud guide updates) are MVP stretch; the offline core never depends on them | MVP with no INTERNET permission; live data out of scope |
+| D4 | The app is hybrid. Online features (bulletin feed, forecast, evacuation centers, cloud guide updates) are MVP stretch; the offline core never depends on them. The release build keeps the INTERNET permission: the AI model is downloaded once from Hugging Face on a Settings tap (owner-approved exception to the one pinned host) | MVP with no INTERNET permission; live data out of scope |
 | D5 | A server-side scraper keeps bulletins, hotlines and evacuation centers current and publishes them as signed files on our one host | No scraping; LGU packs only |
 | D6 | Household location comes from optional GPS (coarse, one-shot, asked only on tap) or a PSGC area list. It never leaves the phone | No location permission; PSGC list in the Pilot |
 | D7 | The mascot character is still being designed. Each phase theme keeps a slot for it; no placeholder art decisions until it is ready | — |
@@ -161,17 +161,18 @@ Recommended by phase first, then fitted to the household and active warnings.
 
 | Feature | Release | Details |
 | :-- | :-- | :-- |
-| Offline core | MVP (core) | Every main feature works in airplane mode. Until the online stretch lands, the release build has no INTERNET permission |
+| Offline core | MVP (core) | Every main feature works in airplane mode. The release build keeps the INTERNET permission, but the network is used only on a user action, only while the app is open, and every request shows in the network log |
 | Low-battery mode | MVP (core) | Below 15% or battery saver on: model off; checklists, cards, search and summaries keep working |
 | Manual low-battery switch | MVP (core) | Settings and Home toggle that turns low-battery mode on right away |
 | Device tiers | MVP (core) | `none` tier skips the model and loses only the AI wording |
 | AI on or off | MVP (core) | |
-| Install the model from a file | MVP | Pick the GGUF from storage; size and SHA-256 checked before use. No network needed |
+| Download the model in Settings | MVP | "I-download ang AI (0.81 GB)" downloads the GGUF once from Hugging Face, only on that tap, never in the background. Size and SHA-256 must match or the file is deleted. The request shows in the network log. Until it succeeds, AI is unavailable and answers use vetted summaries. On a `none` tier phone only the tier message shows |
+| Install the model from a file | MVP | "Mula sa file sa telepono": pick the GGUF from storage; size and SHA-256 checked before use. No network needed |
 | Model load and unload | MVP | Loads when Ask opens and AI is allowed; unloads after 2 minutes idle, in the background, or when AI stops being allowed. One retry per session, then summaries |
 | Large text, icons, dark variants | MVP | Applies to every phase theme |
 | Screen capture blocked | MVP | Android FLAG_SECURE on the whole app, like streaming apps: screenshots, screen recording and the recents preview are blacked out, so member photos and cards cannot be captured. Release builds only; debug builds stay mirrorable for the demo (D12) |
 | Offline light and SOS screen | MVP stretch | Full-screen white light and a large "TULONG" screen to signal rescuers. Screen only; no camera or flash permission |
-| Model from Google Play AI pack | Pilot | Replaces file install for most users |
+| Model from Google Play AI pack | Pilot | May replace the Hugging Face download and file install for most users |
 
 ## 10. Updates, scraper and LGU packs
 
@@ -180,8 +181,8 @@ Recommended by phase first, then fitted to the household and active warnings.
 | Bagyo scraper | MVP stretch | A scheduled job on our server reads PAGASA's public tropical cyclone bulletins and warnings, parses the fields the app shows, keeps the verbatim text, source URL and issued time, and publishes a signed feed file. A parse failure keeps the previous feed and marks it stale; the scraper never guesses a field. Confirm PAGASA's terms and ask for a data feed before the Pilot |
 | Hotline and evacuation-center scraping | MVP stretch | The scraper collects public hotline and evacuation-center lists into a review queue. Nothing reaches phones until a reviewer approves it (structured facts need a source, reviewer and date) |
 | Feed sync on the phone | MVP stretch | On app open and pull to refresh, when online: fetch the small signed feed from the one pinned host, check the signature, cache it. Works on mobile data because the file is small. Can be turned off in Settings. No background fetch, no push |
-| Smart Update for packs | MVP stretch | Guide packs and the model manifest: asks first, Wi-Fi by default, signed, from the same host |
-| Network log | MVP stretch | Every request with time, URL and size, on screen |
+| Smart Update for packs | MVP stretch | Guide packs: asks first, Wi-Fi by default, signed, from the same host. The model is not part of it (see "Download the model in Settings") |
+| Network log | MVP (model download), MVP stretch (feed and packs) | Every request with time, URL and size, on screen |
 | Import a signed pack from a file | MVP stretch | Offline path for the same packs |
 | LGU pack (Bantay tier) | Pilot | Local evacuation centers, hotlines and advisories; paid by the LGU ([BMC.md](BMC.md)) |
 | Opt-in topic reports and DRRM dashboard | Pilot | Off by default; topic counts only, never household data or location |

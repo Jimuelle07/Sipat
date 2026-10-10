@@ -27,7 +27,7 @@ import { createPackManager } from '../services/packs.ts';
 import { createScreenService } from '../services/screen.ts';
 import { createStore } from '../services/store.ts';
 import { updateHost } from '../services/updateConfig.ts';
-import { createUpdateClient, type FetchLike } from '../services/updates.ts';
+import { appendNetworkLog, createUpdateClient, type FetchLike } from '../services/updates.ts';
 import { runAskPipeline } from './askPipeline.ts';
 import { copyText } from './copy.ts';
 import { EVAL_SUMMARY_FIXTURE } from './fixtures/eval.ts';
@@ -258,6 +258,13 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
       : await model.tier().catch(() => 'none');
     battery = powerService?.battery() ?? null;
     ai = await power.aiAllowed().catch(() => ({ allowed: false, reason: 'no_model' as const }));
+    emit('status');
+  };
+  // After either install path: re-read the model file, recompute the AI decision, refresh Settings.
+  const markModelInstalled = async (): Promise<void> => {
+    const present = (model as typeof model & { present?: () => Promise<boolean> }).present;
+    installedModel = present ? await present().catch(() => true) : true;
+    await powerUpdate();
     emit('status');
   };
   power.onChange((decision) => {
@@ -1005,6 +1012,19 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
       setSync: () => err('not_signed_in'),
     },
     model: {
+      async download(onProgress, signal) {
+        const result = await model.download(onProgress, signal).catch(() => err('io', 'Model download failed'));
+        // The checks before the request (tier, space, file access) fail without touching the network;
+        // anything else was a request to Hugging Face, so it goes in the on-screen network log.
+        const requested = result.ok || !['tier', 'no_space', 'io'].includes(result.error.code);
+        if (requested) {
+          appendNetworkLog(store, BUNDLED_MODEL.url, result.ok ? 200 : 'error', result.ok ? result.value.bytes : 0, iso(now()));
+          emit('updates');
+        }
+        if (!result.ok) return result;
+        await markModelInstalled();
+        return ok('installed');
+      },
       async installFromPicker(onProgress, signal) {
         const picked = await filePicker.pick('model').catch(() => err('io', 'File picker failed'));
         if (!picked.ok) return picked;
@@ -1014,10 +1034,7 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
           .install(picked.value, onProgress, signal)
           .catch(() => err('io', 'Model installation failed'));
         if (!result.ok) return result;
-        const present = (model as typeof model & { present?: () => Promise<boolean> }).present;
-        installedModel = present ? await present().catch(() => true) : true;
-        await powerUpdate();
-        emit('status');
+        await markModelInstalled();
         return ok('installed');
       },
       async remove() {

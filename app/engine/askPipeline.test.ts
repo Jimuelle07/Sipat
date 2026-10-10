@@ -27,7 +27,9 @@ function harness(options: { allowed?: AiDecision; raw?: string } = {}) {
     model: {
       state: () => 'ready', tier: async () => 'full', warm: async () => ({ ok: true, value: undefined }),
       generate, stop: async () => undefined, unload: async () => undefined, onStateChange: () => () => undefined,
-      install: async () => ({ ok: false, error: { code: 'io', message: 'unavailable' } }), remove: async () => undefined,
+      install: async () => ({ ok: false, error: { code: 'io', message: 'unavailable' } }),
+      download: async () => ({ ok: false, error: { code: 'io', message: 'unavailable' } }),
+      remove: async () => undefined,
     },
     emergencyCard: () => ({ id: 'emergency-default', title: 'Emergency', steps: [], hotlines: [], source: { sourceId: '', agency: '', title: '', date: '', url: '' } }),
     hotlines: () => content.hotlines, evacuationCenters: () => [], latestBulletin: () => null,

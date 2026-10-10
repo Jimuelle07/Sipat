@@ -1,6 +1,6 @@
-# **Bagyo Buddy: How It Works**
+# **Sipat: How It Works**
 
-Bagyo Buddy is an offline typhoon companion: the family sets a profile once, taps the wind signal they heard on the radio, and gets a checklist fitted to their household, plus answers to Taglish questions drawn only from official preparedness guides shipped in the app. Llama 3.2 1B runs on the phone to answer in plain words; it never answers from its own memory, and the app keeps working with the model switched off to save battery.
+Sipat is an offline typhoon companion: the family sets a profile once, taps the wind signal they heard on the radio, and gets a checklist fitted to their household, plus answers to Taglish questions drawn only from official preparedness guides shipped in the app. Llama 3.2 1B runs on the phone to answer in plain words; it never answers from its own memory, and the app keeps working with the model switched off to save battery.
 
 **How to read this doc.** Linked figures are sourced. *Reasoning:* marks my own analysis. **Unverified** marks secondary figures. All targets are proposals to measure.
 
@@ -20,13 +20,13 @@ The user is a household in a typhoon-exposed area: one parent with a budget Andr
 | Siargao needed satellite links set up by the Office of Civil Defense after communications went down | [PIA](https://mirror.pia.gov.ph/press-releases/2021/12/19/ocd-provides-emergency-comms-between-siargao-and-ndrrmc-after-disruption-due-to-ty-odette) | Official |
 | 74% of Filipinos live in areas prone to floods, landslides and storm surge | [iACADEMY, attributed to World Bank](https://iacademy.edu.ph/story_details?id=1343) | **Unverified:** trace to the World Bank original |
 
-*Reasoning:* Odette is your anchor story: a well-documented storm where power stayed out for over a week in many towns. A household that downloaded Bagyo Buddy before December 2021 would still have had answers on day five; a household relying on search would not.
+*Reasoning:* Odette is your anchor story: a well-documented storm where power stayed out for over a week in many towns. A household that downloaded Sipat before December 2021 would still have had answers on day five; a household relying on search would not.
 
 **Honest limit.** Offline preparedness guides and the PAGASA bulletins already exist. The new part is asking in your own Taglish words and getting an answer fitted to your household, without signal. Pitch it as that, not as a forecasting tool.
 
 ## **2\. User journey**
 
-The household uses Bagyo Buddy in three phases; the first takes two minutes on a calm day, and the other two work with no signal at all.
+The household uses Sipat in three phases; the first takes two minutes on a calm day, and the other two work with no signal at all.
 
 ### **Before the storm (setup, once)**
 
@@ -70,7 +70,7 @@ Two paths share one guide: taps produce checklists with no model at all, and typ
 
  
 
-Bagyo Buddy paths · checklist path and question path
+Sipat paths · checklist path and question path
 
 Only one box runs the model; when search finds no good passage, the app refuses before the model is ever called.
 

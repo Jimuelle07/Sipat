@@ -351,6 +351,42 @@ describe.each(ENGINES)('$name', (factory) => {
       expect(engine.info().model.present).toBe(false);
       expect(ctl.modelDirFiles()).toEqual([]);
     });
+
+    it('download() installs the model with progress up to the total', async () => {
+      const { engine, ctl } = await start();
+      ctl.setModelPresent(false);
+      ctl.setModelFile('exact');
+      const progress: { bytes: number; total: number }[] = [];
+
+      const res = await engine.model.download((bytes, total) => progress.push({ bytes, total }));
+
+      expect(res).toEqual({ ok: true, value: 'installed' });
+      expect(engine.info().model.present).toBe(true);
+      const last = progress[progress.length - 1]!;
+      expect(last.bytes).toBe(last.total);
+    });
+
+    it('download() refuses a file with the wrong hash and leaves no file behind', async () => {
+      const { engine, ctl } = await start();
+      ctl.setModelPresent(false);
+      ctl.setModelFile('wrong_hash');
+
+      const res = await engine.model.download(() => {});
+
+      expect(res).toMatchObject({ ok: false, error: { code: 'hash_mismatch' } });
+      expect(ctl.modelDirFiles()).toEqual([]);
+    });
+
+    it('download() returns tier on a none-tier device before any download', async () => {
+      const { engine, ctl } = await start();
+      ctl.setModelPresent(false);
+      ctl.setTier('none');
+
+      const res = await engine.model.download(() => {});
+
+      expect(res).toMatchObject({ ok: false, error: { code: 'tier' } });
+      expect(ctl.modelDirFiles()).toEqual([]);
+    });
   });
 
   describe('feed (MVP stretch)', () => {

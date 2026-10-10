@@ -31,6 +31,32 @@ import { toManilaIso } from '../core/time.ts';
 
 /** Network log cap (Store doc proposal: 200). */
 export const MAX_NETWORK_LOG = 200;
+
+/** Adds one GET to the on-screen network log (AGENTS rule 1: every request appears there). */
+export function appendNetworkLog(store: Store, url: string, status: number | 'error', bytes: number, at: string): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return;
+  }
+  const entry: NetworkLogEntry = {
+    at,
+    method: 'GET',
+    host: parsed.host,
+    path: `${parsed.pathname}${parsed.search}`,
+    bytes,
+    status: typeof status === 'number' && status > 0 ? status : 'error',
+  };
+  let current: NetworkLogEntry[] = [];
+  try {
+    current = store.get('networkLog') ?? [];
+  } catch {
+    current = [];
+  }
+  store.set('networkLog', [...current, entry].slice(-MAX_NETWORK_LOG));
+}
+
 /** The key set is re-fetched at most once a day (Feed doc step 1, proposal). */
 export const KEY_SET_TTL_MS = 24 * 60 * 60 * 1000;
 /** Tolerated clock skew when checking that an `issued_at` is not in the future. */
@@ -210,27 +236,7 @@ export function createUpdateClient(deps: UpdateClientDeps): UpdateClient {
   }
 
   function appendLog(url: string, status: number | 'error', bytes: number): void {
-    let parsed: URL;
-    try {
-      parsed = new URL(url);
-    } catch {
-      return;
-    }
-    const entry: NetworkLogEntry = {
-      at: nowIso(),
-      method: 'GET',
-      host: parsed.host,
-      path: `${parsed.pathname}${parsed.search}`,
-      bytes,
-      status: typeof status === 'number' && status > 0 ? status : 'error',
-    };
-    let current: NetworkLogEntry[] = [];
-    try {
-      current = store.get('networkLog') ?? [];
-    } catch {
-      current = [];
-    }
-    store.set('networkLog', [...current, entry].slice(-MAX_NETWORK_LOG));
+    appendNetworkLog(store, url, status, bytes, nowIso());
   }
 
   /** Resolves a host-relative path or a same-origin absolute URL; anything else is refused. */

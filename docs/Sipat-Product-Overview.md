@@ -1,4 +1,4 @@
-# Bagyo Buddy
+# Sipat
 
 *Your Offline Typhoon Companion*
 
@@ -94,7 +94,7 @@ NGOs, schools and humanitarian groups get a 20% discount on the Bantay license.
 - PAGASA bulletins and website
 - Printed and PDF preparedness guides from NDRRMC and OCD
 
-Most of these need internet or are static guides. Bagyo Buddy works with no signal and answers in your own Taglish words, for your household.
+Most of these need internet or are static guides. Sipat works with no signal and answers in your own Taglish words, for your household.
 
 ## Tools
 

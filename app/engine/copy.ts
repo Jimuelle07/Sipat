@@ -17,7 +17,7 @@ export const COPY: Record<CopyKey, string> = {
   photo_required: 'Kailangan ang litrato ng mukha para makilala kung sakaling mawalay. Puwedeng mamaya na.',
   photo_pending: 'Kulang pa ang litrato ni {name}.',
   location_button: 'Gamitin ang lokasyon ng telepono',
-  aid_notice: 'Gabay sa paghahanda ang Bagyo Buddy. Hindi ito serbisyong pang-emergency at hindi ito forecast.',
+  aid_notice: 'Gabay sa paghahanda ang Sipat. Hindi ito serbisyong pang-emergency at hindi ito forecast.',
 };
 
 export const COPY_EN: Record<CopyKey, string> = {
@@ -37,7 +37,7 @@ export const COPY_EN: Record<CopyKey, string> = {
   photo_required: 'A face photo is needed in case you get separated. You can add it later.',
   photo_pending: '{name} still needs a photo.',
   location_button: 'Use phone location',
-  aid_notice: 'Bagyo Buddy is a preparedness guide. It is not an emergency service or a forecast.',
+  aid_notice: 'Sipat is a preparedness guide. It is not an emergency service or a forecast.',
 };
 
 export function copyText(

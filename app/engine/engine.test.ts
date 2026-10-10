@@ -243,6 +243,11 @@ function makeScriptedModel(readTier: () => Promise<DeviceTier>): ScriptedModel {
       onProgress(BUNDLED_MODEL.size, BUNDLED_MODEL.size);
       return BUNDLED_MODEL.sha256;
     },
+    async downloadWithSha256(_url, dest, onProgress) {
+      files.set(dest, { size: BUNDLED_MODEL.size, hash: BUNDLED_MODEL.sha256 });
+      onProgress(BUNDLED_MODEL.size, BUNDLED_MODEL.size);
+      return { sha256: BUNDLED_MODEL.sha256, bytes: BUNDLED_MODEL.size };
+    },
     async remove(path) { files.delete(path); },
     async move(srcPath, destPath) {
       const found = files.get(srcPath);
@@ -388,5 +393,17 @@ describe('answer language (real engine)', () => {
     const events = await runAsk(engine, 'Paano ihanda ang go bag?');
 
     expect(events.find((event) => event.type === 'ai_rejected')).toMatchObject({ code: 'wrong_language' });
+  });
+});
+
+describe('model download (real engine)', () => {
+  it('logs the Hugging Face request in the on-screen network log', async () => {
+    const { engine } = await makeHintEngine();
+    const result = await engine.model.download(() => undefined);
+
+    expect(result).toEqual({ ok: true, value: 'installed' });
+    expect(engine.updates.networkLog()).toEqual([expect.objectContaining({
+      method: 'GET', host: 'huggingface.co', bytes: BUNDLED_MODEL.size, status: 200,
+    })]);
   });
 });

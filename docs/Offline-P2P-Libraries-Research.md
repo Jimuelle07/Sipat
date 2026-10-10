@@ -1,4 +1,4 @@
-# Bagyo Buddy: Offline Phone-to-Phone Communication Libraries
+# Sipat: Offline Phone-to-Phone Communication Libraries
 
 **Research brief for a React Native, Android-first typhoon-preparedness app**
 Prepared 2026-10-09. Repository and package metadata was fetched live from the GitHub API and the npm registry on 2026-10-09 UTC.
@@ -122,7 +122,7 @@ Use it if:
 - you need iPhone↔Android; or
 - you need an all-open-source stack.
 
-**Pattern:** every phone **advertises** a Bagyo Buddy service UUID and hosts one write+notify characteristic (peripheral). Every phone also **scans** for that UUID and connects (central). A tie-break, such as "lower device-id initiates", avoids double links. Messages are UTF-8 JSON, hex-encoded, chunked to `getMaximumWriteLength()`.
+**Pattern:** every phone **advertises** a Sipat service UUID and hosts one write+notify characteristic (peripheral). Every phone also **scans** for that UUID and connects (central). A tie-break, such as "lower device-id initiates", avoids double links. Messages are UTF-8 JSON, hex-encoded, chunked to `getMaximumWriteLength()`.
 
 **Costs:**
 - Shorter range (BLE: plan 5–10 m through a wall; est.).
@@ -197,12 +197,12 @@ API names below are taken from the package README (v1.1.x): `startAdvertise`, `s
 
 ```bash
 npx expo install expo-nearby-connections react-native-nitro-modules
-# app.json -> "plugins": [["expo-nearby-connections", { "bonjourServicesName": "bagyobuddy" }]]
+# app.json -> "plugins": [["expo-nearby-connections", { "bonjourServicesName": "sipat" }]]
 npx expo prebuild --clean && npx expo run:android     # dev build on a real phone
 ```
 
 ```ts
-// mesh.ts: Bagyo Buddy offline link (sketch, not production code)
+// mesh.ts: Sipat offline link (sketch, not production code)
 import { PermissionsAndroid, Platform } from "react-native";
 import {
   Strategy, startAdvertise, startDiscovery, stopAdvertise, stopDiscovery,

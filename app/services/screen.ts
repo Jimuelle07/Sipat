@@ -1,7 +1,7 @@
 import type { ScreenService } from '../types/services.ts';
 
 /** Tag for the SOS wake lock, so we release only our own lock. */
-export const SOS_KEEP_AWAKE_TAG = 'bagyo-buddy-sos';
+export const SOS_KEEP_AWAKE_TAG = 'sipat-sos';
 
 export interface ExpoKeepAwakeModule {
   activateKeepAwakeAsync?: (tag?: string) => Promise<void>;

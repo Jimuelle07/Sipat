@@ -28,7 +28,7 @@ export const setupStrings = defineStrings({
 
     doneTitle: 'Handa na ang sambahayan',
     doneBody: 'Puwede ka nang magtanong, gumawa ng checklist, at tingnan ang mga babala para sa pamilya.',
-    start: 'Pumasok sa Bagyo Buddy',
+    start: 'Pumasok sa Sipat',
 
     takePhoto: 'Kunan ng litrato',
     addMember: 'Magdagdag ng miyembro',
@@ -58,7 +58,7 @@ export const setupStrings = defineStrings({
 
     doneTitle: 'The household is ready',
     doneBody: 'You can now ask questions, build a checklist and see warnings for your family.',
-    start: 'Go to Bagyo Buddy',
+    start: 'Go to Sipat',
 
     takePhoto: 'Take a photo',
     addMember: 'Add member',

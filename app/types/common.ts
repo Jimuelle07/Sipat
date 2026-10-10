@@ -19,7 +19,7 @@ export type CopyKey =
   | 'photo_required'    // draft: "Kailangan ang litrato ng mukha para makilala kung sakaling mawalay. Puwedeng mamaya na."
   | 'photo_pending'     // draft: "Kulang pa ang litrato ni {name}."
   | 'location_button'   // draft: "Gamitin ang lokasyon ng telepono"
-  | 'aid_notice';       // draft: "Gabay sa paghahanda ang Bagyo Buddy. Hindi ito serbisyong pang-emergency at hindi ito forecast."
+  | 'aid_notice';       // draft: "Gabay sa paghahanda ang Sipat. Hindi ito serbisyong pang-emergency at hindi ito forecast."
 
 export type Phase = 'before' | 'during' | 'after'; // caution order: during > before > after
 export type PhaseSource = 'manual' | 'warning' | 'ask' | 'bulletin';

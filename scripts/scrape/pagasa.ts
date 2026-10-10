@@ -24,7 +24,7 @@ const BULLETIN_URLS = [
 ];
 
 const FETCH_TIMEOUT_MS = 30_000;
-const USER_AGENT = 'BagyoBuddy-Scraper/0.1 (+contact: fill in)';
+const USER_AGENT = 'Sipat-Scraper/0.1 (+contact: fill in)';
 
 function manilaNow(): string {
   const shifted = new Date(Date.now() + 8 * 60 * 60 * 1000);
