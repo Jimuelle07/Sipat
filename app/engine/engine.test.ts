@@ -226,13 +226,14 @@ function hintContent(): Partial<Record<ContentFileName, unknown>> {
   };
 }
 
-interface ScriptedModel { manager: ReturnType<typeof createModelManager>; setNextOutput(output: string): void }
+interface ScriptedModel { manager: ReturnType<typeof createModelManager>; setNextOutput(output: string, keepAnswer?: boolean): void }
 
 function makeScriptedModel(readTier: () => Promise<DeviceTier>): ScriptedModel {
   const files = new Map<string, { size: number; hash: string }>();
   const modelPath = `memory://models/${BUNDLED_MODEL.file_name}`;
   files.set(modelPath, { size: BUNDLED_MODEL.size, hash: BUNDLED_MODEL.sha256 });
   let nextOutput: string | null = null;
+  let keepNextAnswer = false; // true: return the scripted answer as is instead of the passage summary
   const fileApi: ModelFiles = {
     freeBytes: async () => BUNDLED_MODEL.size * 2,
     exists: async (path) => files.has(path),
@@ -263,7 +264,8 @@ function makeScriptedModel(readTier: () => Promise<DeviceTier>): ScriptedModel {
           nextOutput = null;
           parsed.used = [used];
           const summary = FIXTURE_PASSAGES.find((passage) => passage.id === parsed.used[0])?.summary;
-          if (summary !== undefined) parsed.answer = summary;
+          if (summary !== undefined && !keepNextAnswer) parsed.answer = summary;
+          keepNextAnswer = false;
           const output = JSON.stringify(parsed);
           onToken(output);
           return { text: output, timings: { prompt_n: 1, prompt_ms: 1, predicted_n: 20 } };
@@ -276,7 +278,7 @@ function makeScriptedModel(readTier: () => Promise<DeviceTier>): ScriptedModel {
   const manager = createModelManager({
     backend, files: fileApi, modelDir: 'memory://models', readTier, idleUnloadMs: 0, expected: BUNDLED_MODEL,
   });
-  return { manager, setNextOutput(output: string) { nextOutput = output; } };
+  return { manager, setNextOutput(output: string, keepAnswer = false) { nextOutput = output; keepNextAnswer = keepAnswer; } };
 }
 
 /** A model answer that passed verify, carrying only the given phase_hint. */
@@ -287,7 +289,7 @@ function verifiedOutput(phaseHint: 'before' | 'during' | 'after' | null): string
   });
 }
 
-async function makeHintEngine(): Promise<{ engine: Engine; setNextOutput(output: string): void }> {
+async function makeHintEngine(): Promise<{ engine: Engine; setNextOutput(output: string, keepAnswer?: boolean): void }> {
   const profile = fixtureProfile();
   const store = createMemoryStore({ profiles: [profile], activeProfileId: profile.id });
   const model = makeScriptedModel(async () => 'full');
@@ -358,5 +360,33 @@ describe('phase hints (real engine)', () => {
     expect(events.some((event) => event.type === 'phase_change' && event.kind === 'recommended'
       && event.to === 'after')).toBe(true);
     expect(engine.context.get().phase).toBe('before');
+  });
+});
+
+describe('answer language (real engine)', () => {
+  const englishAnswer = 'Prepare your things and follow the guide in the passage.';
+  const englishOutput = JSON.stringify({
+    used: ['before-gobag-01'], in_guide: true, phase_hint: null, answer: englishAnswer,
+  });
+
+  it('accepts an English AI answer and closes in English after switching to en', async () => {
+    const { engine, setNextOutput } = await makeHintEngine();
+    expect(engine.settings.update({ language: 'en' }).ok).toBe(true);
+    setNextOutput(englishOutput, true);
+
+    const events = await runAsk(engine, 'Paano ihanda ang go bag?');
+
+    expect(events.find((event) => event.type === 'ai_final')).toMatchObject({ text: englishAnswer });
+    expect(events.find((event) => event.type === 'closing')).toMatchObject({ text: engine.copy('closing', { lang: 'en' }) });
+    expect(events[events.length - 1]).toMatchObject({ type: 'done', outcome: 'answered_ai' });
+  });
+
+  it('rejects the same English answer as wrong_language while the language is tl', async () => {
+    const { engine, setNextOutput } = await makeHintEngine();
+    setNextOutput(englishOutput, true);
+
+    const events = await runAsk(engine, 'Paano ihanda ang go bag?');
+
+    expect(events.find((event) => event.type === 'ai_rejected')).toMatchObject({ code: 'wrong_language' });
   });
 });

@@ -1,5 +1,5 @@
 import type {
-  BuiltPrompt, ChatMessage, Context, HomeTag, MemberTag, Passage, Phase, Profile, PromptInput,
+  BuiltPrompt, ChatMessage, Context, HomeTag, MemberTag, Passage, Phase, Profile, PromptInput, UiLanguage,
 } from '../types/index.ts';
 
 export const SYSTEM_TL = [
@@ -11,6 +11,18 @@ export const SYSTEM_TL = [
   'Kung hindi sinasagot ng mga talata ang tanong, ilagay ang "in_guide": false.',
   'Ilagay sa "used" ang ID ng talatang pinagkunan mo.',
   'Ilagay sa "phase_hint" ang yugto ng bagyo kung sinabi ito ng tanong; kung hindi, null.',
+].join('\n');
+
+/** Same rules as SYSTEM_TL; only the answer language changes. The passages stay the vetted Tagalog text. */
+export const SYSTEM_EN = [
+  'You are Bagyo Buddy, a typhoon preparedness guide for one household.',
+  'Answer ONLY from the given passages (Talata). Do not use your own knowledge.',
+  'Answer in 2 to 4 short sentences in simple English.',
+  'Do not add numbers, times, places or names that are not in the passages.',
+  'Do not give phone numbers, hotlines or medicine doses.',
+  'If the passages do not answer the question, set "in_guide": false.',
+  'Put the ID of the passage you used in "used".',
+  'Set "phase_hint" to the storm phase if the question states it; otherwise null.',
 ].join('\n');
 
 export function answerSchema(ids: string[]) {
@@ -120,15 +132,22 @@ export const EXAMPLE_1_JSON = JSON.stringify({
   answer:
     'Ilagay sa go bag ang tubig, pagkain, gamot, flashlight at damit. Isama rin ang gamit sa kalinisan at mga dokumento, at suriin ito nang regular.',
 });
+const EXAMPLE_1_JSON_EN = JSON.stringify({
+  used: [EXAMPLE_PASSAGE_ID],
+  in_guide: true,
+  phase_hint: null,
+  answer:
+    'Put water, food, medicine, a flashlight and clothes in the go bag. Also include hygiene items and documents, and check it regularly.',
+});
 export const EXAMPLE_2_USER = userTurn(EXAMPLE_SUMMARY, EXAMPLE_HEADER, EXAMPLE_PASSAGES, 'Magkano ang pamasahe papuntang evacuation center?');
 export const EXAMPLE_2_JSON = JSON.stringify({ used: [EXAMPLE_PASSAGE_ID], in_guide: false, phase_hint: null, answer: '' });
 
-function assemble(input: PromptInput, passages: Passage[]): BuiltPrompt {
+function assemble(input: PromptInput, passages: Passage[], lang: UiLanguage): BuiltPrompt {
   const header = `${PHASE_LABEL[input.context.phase]}; ${warningsSummary(input.context)}`;
   const messages: ChatMessage[] = [
-    { role: 'system', content: SYSTEM_TL },
+    { role: 'system', content: lang === 'en' ? SYSTEM_EN : SYSTEM_TL },
     { role: 'user', content: EXAMPLE_1_USER },
-    { role: 'assistant', content: EXAMPLE_1_JSON },
+    { role: 'assistant', content: lang === 'en' ? EXAMPLE_1_JSON_EN : EXAMPLE_1_JSON },
     { role: 'user', content: EXAMPLE_2_USER },
     { role: 'assistant', content: EXAMPLE_2_JSON },
     { role: 'user', content: userTurn(input.profile ? profileSummary(input.profile) : 'hindi pa naka-setup', header, passages, redactQuestion(input.question, input.profile)) },
@@ -145,11 +164,12 @@ export function promptTokens(prompt: BuiltPrompt): number {
   return prompt.messages.reduce((n, m) => n + estimateTokens(m.content), 0);
 }
 
-export function buildPrompt(input: PromptInput): BuiltPrompt {
+/** `lang` is `settings.language`: it picks the answer language only; retrieval and passages are the same. */
+export function buildPrompt(input: PromptInput, lang: UiLanguage = 'tl'): BuiltPrompt {
   const passages = input.passages.slice(0, 2);
-  const full = assemble(input, passages);
+  const full = assemble(input, passages, lang);
   if (passages.length === 2 && promptTokens(full) > PROMPT_TOKEN_BUDGET) {
-    return assemble(input, passages.slice(0, 1));
+    return assemble(input, passages.slice(0, 1), lang);
   }
   return full;
 }

@@ -1,4 +1,4 @@
-import type { ModelOutput, Passage, VerifierFailure, VerifyResult } from '../types/index.ts';
+import type { ModelOutput, Passage, UiLanguage, VerifierFailure, VerifyResult } from '../types/index.ts';
 
 const PHASES: readonly string[] = ['before', 'during', 'after'];
 
@@ -29,8 +29,12 @@ const MULTIPLIER: Record<string, number> = { daan: 100, raan: 100, libo: 1000 };
 const UNIT_WORDS: Record<string, true> = {
   oras: true, araw: true, linggo: true, litro: true, galon: true, piraso: true, tao: true, beses: true, metro: true, km: true,
 };
-const FUNCTION_WORDS: Record<string, true> = {
-  ang: true, ng: true, sa: true, mga: true, ay: true, kung: true, para: true, na: true, at: true, si: true, ni: true,
+const FUNCTION_WORDS: Record<UiLanguage, Record<string, true>> = {
+  tl: { ang: true, ng: true, sa: true, mga: true, ay: true, kung: true, para: true, na: true, at: true, si: true, ni: true },
+  en: {
+    the: true, a: true, an: true, and: true, to: true, of: true, in: true, for: true, with: true, your: true, you: true,
+    is: true, are: true, it: true, on: true, or: true,
+  },
 };
 const TOKEN_RE = /\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?|[a-zñ']+/g;
 const PHONE_RE = /\+?\d[\d\s().-]{5,}\d/g;
@@ -133,7 +137,8 @@ function parse(raw: string): ModelOutput | null {
   return { used: o.used as string[], in_guide: o.in_guide, phase_hint: hint as ModelOutput['phase_hint'], answer: o.answer };
 }
 
-export function verify(raw: string, passages: Passage[], allowedExtra: number[] = []): VerifyResult {
+/** `lang` is the answer language the prompt asked for; `wrong_language` fires when the answer is not in it. */
+export function verify(raw: string, passages: Passage[], allowedExtra: number[] = [], lang: UiLanguage = 'tl'): VerifyResult {
   const output = parse(raw);
   if (!output) return fail('schema');
   if (!output.in_guide) return fail('not_in_guide', output);
@@ -166,7 +171,7 @@ export function verify(raw: string, passages: Passage[], allowedExtra: number[] 
   const latin = letters.filter((c) => /\p{Script=Latin}/u.test(c)).length;
   if (letters.length === 0 || latin / letters.length < 0.8) return fail('wrong_language', output, 'script');
   const tokens = answer.toLowerCase().split(/[^\p{L}']+/u).filter(Boolean);
-  const fn = tokens.filter((t) => FUNCTION_WORDS[t]).length;
+  const fn = tokens.filter((t) => FUNCTION_WORDS[lang][t]).length;
   if (fn / tokens.length < 0.1) return fail('wrong_language', output, 'function_words');
 
   return { ok: true, output, failures: [] };
