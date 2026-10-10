@@ -1,4 +1,4 @@
-# Index: Bagyo Buddy
+# Index: Sipat
 
 Map of the important docs and files. Start with [AGENTS.md](AGENTS.md) for the rules, then [docs/README.md](docs/README.md) for shared names.
 
@@ -27,8 +27,8 @@ Map of the important docs and files. Start with [AGENTS.md](AGENTS.md) for the r
 | [docs/BMC.md](docs/BMC.md) | Business model, pricing, how LGUs buy |
 | [docs/proposal-cached-bulletins.md](docs/proposal-cached-bulletins.md) | Proposal (not adopted): cached storm bulletins |
 | [docs/Offline-P2P-Libraries-Research.md](docs/Offline-P2P-Libraries-Research.md) | Research: offline phone-to-phone libraries for React Native |
-| [docs/idea-bagyo-buddy.md](docs/idea-bagyo-buddy.md) | v1 input, history only |
-| [docs/Bagyo-Buddy-Product-Overview.md](docs/Bagyo-Buddy-Product-Overview.md) | v1 input, history only |
+| [docs/idea-sipat.md](docs/idea-sipat.md) | v1 input, history only |
+| [docs/Sipat-Product-Overview.md](docs/Sipat-Product-Overview.md) | v1 input, history only |
 
 ## Application code (`app/`)
 
@@ -65,4 +65,3 @@ Map of the important docs and files. Start with [AGENTS.md](AGENTS.md) for the r
 | File | Purpose |
 | :-- | :-- |
 | [scripts/validate-content.ts](scripts/validate-content.ts) | Content validation (`npm run validate:content`) |
-| [plugins/withReleaseNoInternet.js](plugins/withReleaseNoInternet.js) | Expo config plugin removing INTERNET permission from release builds |

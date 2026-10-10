@@ -1,10 +1,10 @@
-# Bagyo Buddy docs: start here
+# Sipat docs: start here
 
 *v3 · 2026-10-09 · Stage: active development. App code lives in `app/`.*
 
 ## The idea in one paragraph
 
-Bagyo Buddy is an offline-first typhoon companion for Filipino households on budget Android phones. The main person sets up the family once, member by member, with a face photo of each. The app runs in one of three bagyo phases (before, during, after), and the phase changes the whole look of the app, the checklist and the answers. The phase can switch on its own: from the warning the family taps after hearing it on the radio (wind signal, rainfall, storm surge or gale), from what they tell the assistant, and, when the phone has signal, from how close the latest PAGASA bulletin puts the bagyo. They can ask questions in Taglish and get answers drawn only from official preparedness guides that ship inside the app, with the source one tap away. A small on-device model (Llama 3.2 1B) puts the matched passage in plain words, but the app works fully without it: the vetted summary shows first, the AI answer second. When signal is available, the app also fetches a signed feed from our own server (scraped PAGASA bulletins, nearby evacuation centers, hotline and guide updates) and keeps it for offline use. Households never pay. LGUs pay for a localized pack with their own evacuation centers, hotlines and advisories.
+Sipat is an offline-first typhoon companion for Filipino households on budget Android phones. The main person sets up the family once, member by member, with a face photo of each. The app runs in one of three bagyo phases (before, during, after), and the phase changes the whole look of the app, the checklist and the answers. The phase can switch on its own: from the warning the family taps after hearing it on the radio (wind signal, rainfall, storm surge or gale), from what they tell the assistant, and, when the phone has signal, from how close the latest PAGASA bulletin puts the bagyo. They can ask questions in Taglish and get answers drawn only from official preparedness guides that ship inside the app, with the source one tap away. A small on-device model (Llama 3.2 1B) puts the matched passage in plain words, but the app works fully without it: the vetted summary shows first, the AI answer second. When signal is available, the app also fetches a signed feed from our own server (scraped PAGASA bulletins, nearby evacuation centers, hotline and guide updates) and keeps it for offline use. Households never pay. LGUs pay for a localized pack with their own evacuation centers, hotlines and advisories.
 
 ## Read in this order
 
@@ -17,7 +17,7 @@ Bagyo Buddy is an offline-first typhoon companion for Filipino households on bud
 | [api-layer.md](api-layer.md) | Module interfaces, data schemas, feed and pack format, update and LGU APIs |
 | [BMC.md](BMC.md) | Business model canvas, pricing, how LGUs buy, go-to-market |
 
-**Source of truth.** [idea-bagyo-buddy.md](idea-bagyo-buddy.md) and [Bagyo-Buddy-Product-Overview.md](Bagyo-Buddy-Product-Overview.md) are the v1 inputs, kept for history. Where they disagree with the docs above, the docs above win. Where those docs disagree on a feature, [features.md](features.md) wins. [proposal-cached-bulletins.md](proposal-cached-bulletins.md) is superseded by the v3 feed design.
+**Source of truth.** [idea-sipat.md](idea-sipat.md) and [Sipat-Product-Overview.md](Sipat-Product-Overview.md) are the v1 inputs, kept for history. Where they disagree with the docs above, the docs above win. Where those docs disagree on a feature, [features.md](features.md) wins. [proposal-cached-bulletins.md](proposal-cached-bulletins.md) is superseded by the v3 feed design.
 
 **Conventions.** Linked figures are sourced. *Reasoning:* marks our own analysis. **Unverified** marks secondary figures. Every target is a proposal to measure, not a result. Release tags: **MVP** is the 10-hour hackathon build, **MVP stretch** is MVP if time allows (every online feature is here), **Pilot** is the first one or two LGUs, **Later** is the roadmap.
 
@@ -49,7 +49,7 @@ These are the enhancements to the v1 idea, updated for v3.
 
 | # | v1 said | Decision | Why |
 | :-- | :-- | :-- | :-- |
-| F1 | The idea doc: "no internet permission after install." The overview: Smart Update downloads over the internet. | Until the online features land (MVP stretch), the release build has no INTERNET permission, so "offline" is provable. After that, only `UpdateClient` may go online: one pinned host (our server), only while the app is open, every request listed in an on-screen network log. The offline core never waits on it. | Android grants INTERNET at install and most phones give users no switch to deny it, so the limit has to be in our code and visible. |
+| F1 | The idea doc: "no internet permission after install." The overview: Smart Update downloads over the internet. | The release build keeps the INTERNET permission. The network is used only on a user action and only while the app is open, and every request is listed in an on-screen network log. Allowed connections: `UpdateClient` to one pinned host (our server) for the feed and packs (MVP stretch), plus the one-time AI model download from Hugging Face when the user taps "I-download ang AI" in Settings (MVP; owner-approved exception to the one host, verified by size and SHA-256). The offline core never waits on either. | Android grants INTERNET at install and most phones give users no switch to deny it, so the limit has to be in our code and visible. |
 | F2 | "Nothing downloads without a tap," but "the LGU pack downloads automatically." | The small bulletin feed is checked when the app opens with signal (can be turned off). Packs and the model wait for a tap, Wi-Fi by default. | Bulletins are only useful if fresh; packs are large. |
 | F3 | "The profile never leaves the phone," but a DRRM dashboard shows the most-asked questions. | The dashboard is a separate opt-in, off by default. Phones send weekly counts of topic groups only, never question text, profile data or location. Cells with fewer than 10 households are hidden. | Health and disability details are sensitive personal information under the Data Privacy Act (RA 10173). |
 | F4 | Updates "picked by the household profile." | The bulletin feed is one file for everyone. Area data (evacuation centers, LGU packs) comes as a whole province bundle, filtered on the device. | Otherwise what a phone fetches reveals who lives in the house and where. |
@@ -94,7 +94,7 @@ U1 (SMS texts), U2 (go-bag amounts), U4 (Bisaya, Cebuano) and U5 (livelihood tag
 | B1 | Sell into the Local DRRM Fund: by law at least 5% of an LGU's estimated regular revenue, with 30% of it set aside as the Quick Response Fund (RA 10121, Sec. 21). | The buyer already has a mandated budget line for preparedness. |
 | B2 | Tie the pitch to the Seal of Good Local Governance: disaster preparedness is one of the ten areas an LGU must pass (RA 11292; DILG MC 2023-086). | Gives the mayor a reason to care. |
 | B3 | Add CSR-sponsored licenses (telcos, electric cooperatives, banks, insurers), credited on the About screen. Never ads. | A second revenue stream that keeps households free. |
-| B4 | Model bytes come from Google Play (an AI pack) or a pinned public mirror checked by SHA-256, not from our CDN. Our servers host only KB-size feed files and guide packs; the scraper runs as a scheduled job. | Cost to serve stays near zero. |
+| B4 | Model bytes come from Hugging Face in the MVP (downloaded once on a Settings tap and checked by size and SHA-256), and may come from Google Play (an AI pack) in the Pilot; never from our CDN. Our servers host only KB-size feed files and guide packs; the scraper runs as a scheduled job. | Cost to serve stays near zero. |
 | B5 | Report outcomes LGUs care about: the share of pilot households with a packed go-bag, a family plan and photos of every member (before and after survey), not app opens. | Outcomes renew contracts. |
 
 ### 6. Family profiles and photos
@@ -108,7 +108,7 @@ U1 (SMS texts), U2 (go-bag amounts), U4 (Bisaya, Cebuano) and U5 (livelihood tag
 | H5 | Photos stay in app-private storage, re-encoded without location metadata, excluded from Android cloud backup, and never go into the model prompt, packs, topic reports, logs or network requests. They leave the phone only when the user shares a member's card. | MVP (core) | Photos of children and elders are the most personal data the app holds. |
 | H6 | A "Hinahanap" card per member (photo, name, age group, needs, the main person's number, the evacuation center) for showing to rescuers or evacuation staff if someone gets separated. | MVP | Family members get separated during evacuations; a photo card works with no signal. |
 
-**Positioning.** Alerts tell you a storm is coming. Bagyo Buddy tells your household what to do, even with no signal, and shows the latest PAGASA bulletin it saw while it still had one. It complements the free cell-broadcast alerts (RA 10639), PAGASA bulletins, Project NOAH and HazardHunterPH rather than competing with them.
+**Positioning.** Alerts tell you a storm is coming. Sipat tells your household what to do, even with no signal, and shows the latest PAGASA bulletin it saw while it still had one. It complements the free cell-broadcast alerts (RA 10639), PAGASA bulletins, Project NOAH and HazardHunterPH rather than competing with them.
 
 ## Shared names
 
@@ -174,9 +174,9 @@ Use these exact names in every doc and in code. Full types are in [api-layer.md]
 - Dashboard cells hidden below 10 households.
 - Summary on screen in ≤ 1 s. First AI words in ≤ 5 s and the full AI answer in ≤ 10 s, median on a 4 GB phone. v1's 6-second full answer stays the stretch goal.
 
-**Updates, feed and packs.** A pack file is `*.bagyopack`. CDN paths: `/v1/keys.json`, `/v1/feed/manifest.json`, `/v1/core/manifest.json`, `/v1/areas/{provinceCode}/manifest.json`, `/v1/blobs/{sha256}.json.gz`, `/v1/model/manifest.json`. Manifests are signed with Ed25519 over RFC 8785 canonical JSON. Place codes are PSGC codes.
+**Updates, feed and packs.** A pack file is `*.bagyopack`. CDN paths: `/v1/keys.json`, `/v1/feed/manifest.json`, `/v1/core/manifest.json`, `/v1/areas/{provinceCode}/manifest.json`, `/v1/blobs/{sha256}.json.gz`. Manifests are signed with Ed25519 over RFC 8785 canonical JSON. Place codes are PSGC codes. The model is not on the CDN: the MVP downloads it from Hugging Face.
 
-**On-device stores (MMKV keys):** `profiles` (members and location included), `activeProfileId`, `context` (phase, phase source, warnings), `checklist:{profileId}`, `questionLog`, `settings`, `packs`, `feed` (MVP stretch), `networkLog` (MVP stretch), `topicCounts` (Pilot), `damageReports` (Pilot), `account` (Later).
+**On-device stores (MMKV keys):** `profiles` (members and location included), `activeProfileId`, `context` (phase, phase source, warnings), `checklist:{profileId}`, `questionLog`, `settings`, `packs`, `feed` (MVP stretch), `networkLog` (MVP: model download; MVP stretch: feed and packs), `topicCounts` (Pilot), `damageReports` (Pilot), `account` (Later).
 
 **Fixed Tagalog copy**
 
@@ -224,4 +224,4 @@ Use these exact names in every doc and in code. Full types are in [api-layer.md]
 | Go-bag | A bag packed ahead, ready to grab when evacuating |
 | Gabay, lumikas, ligtas, tulong | Guide, evacuate, safe, help |
 | Ambon, Bantay | Free household tier ("drizzle"); paid LGU tier ("watch") |
-| Pack | A signed bundle of guide data: core, area (LGU) or model |
+| Pack | A signed bundle of guide data: core or area (LGU). The model is downloaded separately |

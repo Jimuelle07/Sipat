@@ -1,4 +1,4 @@
-# Bagyo Buddy
+# Sipat
 
 > Offline typhoon companion for Filipino households on budget Android phones. Sourced answers in Taglish, fitted to your family, with no signal.
 
@@ -36,7 +36,7 @@ Why these two storms matter: Odette is the offline case (signal down in hundreds
 
 ## Solution
 
-Bagyo Buddy runs in three bagyo phases (**Bago**, **Habang may bagyo**, **Pagkatapos**). The phase changes the whole UI theme, the checklist and the answers.
+Sipat runs in three bagyo phases (**Bago**, **Habang may bagyo**, **Pagkatapos**). The phase changes the whole UI theme, the checklist and the answers.
 
 - **Household profile, once.** The family sets up each member with a face photo. Photos and names never leave the phone.
 - **Tap the warning you heard on the radio.** PAGASA wind signal 1 to 5, rainfall, storm surge or gale. You get a checklist fitted to your household.
@@ -53,7 +53,7 @@ Bagyo Buddy runs in three bagyo phases (**Bago**, **Habang may bagyo**, **Pagkat
 ## Demo GIF
 
 <!-- TODO: add the recording to docs/media/demo.gif, then uncomment -->
-<!-- ![Bagyo Buddy demo](docs/media/demo.gif) -->
+<!-- ![Sipat demo](docs/media/demo.gif) -->
 *GIF coming soon.*
 
 ## Tools used
@@ -80,8 +80,8 @@ Bagyo Buddy runs in three bagyo phases (**Bago**, **Habang may bagyo**, **Pagkat
 **Steps**
 
 ```bash
-git clone https://github.com/Jimuelle07/AppBuilders-team-Dana-kuys.git
-cd AppBuilders-team-Dana-kuys
+git clone https://github.com/Jimuelle07/Sipat.git
+cd Sipat
 npm install
 npm run validate:content   # checks content/*.json (sources, reviewers, dates)
 npm run typecheck
@@ -112,7 +112,7 @@ The web preview saves to the browser's `localStorage` and has no AI model, so an
 
 **Optional: enable the on-device model**
 
-The app works fully without AI. To turn it on, place `Llama-3.2-1B-Instruct-Q4_K_M.gguf` (about 0.81 GB) in the app's document directory under `models/`. AI is skipped automatically when the model is missing, the device tier is `none`, AI is switched off, the battery is below 15%, or battery saver is on.
+The app works fully without AI. To turn it on, open Settings and tap **I-download ang AI (0.81 GB)**: the app downloads `Llama-3.2-1B-Instruct-Q4_K_M.gguf` once from [Hugging Face](https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF), checks its size and SHA-256, and lists the request in the on-screen network log. Nothing downloads in the background or automatically. Without a connection, tap **Mula sa file sa telepono** and pick a copy of the same file already on the phone. AI is skipped automatically (vetted summaries only) when the model is missing, the device tier is `none` (Settings then shows only the tier message), AI is switched off, the battery is below 15%, or battery saver is on. The web preview cannot run the model (llama.rn is native only).
 
 ## How to use Expo for Android
 
@@ -131,8 +131,8 @@ The app works fully without AI. To turn it on, place `Llama-3.2-1B-Instruct-Q4_K
    npm start      # then press "a" to open on Android
    ```
    or `npm run android`.
-4. **Connection tips.** Phone and computer should be on the same Wi-Fi, or use USB (`adb reverse tcp:8081 tcp:8081`). Debug builds keep the INTERNET permission so Metro can connect.
-5. **Release build** (INTERNET permission is stripped by `plugins/withReleaseNoInternet.js`):
+4. **Connection tips.** Phone and computer should be on the same Wi-Fi, or use USB (`adb reverse tcp:8081 tcp:8081`).
+5. **Release build** (keeps the INTERNET permission for the Settings model download; FLAG_SECURE is added by `plugins/withSecureScreen.js`):
    ```bash
    npx expo run:android --variant release
    ```

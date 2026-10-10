@@ -1,6 +1,6 @@
 # API layer
 
-The exact contracts between Bagyo Buddy's modules, its data files, its signed feed and packs, and its servers; the reasons behind them live in system-design.md. Feature scope and release tags come from [features.md](features.md), which wins where this file disagrees.
+The exact contracts between Sipat's modules, its data files, its signed feed and packs, and its servers; the reasons behind them live in system-design.md. Feature scope and release tags come from [features.md](features.md), which wins where this file disagrees.
 
 Related: [README.md](README.md) · [features.md](features.md) · [system-design.md](system-design.md) · [solution.md](solution.md)
 
@@ -12,17 +12,18 @@ Related: [README.md](README.md) · [features.md](features.md) · [system-design.
 | :-- | :-- | :-- |
 | A. On-device module API | TypeScript inside the app: the `Engine` facade (`app/engine/`), the pure core (`app/core/`), the `ask()` orchestrator and the services (`app/services/`) | MVP; online services MVP stretch |
 | B. Data contracts | Bundled JSON in `content/`; the signed bulletin feed; signed packs and deltas | MVP (bundled), MVP stretch (feed, province evacuation-center bundles, offline pack import, Smart Update), Pilot (LGU packs) |
-| C. Network API | Static files on our one pinned host (keys, feed, packs, model manifest), written by the scheduled scraper and the pack pipeline; Bantay LGU portal REST API; opt-in topic-report endpoint | MVP stretch (feed and Smart Update), Pilot (portal, topic reports) |
+| C. Network API | Static files on our one pinned host (keys, feed, packs), written by the scheduled scraper and the pack pipeline; the one-time model download from Hugging Face (MVP, Settings tap); Bantay LGU portal REST API; opt-in topic-report endpoint | MVP (model download), MVP stretch (feed and Smart Update), Pilot (portal, topic reports) |
 
-The offline core never waits on the network. Until the online stretch lands, the release build has no INTERNET permission. After that, only the modules below may ever open a connection, always to the one pinned host (our server), only while the app is open, and every request goes into `networkLog`:
+The offline core never waits on the network. The release build keeps the INTERNET permission, so the limit lives in code and is visible: only the modules below may ever open a connection, only on a user action or app open, only while the app is open, and every request goes into `networkLog`. All of them use the one pinned host (our server), with one owner-approved exception: `ModelManager.download` fetches the GGUF once from Hugging Face when the user taps "I-download ang AI" in Settings, and the file is accepted only if its size and SHA-256 match `BUNDLED_MODEL`.
 
 | Module | MVP (core) and MVP | MVP stretch | Pilot | Later |
 | :-- | :-- | :-- | :-- | :-- |
-| `UpdateClient` | Not shipped. The APK has no INTERNET permission | GET only. The feed is checked on app open and on pull to refresh (Settings `feedEnabled`); packs and the model manifest wait for a tap, Wi-Fi by default | Same; LGU packs added | Same |
+| `UpdateClient` | Not shipped | GET only. The feed is checked on app open and on pull to refresh (Settings `feedEnabled`); packs wait for a tap, Wi-Fi by default | Same; LGU packs added | Same |
 | `TopicReporter` | Not shipped | Not shipped | One POST per completed week, only after opt-in | Same |
 | `DamageReporter` | Not shipped | Not shipped | One POST per report, only after opt-in and only on the user's send tap | Same |
 | `AccountSync` | Not shipped: the account screens are static | Not shipped | Not shipped | Sign-up, sign-in, reset and the profile backup after sign-in |
-| Everything else: `app/core/*`, `ask()`, `ModelManager`, `PowerPolicy`, `Store`, `PackManager`, `PhotoService`, `LocationService`, `ShareService`, `FilePicker`, `ScreenService` | Never | Never | Never | Never |
+| `ModelManager.download` | One GET to `huggingface.co` for the GGUF, only on the Settings tap; never automatic or in the background | Same | Same (the Google Play AI pack may replace it) | Same |
+| Everything else: `app/core/*`, `ask()`, the rest of `ModelManager`, `PowerPolicy`, `Store`, `PackManager`, `PhotoService`, `LocationService`, `ShareService`, `FilePicker`, `ScreenService` | Never | Never | Never | Never |
 
 No background fetch, no push. The phone never contacts PAGASA or any other site; the server-side scraper does ([section 10](#scraper-output)). `LocationService` asks the OS for one coarse reading and opens no connection itself. `ShareService` only hands a member card image to the Android share sheet when the user taps share.
 
@@ -65,7 +66,7 @@ export type CopyKey =
   | 'photo_required'   // draft: "Kailangan ang litrato ng mukha para makilala kung sakaling mawalay. Puwedeng mamaya na."
   | 'photo_pending'    // draft: "Kulang pa ang litrato ni {name}."
   | 'location_button'  // draft: "Gamitin ang lokasyon ng telepono"
-  | 'aid_notice';      // draft: "Gabay sa paghahanda ang Bagyo Buddy. Hindi ito serbisyong pang-emergency at hindi ito forecast."
+  | 'aid_notice';      // draft: "Gabay sa paghahanda ang Sipat. Hindi ito serbisyong pang-emergency at hindi ito forecast."
 ```
 
 English translations exist for display under the Tagalog original and are pending review.
@@ -191,7 +192,7 @@ export interface EngineInfo {
   passagesCount: number;
   sourcesCount: number;
   packs: InstalledPack[];
-  online: boolean;   // false until the build ships the online stretch (no INTERNET permission)
+  online: boolean;   // false until the build ships the online stretch (feed and packs); the model download is separate
   model: { fileName: string; sizeBytes: number; present: boolean; attribution: 'Built with Llama' };
 }
 
@@ -477,17 +478,23 @@ export interface AccountApi {
 }
 export type AccountError = 'invalid_email' | 'weak_password' | 'offline' | 'http' | 'demo_only';
 
-// Model (MVP): Settings "I-install ang AI model" and the AI badge. The GGUF comes from a file already on the phone
-// (sideloaded for the hackathon); the Google Play AI pack replaces this in the Pilot. No network.
+// Model (MVP): Settings "I-download ang AI (0.81 GB)" and the AI badge. The GGUF is downloaded once from Hugging Face on
+// that tap (owner-approved exception to the one pinned host, logged in networkLog); "Mula sa file sa telepono" keeps the
+// offline file import. Nothing downloads in the background. On a tier 'none' phone only the tier message shows.
 export type ModelInstallError =
-  | 'tier'          // the phone is in tier 'none'; checked before copying
+  | 'tier'          // the phone is in tier 'none'; checked before copying or downloading
   | 'no_space'      // not enough free storage for the copy
   | 'wrong_file'    // the file name or size differs from the bundled model entry
-  | 'hash_mismatch' // the SHA-256 differs; the copy is deleted
-  | 'cancelled'     // the user stopped the copy
+  | 'hash_mismatch' // the size or SHA-256 differs; the file is deleted
+  | 'cancelled'     // the user stopped the copy or download
+  | 'download_failed' // no connection, or the host refused or cut off the file
   | 'io';
 export interface ModelApi {
-  // Opens the system file picker, copies the file into app-private storage while hashing it, then checks it.
+  // Downloads the GGUF from BUNDLED_MODEL.url into app-private storage, then checks size and SHA-256.
+  // Only on the user's tap. Tier, space and file access are checked first and make no request.
+  download(onProgress: (bytes: number, total: number) => void, signal?: AbortSignal):
+    Promise<Result<'installed', ModelInstallError>>;
+  // Offline alternative: opens the system file picker, copies the file into app-private storage while hashing it, then checks it.
   // null: the user closed the picker. On success info().model.present is true and onChange('status') fires.
   installFromPicker(onProgress: (bytes: number, total: number) => void, signal?: AbortSignal):
     Promise<Result<'installed' | null, ModelInstallError>>;
@@ -538,13 +545,13 @@ Every screen, what it reads, what it calls and which `onChange` values make it r
 | Evacuation and bagyo (MVP stretch) | `evacuation.view()`, `feed.get()` | `feed.refresh()`, `family.location.setArea()` or `family.location.useGps()` when `needsLocation`, `profiles.save()` with `plan.evacuationCenterId` and `plan.evacuationCenter` (the center's name) when the user picks a recommended center | `feed`, `profiles`, `packs`, `phase` |
 | Guide topics | `guide.topics()`, `guide.byTopic()`, `guide.passage()` | — | `packs`, `phase` |
 | About | `info()`, `guide.sources()`, `guide.reviewers()`, `copy('aid_notice')`, `packs.installed()`, `feed.get()` (fetched time), `updates.networkLog()` (MVP stretch) | — | `packs`, `feed`, `updates` |
-| Settings | `settings.get()`, `status()`, `info().model`, `family.location.get()`, `packs.installed()` | `settings.update()` (AI, `lowBatteryMode`, low-battery threshold, `feedEnabled`, update settings; Pilot: `topicReportsOptIn`, `damageReportsOptIn`), `model.installFromPicker()`, `model.remove()`, `family.location.setArea()`, `family.location.useGps()`, `history.clear()`, `family.photos.removeAll()`, `packs.importFromPicker()`, `packs.apply()`, `packs.rollback()`, `updates.check()`, `updates.download()` (MVP stretch) | `settings`, `status`, `profiles`, `packs`, `updates` |
+| Settings | `settings.get()`, `status()`, `info().model`, `family.location.get()`, `packs.installed()` | `settings.update()` (AI, `lowBatteryMode`, low-battery threshold, `feedEnabled`, update settings; Pilot: `topicReportsOptIn`, `damageReportsOptIn`), `model.download()`, `model.installFromPicker()`, `model.remove()`, `family.location.setArea()`, `family.location.useGps()`, `history.clear()`, `family.photos.removeAll()`, `packs.importFromPicker()`, `packs.apply()`, `packs.rollback()`, `updates.check()`, `updates.download()` (MVP stretch) | `settings`, `status`, `profiles`, `packs`, `updates` |
 | Account (MVP static; sync Later) | `account.state()` (Later) | In the MVP the sign-up, login and forgot-password forms are pure UI: no reads, no calls, nothing stored. Later: `account.signUp()`, `account.signIn()`, `account.sendReset()`, `account.setSync()` | `account` (Later) |
 | Evaluation | `evaluation.summary()`, `history.list()` | — | `history` |
 | SOS (MVP stretch) | — | `screen.sosOn()` on open, `screen.sosOff()` on close | — |
 | Damage report (Pilot) | `damage.list()`, `settings.get().damageReportsOptIn` | `damage.save()`, `damage.addPhoto()`, `damage.removePhoto()`, `damage.send()`, `damage.remove()` | `damage`, `settings` |
 
-App-wide elements read `status()`: the AI badge (`ai`, `model`), the low-battery badge (`battery`, and `settings.get().lowBatteryMode` for the manual switch), the stale-warning banner (`stale`, text from `engine.copy('stale_warning')`) and, from the MVP stretch, the update banner (`updateAvailable`). The phase banner reads `context.get().lastSwitch`; the UI shows it once per `lastSwitch.at`. An Android "share to Bagyo Buddy" intent passes its file URI to `packs.importFile()`.
+App-wide elements read `status()`: the AI badge (`ai`, `model`), the low-battery badge (`battery`, and `settings.get().lowBatteryMode` for the manual switch), the stale-warning banner (`stale`, text from `engine.copy('stale_warning')`) and, from the MVP stretch, the update banner (`updateAvailable`). The phase banner reads `context.get().lastSwitch`; the UI shows it once per `lastSwitch.at`. An Android "share to Sipat" intent passes its file URI to `packs.importFile()`.
 
 ### 3.4 Rendering the answer stream
 
@@ -581,7 +588,7 @@ Every code the frontend can receive, where it comes from, and draft Tagalog for 
 | `battery_saver` | same | "Naka-on ang battery saver, kaya buod lang ang ipinapakita." |
 | `ai_off` | same | "Naka-off ang AI sa Settings." |
 | `tier` | same | "Hindi kaya ng phone na ito ang AI. Buod mula sa gabay ang ipinapakita." |
-| `no_model` | same | "Wala pang AI model sa phone na ito." |
+| `no_model` | same | "Wala pang AI sa phone na ito. I-download ito sa Settings." |
 | `absent`, `unloaded`, `ready` | `status().model` | No message; the AI badge shows its idle state |
 | `loading`, `generating`, `error` | `status().model`; `ai_status` loading_model, thinking | "Inihahanda ang AI…", "Sumusulat ng sagot…", "Hindi gumana ang AI. Buod lang muna." |
 | `schema`, `not_in_guide`, `bad_citation`, `unknown_number`, `phone_number`, `too_long`, `wrong_language` (every `VerifierFailure`) | `ai_rejected` | One note for all codes: "Hindi ipinakita ang sagot ng AI dahil hindi ito tugma sa gabay." The code goes to the log, not the screen |
@@ -615,22 +622,23 @@ Every code the frontend can receive, where it comes from, and draft Tagalog for 
 | `not_found` | `plan.call()` | Re-read `plan.hotlines()`; generic message |
 | `not_found` | `family.*`, `family.photos.*` | Re-read `family.members()`; generic message |
 | `no_dialer` | `plan.call()` | "Hindi makatawag mula sa phone na ito." |
-| `cancelled`, `failed` | `family.shareCard()`, `updates.download()`, `model.installFromPicker()` | No message for `cancelled`; "Hindi nagawa. Subukan muli." for `failed` |
+| `cancelled`, `failed` | `family.shareCard()`, `updates.download()`, `model.download()`, `model.installFromPicker()` | No message for `cancelled`; "Hindi nagawa. Subukan muli." for `failed` |
 | `off`, `empty`, `fresh`, `stale` (`FeedStatus`) | `feed.get().status` | `off`: no bulletin UI. `empty`: "Wala pang balita mula sa PAGASA na naka-save." `fresh`: the card. `stale`: the card with `copy('stale_warning')` |
 | `disabled` | `feed.refresh()` | "Naka-off ang balita sa Settings." |
 | `offline` | `feed.refresh()`, `updates.check()`, `updates.download()` | "Walang internet. Ipinapakita ang huling na-download." (feed) / "Walang internet." (updates) |
 | `http` | `feed.refresh()`, `updates.*` | "Hindi maabot ang server. Subukan muli mamaya." |
 | `not_allowed` | `updates.check()`, `updates.download()` | "Wi-Fi lang ang nakatakda para sa update. Kumonekta sa Wi-Fi o baguhin ito sa Settings." |
 | `bad_archive` | `packs.import*()` | "Hindi mabasa ang file." |
-| `unknown_key`, `bad_signature`, `key_expired` | `packs.import*()`, `feed.refresh()`, `updates.*` | "Hindi galing sa Bagyo Buddy ang file na ito. Hindi ito ii-install." (packs) / "Hindi ma-verify ang balita. Ipinapakita ang huling na-download." (feed) |
+| `unknown_key`, `bad_signature`, `key_expired` | `packs.import*()`, `feed.refresh()`, `updates.*` | "Hindi galing sa Sipat ang file na ito. Hindi ito ii-install." (packs) / "Hindi ma-verify ang balita. Ipinapakita ang huling na-download." (feed) |
 | `app_too_old` | `packs.import*()`, `feed.refresh()`, `updates.*` | "I-update muna ang app." |
 | `rollback` | `packs.import*()`, `feed.refresh()` | "Mas luma ang file na ito kaysa sa nasa phone." (packs) / no message (feed keeps its cache) |
 | `hash_mismatch`, `schema` | `packs.import*()`, `feed.refresh()`, `updates.*` | "Sira ang file. Humingi ng bagong kopya." (packs) / generic message (feed) |
 | `io`, `nothing_to_roll_back` | `packs.apply()`, `packs.rollback()` | "Hindi na-save. Tingnan kung may espasyo pa ang phone.", "Walang naunang bersyon." |
-| `tier` | `model.installFromPicker()` | "Hindi kaya ng phone na ito ang AI. Gagana pa rin ang app gamit ang buod mula sa gabay." |
-| `no_space` | `model.installFromPicker()` | "Kulang ang espasyo sa phone para sa AI model." |
-| `wrong_file`, `hash_mismatch` | `model.installFromPicker()` | "Hindi ito ang tamang AI model file." |
-| `io` | `model.installFromPicker()`, `damage.*` | "Hindi na-save. Tingnan kung may espasyo pa ang phone." |
+| `tier` | `model.download()`, `model.installFromPicker()` | "Hindi kaya ng phone na ito ang AI. Gagana pa rin ang app gamit ang buod mula sa gabay." |
+| `no_space` | `model.download()`, `model.installFromPicker()` | "Kulang ang espasyo sa phone para sa AI model." |
+| `wrong_file`, `hash_mismatch` | `model.download()`, `model.installFromPicker()` | "Hindi ito ang tamang AI model file." |
+| `download_failed` | `model.download()` | "Hindi na-download ang AI. Tingnan ang internet at subukan muli." |
+| `io` | `model.download()`, `model.installFromPicker()`, `damage.*` | "Hindi na-save. Tingnan kung may espasyo pa ang phone." |
 | `demo_only` | `account.signUp()`, `account.signIn()`, `account.sendReset()` | Not reached in the MVP (the screens make no calls). If reached: "Demo pa lang ito. Gumagana ang app kahit walang account." |
 | `not_signed_in` | `account.signOut()`, `account.setSync()` | Re-read `account.state()`; no message |
 | `invalid_email`, `weak_password` | `account.*` (Later) | "Tingnan muli ang email.", "Masyadong mahina ang password." |
@@ -723,8 +731,8 @@ With `speed: 'realistic'`, `summary` arrives at 0.3 s, `loading_model` at 0.4 s,
 - `setWarning({ kind: 'barangay_order' })` puts `evacuate` right after `now` and fills `now` from `evacuate` items first; clearing it restores the phase order.
 - `context.cards()` reports `hoursSinceSet` and `stale` from the fixed clock and `staleWarningHours`; `reconfirmWarning()` resets both.
 - With `lowBatteryMode` on, `status().ai` is `{ allowed: false, reason: 'low_battery' }` whatever the battery level.
-- `model.installFromPicker()` with a fixture file of the wrong size returns `wrong_file`, with the wrong hash returns `hash_mismatch` and leaves no file behind; tier `none` returns `tier` before copying.
-- The account calls return the documented demo results, and no engine call makes a network request in a build without the online stretch.
+- `model.installFromPicker()` with a fixture file of the wrong size returns `wrong_file`, with the wrong hash returns `hash_mismatch` and leaves no file behind; tier `none` returns `tier` before copying. `model.download()` with a wrong size or hash returns `hash_mismatch` and leaves no file behind; tier `none`, low space and no file access return `tier`, `no_space` and `io` without a request.
+- The account calls return the documented demo results, and no engine call except `model.download()` makes a network request in a build without the online stretch.
 
 Phase cases (the same table also runs as `decidePhase` unit tests, [section 5](#decidephase)):
 
@@ -750,7 +758,7 @@ When both engines pass, swapping the mock for the real engine cannot break the s
 | Hour 4 sync | Run with `EXPO_PUBLIC_ENGINE` unset (the real engine); run the demo path end to end; list mismatches | Fix mismatches; contract tests green on both engines |
 | Hour 4 to 7 | Photo and crop, "Hinahanap", Emergency, Hotlines, About, Settings (model install, low-battery switch) and Evaluation screens; polish | Verifier, critical pinning, `PowerPolicy`, tiers, model install, `PhotoService` and the face check, `ShareService`, performance |
 | Hour 7 | The contract is frozen; bug fixes only | Same |
-| Hour 9 | The release build uses the real engine; the mock stays for UI tests | The release build has no INTERNET permission and has FLAG_SECURE |
+| Hour 9 | The release build uses the real engine; the mock stays for UI tests | The release build has FLAG_SECURE; it keeps INTERNET, and only the Settings model download (and, with the stretch, `UpdateClient`) opens connections |
 
 The MVP stretch (feed, Evacuation and bagyo screen, GPS, Smart Update, SOS screen) is built only after hour 7's freeze holds, against the mock's `setFeed()` and `setLocationResult()`.
 
@@ -780,9 +788,9 @@ Backend:
 - [ ] Core unit tests and the Node evaluation pass; `evaluation.summary()` returns the latest report, phase cases included.
 - [ ] `content/phase_rules.json` ships with every unsourced band and threshold marked `placeholder: true`; no threshold number appears in code.
 - [ ] Performance budgets are measured on the reference phone ([system-design.md](system-design.md)).
-- [ ] The MVP release build has no INTERNET permission. With the online stretch: only `UpdateClient` opens connections, to the one pinned host, and every request shows in the network log.
+- [ ] The release build keeps the INTERNET permission. Only `model.download()` (Hugging Face, on the Settings tap) and, with the online stretch, `UpdateClient` (the one pinned host) open connections, only while the app is open, and every request shows in the network log.
 - [ ] Every item in [section 3.10](#310-current-code-vs-this-contract) under "Backend migration" is done; `ENGINE_API_VERSION` is 2 in `app/types/engine.ts`.
-- [ ] `model.installFromPicker()` checks tier, space, name, size and SHA-256 against `BUNDLED_MODEL`, which holds the values in [section 7](#modelmanager-mvp); installing `models/Llama-3.2-1B-Instruct-Q4_K_M.gguf` on the reference phone succeeds.
+- [ ] `model.download()` and `model.installFromPicker()` check tier, space, size and SHA-256 (and, for the import, the name) against `BUNDLED_MODEL`, which holds the values in [section 7](#modelmanager-mvp); downloading on the reference phone succeeds, and installing `models/Llama-3.2-1B-Instruct-Q4_K_M.gguf` from a file succeeds.
 - [ ] The release build has FLAG_SECURE; the debug build does not.
 - [ ] `npm test`, `npm run typecheck` and `npm run validate:content` pass with `phase_rules.json` and `places.json` in the required list.
 
@@ -814,7 +822,7 @@ Snapshot of `app/` on 2026-10-10 (last commit `6d624ed`, plus uncommitted work).
 | Services | `app/services/model.ts`, `power.ts`, `store.ts` (MMKV and in-memory), `packs.ts` | Extend as in B5 |
 | Ask pipeline | `app/engine/askPipeline.ts` | Extend as in B6 |
 | Content | 7 of the 9 bundled files in `content/`, loaded by `app/content/index.ts`; `scripts/validate-content.ts` (`npm run validate:content`) | `phase_rules.json` and `places.json` are missing (B7) |
-| Build plugins | `plugins/withReleaseNoInternet.js`, `plugins/withSecureScreen.js` | Release builds: no INTERNET permission, FLAG_SECURE. Debug builds keep both off |
+| Build plugins | `plugins/withSecureScreen.js` | Release builds: FLAG_SECURE; debug builds keep it off. Both builds keep the INTERNET permission |
 | Tests | Vitest in Node (`npm test`, `app/**/*.test.ts`, `plugins/**/*.test.ts`), `npm run typecheck` | No lint yet (F1) |
 | Screens | `HomeScreen`, `AskScreen`, `GuideScreen`, `HotlinesScreen`, `ProfileScreen`, `AccountScreen` (static) | Tabs today: Home, Ask, Guide, Hotlines, Family, Account |
 | UI copy | `app/ui/strings/*.ts` (`defineStrings({ tl, en })`), `app/ui/i18n/` (`useT`, reads `settings.language`) | The legacy table in `app/ui/strings.ts` folds into these (F3) |
@@ -1535,7 +1543,11 @@ export interface ModelManager {
   stop(): Promise<void>;
   unload(): Promise<void>;
   onStateChange(listener: (s: ModelState) => void): () => void; // returns unsubscribe
-  // Copies a picked GGUF into app-private storage (files/models/, excluded from backup) while hashing it.
+  // Downloads BUNDLED_MODEL.url into app-private storage (files/models/, excluded from backup) through
+  // ModelFiles.downloadWithSha256, then checks size and SHA-256. Each request is appended to networkLog.
+  download(onProgress: (bytes: number, total: number) => void, signal?: AbortSignal):
+    Promise<Result<{ bytes: number }, ModelInstallError>>;
+  // Offline alternative: copies a picked GGUF into app-private storage while hashing it.
   install(file: PickedFile, onProgress: (bytes: number, total: number) => void, signal?: AbortSignal):
     Promise<Result<void, ModelInstallError>>;
   remove(): Promise<void>; // unload, then delete the file
@@ -1547,19 +1559,21 @@ export interface ModelManager {
 - `generate()` calls `context.completion(params, callback)`. The token callback feeds a partial-JSON reader that passes the `answer` value so far to `onAnswerText`. One generation at a time; a second call gets `busy`.
 - `stop()` calls `stopCompletion()`. `unload()` calls `release()`. The manager unloads itself after 2 minutes idle and when the app goes to the background.
 - Errors: no model file gives `no_model`; tier `none` gives `tier`; a policy refusal gives `not_allowed`; a failed native init, usually memory, gives `load_failed`. A failed load moves to `error`; the next `warm()` in the same app session retries once, then the state stays `error` and answers use summaries until the app restarts.
-- `install` checks, in order: tier `none` (`tier`), free space for the file plus a margin (`no_space`), the file name and size against `BUNDLED_MODEL` (`wrong_file`), then copies with a native streaming SHA-256 and compares the hash (`hash_mismatch`; the partial copy is deleted, as on `cancelled`). `BUNDLED_MODEL` is a `Pick<ModelEntry, 'file_name' | 'size' | 'sha256'>` ([section 10](#pack-format)) compiled into `app/services/modelEntry.ts`; the signed model manifest replaces it once Smart Update ships.
+- `download` checks, before any request: tier `none` (`tier`), free space for the file plus a margin (`no_space`), file access (`io`). Then `ModelFiles.downloadWithSha256(url, destPath, onProgress, signal): Promise<{ sha256, bytes }>` downloads with expo-file-system `File.downloadFileAsync` and hashes the file in chunks. Size and SHA-256 must both match `BUNDLED_MODEL`, or the file is deleted and `hash_mismatch` returned. No connection, or a refused or cut-off file, gives `download_failed`. Every request goes into the on-screen network log (host `huggingface.co`) through `appendNetworkLog` in `app/services/updates.ts`. It runs only on the Settings tap, never automatically or in the background.
+- `install` checks, in order: tier `none` (`tier`), free space for the file plus a margin (`no_space`), the file name and size against `BUNDLED_MODEL` (`wrong_file`), then copies with a native streaming SHA-256 and compares the hash (`hash_mismatch`; the partial copy is deleted, as on `cancelled`). `BUNDLED_MODEL` is a `Pick<ModelEntry, 'file_name' | 'size' | 'sha256'>` ([section 10](#pack-format)) plus the download `url`, compiled into `app/services/modelEntry.ts`.
 
   ```ts
   // app/services/modelEntry.ts. Verified 2026-10-10: the team's copy in models/ (git-ignored) matches the upstream file
   // byte for byte: https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF (Llama-3.2-1B-Instruct-Q4_K_M.gguf).
   export const BUNDLED_MODEL = {
     file_name: 'Llama-3.2-1B-Instruct-Q4_K_M.gguf',
+    url: 'https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q4_K_M.gguf',
     size: 807694464, // bytes
     sha256: '6f85a640a97cf2bf5b8e764087b1e83da0fdb51d7c9fab7d0fece9385611df83',
   } as const;
   ```
 
-  The team's copy lives in `models/`, which `.gitignore` excludes. Copy it to the phone (USB or sideload) before using "I-install ang AI model"; the app never downloads it in the MVP.
+  The usual path is "I-download ang AI (0.81 GB)" in Settings. Without a good connection, the team's copy in `models/` (git-ignored) can be copied to the phone (USB or sideload) and installed with "Mula sa file sa telepono". Until one of the two succeeds, AI stays unavailable and answers use vetted summaries. The web preview cannot run the model (llama.rn is native only). *Reasoning:* downloading straight from Hugging Face is an owner-approved exception to the one pinned host rule; the size and SHA-256 check means a changed or tampered file is never loaded.
 
 ### PowerPolicy (MVP)
 
@@ -1714,7 +1728,7 @@ export interface FilePicker {
 }
 ```
 
-Used by `model.installFromPicker()` and `packs.importFromPicker()`. Check the copy option and content-URI reading against the installed expo-document-picker and expo-file-system versions.
+Used by `model.installFromPicker()` (the offline alternative to `model.download()`) and `packs.importFromPicker()`. Check the copy option and content-URI reading against the installed expo-document-picker and expo-file-system versions.
 
 ### ScreenService (MVP stretch)
 
@@ -1748,7 +1762,7 @@ export interface UpdateClient {
   fetchFeed(opts: { trigger: 'open' | 'pull' }): Promise<Result<FeedCache | 'unchanged', FeedError>>;
   // Province evacuation-center bundle for the household's province, fetched with the feed (small; reviewed data).
   fetchCenters(provinceCode: string): Promise<Result<ImportPreview | 'unchanged', UpdateError>>;
-  // Guide packs and the model manifest: check fetches manifests only; download waits for a tap.
+  // Guide packs: check fetches manifests only; download waits for a tap. (The model is not fetched here: see ModelManager.download.)
   check(opts: { trigger: 'auto' | 'user' }): Promise<Result<UpdatePlan | null, UpdateError>>;
   download(
     plan: UpdatePlan, onProgress: (bytes: number, total: number) => void, signal?: AbortSignal,
@@ -1876,7 +1890,7 @@ Both example outputs carry `"phase_hint": null` unless the example question itse
 `SYSTEM_TL`, adapted from v1. This is the canonical text; [system-design.md](system-design.md) quotes the same lines. The `phase_hint` line is a draft pending native-speaker review.
 
 ```text
-Ikaw si Bagyo Buddy, gabay sa paghahanda sa bagyo para sa isang sambahayan.
+Ikaw si Sipat, gabay sa paghahanda sa bagyo para sa isang sambahayan.
 Sumagot LAMANG mula sa mga talatang ibinigay. Huwag gumamit ng sariling kaalaman.
 Sumagot sa 2 hanggang 4 na maiikling pangungusap sa simpleng Tagalog.
 Huwag magdagdag ng numero, oras, lugar o pangalan na wala sa mga talata.
@@ -2356,7 +2370,7 @@ Two kinds of signed files come from our one host, or (packs only) from a file:
 
 | | Feed | Packs |
 | :-- | :-- | :-- |
-| Holds | Scraped PAGASA bulletins (`bulletins.json`); reviewed national hotline updates (`hotlines.json`) | Guide content (core), province evacuation-center bundles and LGU data (area), the model manifest |
+| Holds | Scraped PAGASA bulletins (`bulletins.json`); reviewed national hotline updates (`hotlines.json`) | Guide content (core), province evacuation-center bundles and LGU data (area) |
 | Built by | The scheduled scraper job in `scripts/scrape/` | The content build and pack pipeline |
 | Signed with | The **feed key**, held by the job | The **pack key**, kept offline |
 | Reaches the phone | `UpdateClient.fetchFeed`, on app open and pull to refresh | Smart Update after a tap (centers bundle with the feed), or a file import |
@@ -2532,7 +2546,6 @@ export interface PackManifest {
   issued_at: string;
   min_app_version: string; // semver
   packs?: PackEntry[];
-  models?: ModelEntry[];   // model manifest only
   signature?: Signature;   // pack key; embedded in CDN manifests; detached (manifests/{manifest_id}.sig) in .bagyopack
 }
 
@@ -2566,7 +2579,7 @@ example.bagyopack
 
 A file usually carries the core manifest and one area manifest. A manifest may list blobs the archive does not carry (for example other provinces' bundles); those packs are skipped, not errors.
 
-Model files never go into a `.bagyopack`, and the feed never does. Model files are checked against the `sha256` in the signed model manifest.
+Model files never go into a `.bagyopack`, and the feed never does. In the MVP the model is downloaded from Hugging Face and checked against the `size` and `sha256` in `BUNDLED_MODEL` ([section 7](#modelmanager-mvp)).
 
 ### Verification steps
 
@@ -2599,7 +2612,6 @@ MVP stretch. Static files on S3 and CloudFront behind one pinned host, `https://
 | GET | `/v1/core/manifest.json` | `PackManifest` for the national guide | `max-age=300` |
 | GET | `/v1/areas/{provinceCode}/manifest.json` | `PackManifest` listing the province's evacuation-center bundle and, in the Pilot, every LGU and hazard pack in the province | `max-age=300` |
 | GET | `/v1/blobs/{sha256}.json.gz` | A feed file, a full pack or a delta | `public, max-age=31536000, immutable` |
-| GET | `/v1/model/manifest.json` | `PackManifest` with `models` | `max-age=3600` |
 
 ```json
 {
@@ -2627,7 +2639,7 @@ Sizes are illustrative.
 
 **Smart Update algorithm** (`check`, then `download` after a tap):
 
-1. `check`: confirm the trigger rules ([section 7](#updateclient-mvp-stretch)), then GET `keys.json`, the core manifest, the model manifest and, if the household has a location, its province's area manifest (the province is found through `places.json` parents).
+1. `check`: confirm the trigger rules ([section 7](#updateclient-mvp-stretch)), then GET `keys.json`, the core manifest and, if the household has a location, its province's area manifest (the province is found through `places.json` parents).
 2. Verify each manifest with steps 2 to 5 of the [verification steps](#verification-steps).
 3. Build an `UpdatePlan` from every guide pack newer than installed, preferring deltas. All packs in the province go into the plan, not only the household's, so the request pattern reveals nothing about the profile.
 4. Empty plan: return `null`. Otherwise show the size and wait for a tap.
@@ -2635,7 +2647,7 @@ Sizes are illustrative.
 
 **Errors.** A 404 on the area manifest means the province has no area data yet; it is not an error. Timeouts and 5xx get one retry, then `http`. No connection gives `offline`. Any verification failure stops the whole plan or feed refresh and applies nothing.
 
-**Privacy.** Requests carry no cookies, no auth headers, no device ID, no location and no profile data. The feed path is the same for everyone; the province code in an area path is the only household-derived input, so a request reveals at most the province. The User-Agent is a fixed `BagyoBuddy/{version}`. Requests run only while the app is open; there is no background fetch and no push. Every request appears in the on-screen network log.
+**Privacy.** Requests carry no cookies, no auth headers, no device ID, no location and no profile data. The feed path is the same for everyone; the province code in an area path is the only household-derived input, so a request reveals at most the province. The User-Agent is a fixed `Sipat/{version}`. Requests run only while the app is open; there is no background fetch and no push. Every request appears in the on-screen network log.
 
 ### b. Bantay LGU portal REST API
 
@@ -2810,7 +2822,7 @@ X-CSRF-Token: (from Session)
 | PUT | `/v1/account/profile` (Later) | session | the profile minus photos, location and health notes | `200` empty |
 | POST | `/v1/damage-reports` (Pilot) | none | `DamageReport`; photos as multipart or signed-upload blobs | `202` empty; `400` on schema error; `429` over the limit |
 
-- All paths sit on the same pinned host. The account endpoints store only salted password hashes; the profile payload never contains photos, location, or free-form health notes. The MVP ships none of these: the static sign-up, login and forgot-password screens make no request at all (the offline build has no INTERNET permission).
+- All paths sit on the same pinned host. The account endpoints store only salted password hashes; the profile payload never contains photos, location, or free-form health notes. The MVP ships none of these: the static sign-up, login and forgot-password screens make no request at all.
 - Damage reports are held for the household's LGU and visible in the Bantay portal under the portal's own access rules.
 
 ## 12. Versioning and compatibility

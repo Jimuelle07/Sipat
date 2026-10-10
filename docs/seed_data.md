@@ -36,7 +36,7 @@ All of it comes through the existing `Engine` facade; no new API.
 | Storm measure | `evacuation.view().storm` | Computed by `measureStorm` from the bulletin and the demo centroid: about 264 km E now, closest forecast point about 12 km, `signalHere: 2` |
 | Evacuation centers | `evacuation.view().centers` | Ranked nearest first by `rankCenters`: DEMO Paaralang Sentral (about 0 km NW, capacity 300, accessible), DEMO Covered Court ng Barangay (about 1 km SE, capacity 150, accepts pets), DEMO Parish Hall (about 2 km N, capacity 120) |
 | Phase | `context.get()` | Switches to `during` on the first `init()`, from the bulletin signal over the household's province (`reason.source: 'bulletin'`, "May signal para sa inyong lugar."). Undo and manual phase picks work as usual |
-| Demo source | `guide.sources()` | `demo-seed`: agency "Bagyo Buddy (DEMO)", title "DEMO seed data – hindi opisyal, para sa demo lamang" |
+| Demo source | `guide.sources()` | `demo-seed`: agency "Sipat (DEMO)", title "DEMO seed data – hindi opisyal, para sa demo lamang" |
 
 Bulletin and storm timestamps follow the clock at seeding or refresh time, so the card is never stale during a demo. Pull to refresh re-issues the bulletin with new timestamps.
 
@@ -49,7 +49,7 @@ Where it shows in the app (MVP stretch screens):
 | Ask ("nasaan na ang bagyo?") | The same bulletin card |
 | Hotlines, Family | Plan contacts, members and the area |
 
-On web, MMKV saves to the browser's `localStorage` (`bagyo-buddy\…` keys). If the app opens on "May problema sa app", the browser holds data from an older build: clear the site data for the dev server's origin (DevTools, Application, Clear site data) and reload. The console shows the cause as `[engine.init]` in dev builds.
+On web, MMKV saves to the browser's `localStorage` (`sipat\…` keys). If the app opens on "May problema sa app", the browser holds data from an older build: clear the site data for the dev server's origin (DevTools, Application, Clear site data) and reload. The console shows the cause as `[engine.init]` in dev builds.
 
 ## What stays a placeholder, on purpose
 

@@ -1,6 +1,6 @@
 # System design
 
-Bagyo Buddy runs a pure-TypeScript core on the phone that routes, searches and checks every question and decides which bagyo phase the app is in. An optional on-device model only rephrases vetted passages. The design is hybrid: the offline core never waits on the network, and the online features (MVP stretch) fetch a signed PAGASA bulletin feed and signed guide packs from one pinned host, only while the app is open.
+Sipat runs a pure-TypeScript core on the phone that routes, searches and checks every question and decides which bagyo phase the app is in. An optional on-device model only rephrases vetted passages. The design is hybrid: the offline core never waits on the network, and the online features (MVP stretch) fetch a signed PAGASA bulletin feed and signed guide packs from one pinned host, only while the app is open.
 
 Related: [README.md](README.md) (v3 decisions and shared names) · [features.md](features.md) (feature list, decisions D1 to D8, release tags) · [problem.md](problem.md) · [solution.md](solution.md) (journey, features, evaluation set) · [api-layer.md](api-layer.md) (exact types, schemas, endpoints) · [BMC.md](BMC.md)
 
@@ -10,8 +10,8 @@ Related: [README.md](README.md) (v3 decisions and shared names) · [features.md]
 
 | Area | Requirement | Target (proposal to measure) |
 | :-- | :-- | :-- |
-| Offline | Every MVP (core) and MVP feature works in airplane mode from the first launch; no offline feature waits on the network | Until the MVP stretch online features land, the release APK has no INTERNET permission |
-| Online (MVP stretch) | Bulletin feed, track view, recommended evacuation centers, hotline updates, Smart Update, network log, optional GPS | Only `UpdateClient` (feed and packs) and the opt-in `TopicReporter` (Pilot) touch the network: one pinned host, only while the app is open, no background fetch, no push, every request in `networkLog` |
+| Offline | Every MVP (core) and MVP feature works in airplane mode from the first launch; no offline feature waits on the network | The release APK keeps the INTERNET permission; no request happens without a user action (the Settings model download, or the MVP stretch feed and packs) |
+| Online (MVP; MVP stretch) | MVP: the one-time model download in Settings. MVP stretch: bulletin feed, track view, recommended evacuation centers, hotline updates, Smart Update, network log, optional GPS | Only `ModelManager.download` (Hugging Face, on the Settings tap; owner-approved exception, verified by size and SHA-256), `UpdateClient` (feed and packs, one pinned host) and the opt-in `TopicReporter` (Pilot, pinned host) touch the network: only while the app is open, no background fetch, no push, every request in `networkLog` |
 | Device | Runs on a budget Android phone | Reference phone: sold as 4 GB RAM, arm64. Other phones fall into the [device tiers](README.md#shared-names) |
 | Memory | Peak RAM with the model loaded | ≤ 1.2 GB |
 | Speed | Checklist on screen | < 0.5 s |
@@ -27,7 +27,7 @@ Related: [README.md](README.md) (v3 decisions and shared names) · [features.md]
 | | App without the model | Measure the first release build, then set a ceiling |
 | | Face detector (MVP) | About 6.9 MB, bundled so it works offline |
 | | Member photos (required) | ≤ 150 KB each; a family of 10 stays under 2 MB |
-| | Model | 0.81 GB, shipped as an optional pack ([bartowski](https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF)) |
+| | Model | 0.81 GB, downloaded once from Hugging Face in Settings, or imported from a file ([bartowski](https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF)) |
 
 Three facts shape every choice below.
 
@@ -515,7 +515,7 @@ The model writes in a shape the grammar fixes, from passages search chose.
 System message, the fixed instructions (the canonical text is `SYSTEM_TL` in [api-layer.md](api-layer.md#8-llm-contract-mvp)):
 
 ```text
-Ikaw si Bagyo Buddy, gabay sa paghahanda sa bagyo para sa isang sambahayan.
+Ikaw si Sipat, gabay sa paghahanda sa bagyo para sa isang sambahayan.
 Sumagot LAMANG mula sa mga talatang ibinigay. Huwag gumamit ng sariling kaalaman.
 Sumagot sa 2 hanggang 4 na maiikling pangungusap sa simpleng Tagalog.
 Huwag magdagdag ng numero, oras, lugar o pangalan na wala sa mga talata.
@@ -693,7 +693,7 @@ stateDiagram-v2
 **Battery** (*Reasoning*, v1's estimate updated for slower answers):
 
 - A 5,000 mAh battery at about 3.85 V holds roughly 19 Wh.
-- A 1B model draws about 2 to 3 W while generating (Ertas, **Unverified** vendor figure, linked in [idea-bagyo-buddy.md](idea-bagyo-buddy.md)).
+- A 1B model draws about 2 to 3 W while generating (Ertas, **Unverified** vendor figure, linked in [idea-sipat.md](idea-sipat.md)).
 - An answer of 6 to 15 seconds therefore costs about 12 to 45 J, or 0.003 to 0.013 Wh: roughly 0.02 to 0.07% of the battery, well under 0.1%.
 - Network and location add little by design: the feed is fetched only while the app is open (on open and pull to refresh, a few KB), and location is a single coarse reading on tap. Neither runs in the background.
 - Fifty questions during a storm cost about 1 to 3%. A few minutes of screen-on time cost more, which is why the dark theme and short screens matter. Confirm with the Android Studio profiler on the reference phone.
@@ -744,7 +744,7 @@ Offline import, the CDN and the bulletin feed are MVP stretch; the Pilot hardens
 | :-- | :-- | :-- |
 | Core | Guide, checklist, warnings, synonyms, intents, sources, national hotlines | National content repo |
 | Area (province bundle) | MVP stretch: `evacuation_centers.json`, scraped and reviewed. Pilot: LGU packs replace it and add local hotlines, `advisories.json` and `hazard_notes.json`; one per municipality, published per province. The same province manifest also lists hazard packs (coastal, upland) | Scraper review queue (section 19); Bantay portal (section 14, Pilot); hazard packs from the content repo |
-| Model | The GGUF file, verified by SHA-256 from the signed model manifest | Google Play AI pack in production; sideload or USB for the hackathon; a pinned public mirror for direct-APK rollouts |
+| Model | The GGUF file, verified by size and SHA-256 against `BUNDLED_MODEL` in the app | MVP: downloaded once from Hugging Face on the Settings tap "I-download ang AI" (owner-approved exception to the one pinned host, logged in `networkLog`), or imported from a file on the phone. Pilot: the Google Play AI pack may replace it |
 
 Google Play for On-device AI delivers models in AI packs (install-time, fast-follow or on-demand) and allows app versions up to 4 GB ([Android](https://developer.android.com/google/play/on-device-ai)). It is in beta; check the per-pack limits before relying on it.
 
@@ -757,12 +757,11 @@ Google Play for On-device AI delivers models in AI packs (install-time, fast-fol
 | `/v1/core/manifest.json` | Core pack version, guide date, blob list (SHA-256, size), deltas | Short TTL |
 | `/v1/areas/{provinceCode}/manifest.json` | Every area pack in the province | Short TTL |
 | `/v1/blobs/{sha256}.json.gz` | Content-addressed pack files and deltas | Immutable, cache forever |
-| `/v1/model/manifest.json` | Model options: file name, size, SHA-256, sources | Short TTL |
 
 ### Trust chain
 
 - One or two **root public keys** are pinned in the app binary. The root private key stays offline and is used only to sign `keys.json`.
-- **Two signing keys, two purposes**, both listed in `keys.json` with validity windows. The **pack key** signs core, area and model manifests; it stays offline and signing is a manual step. The **feed key** signs only `/v1/feed/manifest.json`; it is held by the scraper job (CI secret) so bulletins publish without a person in the loop. The app accepts a manifest only when its key's purpose matches the manifest type, so a stolen feed key cannot sign a guide pack. Rotation means publishing a new `keys.json`.
+- **Two signing keys, two purposes**, both listed in `keys.json` with validity windows. The **pack key** signs core and area manifests; it stays offline and signing is a manual step. The **feed key** signs only `/v1/feed/manifest.json`; it is held by the scraper job (CI secret) so bulletins publish without a person in the loop. The app accepts a manifest only when its key's purpose matches the manifest type, so a stolen feed key cannot sign a guide pack. Rotation means publishing a new `keys.json`. The model is not on the CDN: the MVP downloads it from Hugging Face and checks it against the size and SHA-256 compiled into the app.
 - A manifest's signature is Ed25519 over the RFC 8785 canonical JSON of the manifest without its signature field ([RFC 8785](https://www.rfc-editor.org/rfc/rfc8785)).
 - Manifests list blobs by SHA-256 and size, so blobs need no signature of their own.
 - **Monotonic versions.** A manifest must be newer than the installed version of that pack. An equal version is a no-op; an older one is rejected, which blocks rollback attacks. `min_app_version` keeps old apps from installing packs they cannot read. Field names are in [api-layer.md](api-layer.md).
@@ -843,13 +842,13 @@ flowchart LR
 | Member card sharing | expo-sharing with a rendered image | Shares one "Hinahanap" card | None |
 | Camera and gallery | expo-image-picker (system camera and system photo picker) | Permission only on tap; no storage permission with the photo picker | Behavior on the target Android versions |
 | Crop and re-encode | expo-image-manipulator | Crop, resize and JPEG encode in one step | That the output carries no EXIF |
-| Screen capture protection | A small Expo config plugin (like `withReleaseNoInternet`) that adds `FLAG_SECURE` to the main activity in release builds | Blocks screenshots, screen recording and the recents preview, like streaming apps; debug builds stay mirrorable for demos | That the flag is set in the release manifest build and unset in debug |
+| Screen capture protection | A small Expo config plugin (`plugins/withSecureScreen.js`) that adds `FLAG_SECURE` to the main activity in release builds | Blocks screenshots, screen recording and the recents preview, like streaming apps; debug builds stay mirrorable for demos | That the flag is set in the release manifest build and unset in debug |
 | Face detection | Google ML Kit face detection, bundled model, through a React Native wrapper for still images (for example `@react-native-ml-kit/face-detection`) | Offline, about 6.9 MB, boxes only. expo-face-detector is not available from Expo SDK 51 ([Expo](https://docs.expo.dev/versions/latest/sdk/facedetector)) | That the wrapper uses the bundled dependency, not the Play services one; Expo SDK compatibility |
 | Hashing and signatures | A vetted JS Ed25519 and SHA-256 library for manifests and KB blobs; native streaming SHA-256 for the 0.81 GB model | JS is fine for KB; too slow for the model | Native hash option; Hermes compatibility |
 | Content tools | Node scripts: validate, build packs, sign, evaluate | Reuse the pure core | None |
 | Scraper | Node script in `scripts/scrape/`, run on a schedule (for example GitHub Actions cron; MVP stretch) | No server to run; reuses the feed schema and validators | PAGASA terms or permission; source URLs; cadence |
 | Laptop evaluation | llama.cpp (`llama-server` with a JSON schema, or node-llama-cpp) with the same GGUF, prompt and schema | Fast iteration; the phone is for latency, RAM and battery | Output parity on a sample |
-| Model delivery | Google Play for On-device AI pack (production); sideload for the hackathon | Free delivery; app versions up to 4 GB | Beta limits |
+| Model delivery | MVP: expo-file-system `File.downloadFileAsync` from Hugging Face on the Settings tap, then a chunked SHA-256; file import as the offline path. Pilot: Google Play for On-device AI pack | No server to run for an 0.81 GB file; Play delivery is free with app versions up to 4 GB | Hugging Face URL and hash stay valid; Play beta limits |
 | Pack and feed hosting | S3 and CloudFront, static files on one pinned host (MVP stretch) | No servers to run | Pinning setup |
 
 ## 16. Testing strategy
@@ -880,9 +879,9 @@ flowchart LR
   - No photo path, name or note appears in a prompt, a pack, a topic report or `questionLog`.
 - **Offline proof.**
   - Run the full demo script in airplane mode.
-  - Confirm with APK Analyzer that the offline release manifest has no INTERNET permission and no services, receivers or jobs.
+  - Confirm with APK Analyzer that the release manifest has no services, receivers or jobs. It keeps the INTERNET permission; confirm that with no tap on the model download (and no feed or pack action) the network log stays empty.
 - **Screen protection.** On the release build: a screenshot and a screen recording are blacked out and the recents preview is blank; on a debug build they work, so the mirrored demo stays viewable.
-- **Static account screens.** Sign-up, login and forgot-password render their forms, store nothing and make no request (the offline build has no INTERNET permission), and the app stays fully usable without logging in.
+- **Static account screens.** Sign-up, login and forgot-password render their forms, store nothing and make no request, and the app stays fully usable without logging in.
 - **Feed and network tests (MVP stretch).** Scraper parse fixtures, including a malformed bulletin that must keep the previous feed; a feed signed by an unknown key is rejected; no request leaves the pinned host; every request shows in `networkLog`; the app never fetches in the background.
 - **Damage report tests (Pilot).** A report with photos persists offline and sends only on the user's tap; damage photos live in `files/damage/`, never in the member photo folder; nothing sends without opt-in.
 - **CI (MVP stretch; Pilot hardens).** Every content change runs validate, the core tests and the retrieval evaluation before a pack can be signed.
@@ -974,4 +973,4 @@ flowchart LR
 - [Inquirer: EO 56 makes 911 the national emergency hotline (2018)](https://newsinfo.inquirer.net/996682/eo-makes-911-countrys-emergency-hotline-number)
 - [National Privacy Commission: Data Privacy Act of 2012](https://privacy.gov.ph/data-privacy-act/)
 - [RFC 8785: JSON Canonicalization Scheme](https://www.rfc-editor.org/rfc/rfc8785)
-- Ertas, LLM benchmarks on Android (vendor blog, **Unverified**), linked in [idea-bagyo-buddy.md](idea-bagyo-buddy.md)
+- Ertas, LLM benchmarks on Android (vendor blog, **Unverified**), linked in [idea-sipat.md](idea-sipat.md)

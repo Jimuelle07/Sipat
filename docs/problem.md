@@ -58,7 +58,7 @@ Lead times come from PAGASA's wind signal definitions ([PAGASA](https://bagong.p
 | A one-minute phone call takes the same bandwidth as about 800 short texts | [NC DPS, 2016](https://www.ncdps.gov/press-release/governor-mccrory-and-first-lady-encourage-texting-first-communication-between-loved) | Official, US context |
 | 74% of Filipinos live in areas prone to floods, landslides and storm surge | [iACADEMY, attributed to World Bank](https://iacademy.edu.ph/story_details?id=1343) | **Unverified:** trace to the World Bank original |
 
-*Reasoning:* Odette and Kristine are complementary anchor stories. Odette is the offline case: signal down in hundreds of areas on day one and power out for over a week in many towns. A household with Bagyo Buddy installed beforehand would still have had answers on day five. Kristine is the wind-only trap: a storm below typhoon strength whose danger was rain, easy to read as manageable while the river rose. Together they set two requirements: work fully offline, and take rainfall and storm surge warnings, not just wind signals (README, S1).
+*Reasoning:* Odette and Kristine are complementary anchor stories. Odette is the offline case: signal down in hundreds of areas on day one and power out for over a week in many towns. A household with Sipat installed beforehand would still have had answers on day five. Kristine is the wind-only trap: a storm below typhoon strength whose danger was rain, easy to read as manageable while the river rose. Together they set two requirements: work fully offline, and take rainfall and storm surge warnings, not just wind signals (README, S1).
 
 ## 5. Root causes
 
@@ -81,7 +81,7 @@ Lead times come from PAGASA's wind signal definitions ([PAGASA](https://bagong.p
 | Printed or PDF guides (NDRRMC, OCD, DOH) | Authoritative, and print works offline | Long, generic and hard to search under stress |
 | Online AI chatbots | Conversational, and understand Taglish | Need internet. May answer from memory with no source. |
 
-**Positioning.** Alerts tell you a storm is coming. Bagyo Buddy tells your household what to do, even with no signal. While signal lasts it also keeps the latest PAGASA bulletin, shown verbatim with its issued and fetched times, so the family can still read it offline (MVP stretch, [features.md, section 7](features.md#7-evacuation-and-bagyo-forecast)). It complements these channels, the radio included, rather than replacing them.
+**Positioning.** Alerts tell you a storm is coming. Sipat tells your household what to do, even with no signal. While signal lasts it also keeps the latest PAGASA bulletin, shown verbatim with its issued and fetched times, so the family can still read it offline (MVP stretch, [features.md, section 7](features.md#7-evacuation-and-bagyo-forecast)). It complements these channels, the radio included, rather than replacing them.
 
 ## 7. Honest limits
 

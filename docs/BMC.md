@@ -1,6 +1,6 @@
-# Bagyo Buddy: Business Model Canvas
+# Sipat: Business Model Canvas
 
-Households use Bagyo Buddy free forever; LGUs pay an annual Bantay license for a localized pack, out of the disaster fund the law already requires them to keep.
+Households use Sipat free forever; LGUs pay an annual Bantay license for a localized pack, out of the disaster fund the law already requires them to keep.
 
 Related: [README](README.md) · [Features](features.md) · [Problem](problem.md) · [Solution](solution.md)
 
@@ -8,12 +8,12 @@ Related: [README](README.md) · [Features](features.md) · [Problem](problem.md)
 
 - **Who uses it.** Households in typhoon-prone areas ([problem.md](problem.md) has the persona and evidence). They never pay, never need an account and never see an ad.
 - **Who pays.** Municipal and city LGUs, through their DRRM offices, buy the **Bantay** license. NGOs, schools and CSR sponsors can buy or sponsor licenses too.
-- **The logic.** LGUs already have a legal duty and a budget line to prepare households (RA 10121). Bagyo Buddy turns part of that budget into guidance that stays on each household's phone when power and signal fail.
+- **The logic.** LGUs already have a legal duty and a budget line to prepare households (RA 10121). Sipat turns part of that budget into guidance that stays on each household's phone when power and signal fail.
 - **What we never do.** No ads, no data sales, no household payments. The household app has no payment or license check, so it works fully offline.
 
 ## 2. The canvas at a glance
 
-| Block | Bagyo Buddy |
+| Block | Sipat |
 | :-- | :-- |
 | Customer segments | Households (users, free); municipal and city DRRMOs (payers); barangays (pilot partners); NGOs, schools, CSR sponsors (co-payers) |
 | Value propositions | Households: what to do for your own household, offline, with sources; the phase-themed app that switches with the bagyo; the latest PAGASA bulletin kept for when signal drops. LGUs: their centers, hotlines and advisories on every phone even when towers are down; anonymous insight; preparedness evidence for the SGLG |
@@ -162,7 +162,7 @@ v1 said "custom pricing per LGU." v2 keeps custom quotes but gives them one stru
 
 ## 5. How LGUs buy
 
-**The money already exists.** RA 10121, Sec. 21 requires every LGU to set aside not less than 5% of its estimated revenue from regular sources as the Local DRRM Fund, to support disaster risk management "such as, but not limited to, pre-disaster preparedness programs including training." 30% of it is the Quick Response Fund for relief and recovery, and unspent money goes to a DRRM trust fund for the next five years ([RA 10121](https://lawphil.net/statutes/repacts/ra2010/ra_10121_2010.html)). *Reasoning:* Bagyo Buddy belongs in the preparedness share, not the Quick Response Fund.
+**The money already exists.** RA 10121, Sec. 21 requires every LGU to set aside not less than 5% of its estimated revenue from regular sources as the Local DRRM Fund, to support disaster risk management "such as, but not limited to, pre-disaster preparedness programs including training." 30% of it is the Quick Response Fund for relief and recovery, and unspent money goes to a DRRM trust fund for the next five years ([RA 10121](https://lawphil.net/statutes/repacts/ra2010/ra_10121_2010.html)). *Reasoning:* Sipat belongs in the preparedness share, not the Quick Response Fund.
 
 **The mayor has a reason to care.** Under the Seal of Good Local Governance ([RA 11292](https://legacy.senate.gov.ph/republic_acts/ra%2011292.pdf)) and DILG MC 2023-086, an LGU must pass all ten governance areas, and Disaster Preparedness is one ([MC 2023-086](https://batasnatin.com/laws/mc-2023-086)). *Reasoning:* a household program with measured outcomes is useful evidence there; we do not promise it changes a score.
 
@@ -187,7 +187,7 @@ To sell under it we need a registered Philippine business with BIR registration,
 
 The alternatives are complements, not rivals ([problem.md](problem.md) has the full comparison).
 
-| Alternative | Its job | How Bagyo Buddy fits |
+| Alternative | Its job | How Sipat fits |
 | :-- | :-- | :-- |
 | Free cell-broadcast alerts ([ECBS](https://en.wikipedia.org/wiki/Emergency_Cell_Broadcast_System), RA 10639) | Say a hazard is coming | We say what the household should do, offline |
 | PAGASA bulletins | Official forecasts and warnings | The family taps the warning PAGASA announced; the app keeps the latest bulletin, verbatim, for when signal drops |
