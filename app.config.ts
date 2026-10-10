@@ -9,10 +9,14 @@ const config: ExpoConfig = {
   platforms: ['android', 'web'],
   orientation: 'portrait',
   userInterfaceStyle: 'light',
+  icon: './assets/agi-sipat-logo.png',
+  web: { favicon: './assets/agi-sipat-logo.png' },
   updates: {
     enabled: false,
   },
   android: {
+    // shortcut: the logo is not padded for the adaptive safe zone, so launchers may crop its edges; export a padded foreground if that matters.
+    adaptiveIcon: { foregroundImage: './assets/agi-sipat-logo.png', backgroundColor: '#62788F' },
     package: 'ph.bagyobuddy.app',
     // Camera only for member photos, asked when the user taps "Kunan ng litrato". Coarse location only.
     permissions: ['android.permission.CAMERA'],
