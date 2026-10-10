@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { JSX, ReactNode } from 'react';
-import { AccessibilityInfo, PixelRatio, StyleSheet, useColorScheme } from 'react-native';
+import { AccessibilityInfo, PixelRatio, StyleSheet } from 'react-native';
 import type { Phase } from '../../engine';
 import { buildTheme } from './themes';
 import type { Scheme, Theme } from './types';
@@ -26,8 +26,8 @@ export function ThemeProvider({ phase, scheme, largeText, children }: {
   largeText?: boolean;
   children: ReactNode;
 }): JSX.Element {
-  const system = useColorScheme();
-  const resolvedScheme: Scheme = scheme ?? (system === 'dark' ? 'dark' : 'light');
+  // The design ships light only; the dark theme is kept in code but never selected.
+  const resolvedScheme: Scheme = 'light';
   const resolvedLarge = largeText ?? PixelRatio.getFontScale() >= LARGE_TEXT_FONT_SCALE;
   const [reduceMotion, setReduceMotion] = useState(false);
 
@@ -54,6 +54,11 @@ function useThemeContext(): ThemeContextValue {
 
 export function useTheme(): Theme {
   return useThemeContext().theme;
+}
+
+/** True only when the phone itself asks for reduced motion (not the during phase's minimal style). */
+export function useReduceMotion(): boolean {
+  return useThemeContext().reduceMotion;
 }
 
 /** True when the phone asks for less motion or the theme's motion style is minimal. */

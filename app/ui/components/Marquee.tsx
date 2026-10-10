@@ -1,26 +1,33 @@
 import type { JSX } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, View, StyleSheet } from 'react-native';
-import { useMinimalMotion, useTheme } from '../theme';
+import { useReduceMotion, useTheme } from '../theme';
 import { Txt } from './Txt';
 
 /**
  * Black announcement strip with uppercase text on a slow loop (design-v2 "Marquee Banner").
- * Stands still under minimal motion (during phase or reduce-motion).
+ * Runs in every phase; stands still only under the phone's reduce-motion setting.
  */
 export function Marquee({ text }: { text: string }): JSX.Element {
   const t = useTheme();
-  const minimal = useMinimalMotion();
+  // Keeps scrolling in the during phase too: it is the ticker, not decoration. Only the phone's reduce-motion setting stops it.
+  const minimal = useReduceMotion();
   const x = useRef(new Animated.Value(0)).current;
   const [unit, setUnit] = useState(0);
   const line = `${text}  ✦  `;
 
   useEffect(() => {
     if (minimal || unit === 0) return undefined;
-    x.setValue(0);
-    const loop = Animated.loop(Animated.timing(x, { toValue: -unit, duration: unit * 28, easing: Easing.linear, useNativeDriver: true }));
-    loop.start();
-    return () => loop.stop();
+    // One explicit lap after another, so the strip can never settle: each lap ends exactly one copy later.
+    let live = true;
+    const lap = (): void => {
+      x.setValue(0);
+      Animated.timing(x, { toValue: -unit, duration: unit * 28, easing: Easing.linear, useNativeDriver: true }).start(({ finished }) => {
+        if (live && finished) lap();
+      });
+    };
+    lap();
+    return () => { live = false; x.stopAnimation(); };
   }, [minimal, unit, x]);
 
   return (

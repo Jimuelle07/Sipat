@@ -8,7 +8,7 @@ const config: ExpoConfig = {
   version: '0.1.0',
   platforms: ['android', 'web'],
   orientation: 'portrait',
-  userInterfaceStyle: 'dark',
+  userInterfaceStyle: 'light',
   updates: {
     enabled: false,
   },

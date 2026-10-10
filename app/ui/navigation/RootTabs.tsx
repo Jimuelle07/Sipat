@@ -65,7 +65,7 @@ function DockItem({ name, title, focused, onPress, onLongPress }: {
         <Ionicons name={focused ? icon.on : icon.off} size={22} color={focused ? theme.colors.selected.ink : theme.colors.textMuted} />
         {focused ? (
           <Animated.View style={{ opacity: grow }}>
-            <Txt role="label" color={theme.colors.selected.ink} numberOfLines={1}>{title}</Txt>
+            <Txt role="label" color={theme.colors.selected.ink} numberOfLines={1} style={styles.label}>{title}</Txt>
           </Animated.View>
         ) : null}
       </Pressable>
@@ -150,11 +150,12 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: t.space.md,
-    paddingHorizontal: t.space.md,
+    paddingHorizontal: t.space.lg,
     borderRadius: t.radius.pill,
     borderWidth: t.border.control,
     borderColor: 'transparent',
   },
+  label: { lineHeight: 20, paddingRight: t.space.xs },
   pillOn: {
     backgroundColor: t.colors.wash,
     borderColor: t.colors.stroke,

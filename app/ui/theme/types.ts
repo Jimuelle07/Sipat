@@ -74,7 +74,7 @@ export type TypeRole =
 
 export interface Typography {
   /** Bundled faces: heavy display for headings, Inter for reading. Loaded once at the app root. */
-  families: { display: string; medium: string; bold: string };
+  families: { display: string; medium: string; bold: string; serif: string; serifBold: string; serifItalic: string };
   roles: Record<TypeRole, TextStyleToken>;
   maxFontSizeMultiplier: number;
 }
@@ -139,7 +139,7 @@ export interface ShadowSpec {
   offsetX: number;
   offsetY: number;
   blurRadius: number;
-  spreadRadius: number;
+  spreadDistance: number;
   color: string;
 }
 

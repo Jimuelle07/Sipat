@@ -317,14 +317,14 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     marginBottom: t.space.xs,
   },
   posterStack: {
-    paddingBottom: t.space.xl,
+    paddingBottom: t.space.xxxl,
   },
   posterBack: {
     position: 'absolute',
     left: t.space.xs,
     right: t.space.xs,
     top: t.space.xxl,
-    bottom: -t.space.md,
+    bottom: t.space.xxxl - t.space.lg,
     borderRadius: t.radius.capsule,
     borderWidth: t.border.emphasis,
     borderColor: t.colors.stroke,

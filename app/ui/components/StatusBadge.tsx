@@ -21,7 +21,7 @@ export function StatusBadge({ label, state, icon }: {
   const styles = useThemedStyles(makeStyles);
 
   const tone = state === 'on'
-    ? t.colors.selected
+    ? { fill: t.colors.surface, ink: t.colors.ink }
     : state === 'busy'
       ? { fill: t.colors.surfaceSunken, ink: t.colors.accentText }
       : { fill: t.colors.surfaceSunken, ink: t.colors.textMuted };

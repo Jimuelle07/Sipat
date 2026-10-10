@@ -57,7 +57,7 @@ export function EmergencyScreen(): JSX.Element {
         <Ionicons name="alert-circle" size={theme.type.roles.title.fontSize} color={ink} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.body}>
+      <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
         <Txt role="display" color={ink} accessibilityRole="header" style={styles.title}>{card.title}</Txt>
 
         <View style={styles.steps}>

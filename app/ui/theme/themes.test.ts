@@ -253,14 +253,16 @@ describe('buildTheme phase character', () => {
     expect(themeFor(phase, 'light').mood).toBe(mood);
   });
 
-  it('during is the high-contrast, stripped variant', () => {
+  it('during keeps the same control, border and type sizes as before and after, with minimal motion', () => {
     const before = themeFor('before', 'light');
     const during = themeFor('during', 'light');
     const after = themeFor('after', 'light');
 
-    expect(during.border.hairline).toBeGreaterThan(before.border.hairline);
-    expect(during.minTouch).toBeGreaterThan(before.minTouch);
-    expect(during.type.roles.body.fontSize).toBeGreaterThan(before.type.roles.body.fontSize);
+    for (const other of [before, after]) {
+      expect(during.border).toEqual(other.border);
+      expect(during.minTouch).toBe(other.minTouch);
+      expect(during.type.roles).toEqual(other.type.roles);
+    }
 
     expect(during.motion.style).toBe('minimal');
     expect(before.motion.style).toBe('full');
