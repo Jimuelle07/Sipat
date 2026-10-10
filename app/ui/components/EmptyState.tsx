@@ -29,7 +29,7 @@ export function EmptyState({ icon, title, body, action }: EmptyStateProps): JSX.
     <View style={styles.box}>
       <View style={styles.blob}>
         <MascotSlot size={150} accessibilityLabel={title} />
-        <Ionicons name={icon} size={t.type.roles.title.fontSize} color={t.colors.stickers.carbon} style={styles.glyph} />
+        <Ionicons name={icon} size={t.type.roles.title.fontSize} color={t.colors.ink} style={styles.glyph} />
       </View>
       <Txt role="title" align="center">{title}</Txt>
       {body !== undefined ? <Txt role="body" tone="muted" align="center">{body}</Txt> : null}
@@ -54,7 +54,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     justifyContent: 'center',
     borderRadius: t.radius.pill,
     borderWidth: t.border.control,
-    borderColor: t.colors.stickers.carbon,
+    borderColor: t.colors.stroke,
     backgroundColor: t.colors.wash,
   },
   glyph: {
@@ -65,7 +65,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     overflow: 'hidden',
     borderRadius: t.radius.pill,
     borderWidth: t.border.control,
-    borderColor: t.colors.stickers.carbon,
+    borderColor: t.colors.stroke,
     backgroundColor: t.colors.stickers.sunburst,
   },
 })

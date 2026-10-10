@@ -13,6 +13,8 @@ export interface TxtProps extends Omit<TextProps, 'style' | 'role'> {
   align?: TextStyle['textAlign'];
   /** Theme value only; wins over `tone`. */
   color?: string;
+  /** Newsprint voice for the Gabay: Libre Baskerville in place of Inter. */
+  serif?: boolean | 'italic';
   style?: StyleProp<TextStyle>;
 }
 
@@ -27,6 +29,7 @@ export function Txt({
   tone = 'text',
   align,
   color,
+  serif = false,
   style,
   accessibilityRole,
   children,
@@ -55,7 +58,11 @@ export function Txt({
           fontSize: token.fontSize,
           lineHeight: token.lineHeight,
           // Bundled faces carry their own weight; a fontWeight on top would be faked on Android.
-          fontFamily: token.fontWeight === '800' ? t.type.families.display : token.fontWeight === '700' ? t.type.families.bold : t.type.families.medium,
+          fontFamily: serif === 'italic'
+            ? t.type.families.serifItalic
+            : serif
+              ? (token.fontWeight === '400' || token.fontWeight === '500' ? t.type.families.serif : t.type.families.serifBold)
+              : token.fontWeight === '800' ? t.type.families.display : token.fontWeight === '700' ? t.type.families.bold : t.type.families.medium,
           fontWeight: 'normal',
           letterSpacing: token.letterSpacing,
         },

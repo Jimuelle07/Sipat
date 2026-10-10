@@ -22,7 +22,7 @@ export function SectionHeader({ title, action }: SectionHeaderProps): JSX.Elemen
     <View style={styles.row}>
       <Txt role="headline" accessibilityRole="header" style={styles.title}>{title}</Txt>
       {action !== undefined ? (
-        <Button label={action.label} onPress={action.onPress} variant="text" accessibilityState={action.accessibilityState} />
+        <Button label={action.label} onPress={action.onPress} variant="outline" accessibilityState={action.accessibilityState} />
       ) : null}
     </View>
   );

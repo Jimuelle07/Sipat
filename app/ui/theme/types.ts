@@ -48,6 +48,8 @@ export interface ColorRoles {
   dangerSurface: Tone;     // calm alert surface: tinted fill with alert ink
   scrim: string;           // overlay behind sheets and the crop frame; applied with scrimOpacity
   mascot: { original: string; refresh: string }; // reserved for the mascot slot only
+  stroke: string;          // outlines on cards, buttons and stickers: a blue, never black
+  ink: string;             // text and icons on a phase wash
   wash: string;            // the phase's big sticker colour: hero blob, selected segment, decorations
   stickers: Palette['sticker']; // the shared sticker set for decorations only
 }
@@ -72,7 +74,7 @@ export type TypeRole =
 
 export interface Typography {
   /** Bundled faces: heavy display for headings, Inter for reading. Loaded once at the app root. */
-  families: { display: string; medium: string; bold: string };
+  families: { display: string; medium: string; bold: string; serif: string; serifBold: string; serifItalic: string };
   roles: Record<TypeRole, TextStyleToken>;
   maxFontSizeMultiplier: number;
 }
@@ -137,7 +139,7 @@ export interface ShadowSpec {
   offsetX: number;
   offsetY: number;
   blurRadius: number;
-  spreadRadius: number;
+  spreadDistance: number;
   color: string;
 }
 

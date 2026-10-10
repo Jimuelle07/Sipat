@@ -192,18 +192,18 @@ describe('buildTheme palette traceability', () => {
 });
 
 describe('buildTheme role spot checks', () => {
-  it('before light canvas is the sky wash', () => {
-    expect(themeFor('before', 'light').colors.canvas).toBe(paletteJson.sticker.skyWash);
+  it('before light canvas is the soft phase green', () => {
+    expect(themeFor('before', 'light').colors.canvas).toBe(paletteJson.phase.before.soft);
   });
 
-  it('during light canvas is gray[0]', () => {
-    expect(themeFor('during', 'light').colors.canvas).toBe(paletteJson.gray['0']);
+  it('during light canvas is the soft phase orange', () => {
+    expect(themeFor('during', 'light').colors.canvas).toBe(paletteJson.phase.during.soft);
   });
 
-  it('during light highlight is the ember sticker with carbon ink', () => {
+  it('light highlight is blue[400] with blue[900] ink', () => {
     expect(themeFor('during', 'light').colors.highlight).toEqual({
-      fill: paletteJson.sticker.ember,
-      ink: paletteJson.sticker.carbon,
+      fill: paletteJson.blue['400'],
+      ink: paletteJson.blue['900'],
     });
   });
 
@@ -253,14 +253,16 @@ describe('buildTheme phase character', () => {
     expect(themeFor(phase, 'light').mood).toBe(mood);
   });
 
-  it('during is the high-contrast, stripped variant', () => {
+  it('during keeps the same control, border and type sizes as before and after, with minimal motion', () => {
     const before = themeFor('before', 'light');
     const during = themeFor('during', 'light');
     const after = themeFor('after', 'light');
 
-    expect(during.border.hairline).toBeGreaterThan(before.border.hairline);
-    expect(during.minTouch).toBeGreaterThan(before.minTouch);
-    expect(during.type.roles.body.fontSize).toBeGreaterThan(before.type.roles.body.fontSize);
+    for (const other of [before, after]) {
+      expect(during.border).toEqual(other.border);
+      expect(during.minTouch).toBe(other.minTouch);
+      expect(during.type.roles).toEqual(other.type.roles);
+    }
 
     expect(during.motion.style).toBe('minimal');
     expect(before.motion.style).toBe('full');

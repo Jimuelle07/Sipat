@@ -214,8 +214,8 @@ function DangerTile({ engine, profile }: { engine: EngineContextValue; profile: 
       {error ? <InlineError message={error} /> : null}
       {confirming ? (
         <View style={styles.actions}>
-          <Button label={t.cancel} variant="tonal" onPress={() => { setConfirming(false); setError(null); }} />
-          <Button label={t.confirmRemove} variant="danger" icon="trash-outline" onPress={remove} />
+          <View style={styles.half}><Button label={t.cancel} variant="outline" fullWidth onPress={() => { setConfirming(false); setError(null); }} /></View>
+          <View style={styles.half}><Button label={t.confirmRemove} variant="danger" icon="trash-outline" fullWidth onPress={remove} /></View>
         </View>
       ) : (
         <Button label={t.removeHousehold} variant="danger" icon="trash-outline" onPress={() => { setConfirming(true); setError(null); }} />
@@ -230,8 +230,8 @@ function LinksTile({ navigation }: { navigation: RootNavigation }): JSX.Element 
   return (
     <Tile title={t.linksTitle}>
       <View style={styles.actions}>
-        <Button label={t.settingsLink} variant="tonal" icon="settings-outline" onPress={() => navigation.navigate('Settings')} />
-        <Button label={t.accountLink} variant="tonal" icon="person-circle-outline" onPress={() => navigation.navigate('Account')} />
+        <View style={styles.half}><Button label={t.settingsLink} variant="outline" icon="settings-outline" fullWidth onPress={() => navigation.navigate('Settings')} /></View>
+        <View style={styles.half}><Button label={t.accountLink} variant="outline" icon="person-circle-outline" fullWidth onPress={() => navigation.navigate('Account')} /></View>
       </View>
     </Tile>
   );
@@ -247,22 +247,25 @@ function IconButton({ label, icon, onPress }: { label: string; icon: IconName; o
       onPress={onPress}
       style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}
     >
-      <Ionicons name={icon} size={theme.type.roles.title.fontSize} color={theme.colors.accentText} />
+      <Ionicons name={icon} size={theme.type.roles.title.fontSize} color={theme.colors.ink} />
     </Pressable>
   );
 }
 
 const makeStyles = (t: Theme) => StyleSheet.create({
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.sm },
-  actions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: t.space.sm },
+  actions: { flexDirection: 'row', gap: t.space.sm },
   stepperControls: { flexDirection: 'row', alignItems: 'center', gap: t.space.md },
   stepperButton: {
-    minWidth: t.minTouch,
-    minHeight: t.minTouch,
+    width: t.minTouch,
+    height: t.minTouch,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: t.radius.pill,
-    backgroundColor: t.colors.capsule.fill,
+    borderWidth: t.border.control,
+    borderColor: t.colors.stroke,
+    backgroundColor: t.colors.surface,
+    boxShadow: t.shadow.sticker,
   },
   stepperValue: { flex: 1 },
   memberRow: {
@@ -278,12 +281,16 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   memberInfo: { flex: 1, gap: t.space.xs },
   memberActions: { flexDirection: 'row', alignItems: 'center', gap: t.space.xs },
   iconButton: {
-    minWidth: t.minTouch,
-    minHeight: t.minTouch,
+    width: t.minTouch,
+    height: t.minTouch,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: t.radius.form,
-    backgroundColor: t.colors.surfaceSunken,
+    borderRadius: t.radius.pill,
+    borderWidth: t.border.control,
+    borderColor: t.colors.stroke,
+    backgroundColor: t.colors.surface,
+    boxShadow: t.shadow.sticker,
   },
+  half: { flex: 1 },
   pressed: { opacity: 0.86 },
 });

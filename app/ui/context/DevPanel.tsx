@@ -41,24 +41,43 @@ export function DevPanelEntry(): JSX.Element | null {
       onPress={() => setExpanded(true)}
       style={styles.entry}
     >
-      <Ionicons name="construct-outline" size={theme.type.roles.title.fontSize} color={theme.colors.accentText} />
+      <Ionicons name="construct-outline" size={theme.type.roles.title.fontSize} color={theme.colors.ink} />
     </Pressable>
   );
 }
 
 type LabelKey = keyof typeof devStrings.tl;
 
-function ControlSection({ title, children }: { title: string; children: ReactNode }): JSX.Element {
-  return <Tile title={title}>{children}</Tile>;
+/** One collapsible group: a tappable header row, content only while open. */
+function ControlSection({ title, children, open, onToggle }: { title: string; children: ReactNode; open: boolean; onToggle: () => void }): JSX.Element {
+  const theme = useTheme();
+  const styles = useThemedStyles(makeStyles);
+  return (
+    <View style={styles.group}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        accessibilityLabel={title}
+        onPress={onToggle}
+        style={[styles.groupHead, open && styles.groupHeadOpen]}
+      >
+        <Txt role="label" style={styles.groupTitle}>{title}</Txt>
+        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={theme.type.roles.title.fontSize} color={theme.colors.ink} />
+      </Pressable>
+      {open ? <View style={styles.groupBody}>{children}</View> : null}
+    </View>
+  );
 }
 
 export function DevPanel({ global = false }: { global?: boolean }): JSX.Element | null {
   const engine = useEngine();
   const t = useT(devStrings);
   const styles = useThemedStyles(makeStyles);
+  const theme = useTheme();
   const overrides = useDevOverrides();
   useEngineChange(['context', 'status']);
   const { expanded, setExpanded } = useDevPanelState();
+  const [section, setSection] = useState<string | null>(null);
   const [scenario, setScenario] = useState<MockScenario | 'keyword'>('keyword');
   const [statusPreset, setStatusPreset] = useState<'battery' | 'saver' | 'lite' | 'none' | 'clear'>('clear');
   const [photoPreset, setPhotoPreset] = useState<FaceDetection | PhotoError>('one_face');
@@ -153,14 +172,16 @@ export function DevPanel({ global = false }: { global?: boolean }): JSX.Element 
     <View style={styles.anchor}>
         <View style={styles.panel}>
           <View style={styles.panelHeader}>
-            <Txt role="title">{t.title}</Txt>
-            <Button label={t.close} onPress={() => setExpanded(false)} variant="text" />
+            <Txt role="title" style={styles.groupTitle}>{t.title}</Txt>
+            <Pressable accessibilityRole="button" accessibilityLabel={t.close} onPress={() => setExpanded(false)} style={styles.entry}>
+              <Ionicons name="close" size={22} color={theme.colors.ink} />
+            </Pressable>
           </View>
-          <ScrollView style={styles.scroll} contentContainerStyle={styles.sections}>
-            <ControlSection title={t.scenario}>
+          <ScrollView style={styles.scroll} contentContainerStyle={styles.sections} showsVerticalScrollIndicator={false}>
+            <ControlSection title={t.scenario} open={section === 'scenario'} onToggle={() => setSection(section === 'scenario' ? null : 'scenario')}>
               {chips(scenarioItems, scenario, (value) => { setScenario(value); debug.setScenario(value === 'keyword' ? null : value); })}
             </ControlSection>
-            <ControlSection title={t.status}>
+            <ControlSection title={t.status} open={section === 'status'} onToggle={() => setSection(section === 'status' ? null : 'status')}>
               <View style={styles.chips}>{stateItems.map((item) => <Chip key={item.value} label={t[item.label]} selected={statusPreset === item.value} onPress={item.onPress} />)}</View>
               <View style={styles.chips}>
                 <Button
@@ -176,29 +197,25 @@ export function DevPanel({ global = false }: { global?: boolean }): JSX.Element 
               </View>
               {!firstWarning ? <Txt role="bodySmall" tone="muted">{t.staleNeedsWarning}</Txt> : null}
             </ControlSection>
-            <ControlSection title={t.photo}>
+            <ControlSection title={t.photo} open={section === 'photo'} onToggle={() => setSection(section === 'photo' ? null : 'photo')}>
               {chips(photoItems, photoPreset, (value) => { setPhotoPreset(value); debug.setPhotoResult(value); })}
             </ControlSection>
-            <ControlSection title={t.modelInstall}>
+            <ControlSection title={t.modelInstall} open={section === 'modelInstall'} onToggle={() => setSection(section === 'modelInstall' ? null : 'modelInstall')}>
               {chips(installItems, installPreset, (value) => { setInstallPreset(value); debug.setModelInstallResult(value); })}
             </ControlSection>
-            <ControlSection title={t.feed}>
+            <ControlSection title={t.feed} open={section === 'feed'} onToggle={() => setSection(section === 'feed' ? null : 'feed')}>
               {chips(feedItems, feedPreset, (value) => { setFeedPreset(value); debug.setFeed(value); })}
             </ControlSection>
-            <ControlSection title={t.gps}>
+            <ControlSection title={t.gps} open={section === 'gps'} onToggle={() => setSection(section === 'gps' ? null : 'gps')}>
               {chips(locationItems, locationPreset, (value) => { setLocationPreset(value); debug.setLocationResult(value); })}
             </ControlSection>
-            <ControlSection title={t.appearance}>
-              <Txt role="label">{t.scheme}</Txt>
-              {chips([
-                { value: 'system' as const, label: 'system' }, { value: 'light' as const, label: 'light' }, { value: 'dark' as const, label: 'dark' },
-              ], overrides.scheme, overrides.setScheme)}
+            <ControlSection title={t.appearance} open={section === 'appearance'} onToggle={() => setSection(section === 'appearance' ? null : 'appearance')}>
               <Txt role="label">{t.largeText}</Txt>
               {chips([
                 { value: 'system' as const, label: 'system' }, { value: 'on' as const, label: 'on' }, { value: 'off' as const, label: 'off' },
               ], overrides.largeText, overrides.setLargeText)}
             </ControlSection>
-            <ControlSection title={t.engine}>
+            <ControlSection title={t.engine} open={section === 'engine'} onToggle={() => setSection(section === 'engine' ? null : 'engine')}>
               <View style={styles.chips}>
                 <Chip label={t.mock} selected={engine.engineKind === 'mock'} onPress={() => engine.switchEngine('mock')} />
                 <Chip label={t.real} selected={engine.engineKind === 'real'} onPress={() => engine.switchEngine('real')} />
@@ -213,7 +230,16 @@ export function DevPanel({ global = false }: { global?: boolean }): JSX.Element 
 
 const makeStyles = (t: Theme) => StyleSheet.create({
   anchor: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, zIndex: 20, justifyContent: 'flex-end' },
-  entry: { minWidth: t.minTouch, minHeight: t.minTouch, alignItems: 'center', justifyContent: 'center' },
+  entry: {
+    width: t.minTouch,
+    height: t.minTouch,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: t.radius.pill,
+    borderWidth: t.border.control,
+    borderColor: t.colors.stroke,
+    backgroundColor: t.colors.surface,
+  },
   panel: {
     height: '78%',
     padding: t.space.gutter,
@@ -228,4 +254,27 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   scroll: { flex: 1 },
   sections: { gap: t.space.gutter, paddingBottom: t.space.gutter },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: t.space.sm },
+  group: { gap: t.space.sm },
+  groupHead: {
+    minHeight: t.minTouch,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: t.space.md,
+    paddingHorizontal: t.space.xl,
+    borderRadius: t.radius.pill,
+    borderWidth: t.border.control,
+    borderColor: t.colors.stroke,
+    backgroundColor: t.colors.surface,
+    boxShadow: t.shadow.sticker,
+  },
+  groupHeadOpen: { backgroundColor: t.colors.selected.fill },
+  groupTitle: { flex: 1 },
+  groupBody: {
+    gap: t.space.lg,
+    padding: t.space.tile,
+    borderRadius: t.radius.panel,
+    borderWidth: t.border.control,
+    borderColor: t.colors.controlBorder,
+    backgroundColor: t.colors.surface,
+  },
 });

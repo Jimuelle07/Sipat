@@ -21,7 +21,7 @@ export function StatusBadge({ label, state, icon }: {
   const styles = useThemedStyles(makeStyles);
 
   const tone = state === 'on'
-    ? t.colors.selected
+    ? { fill: t.colors.surface, ink: t.colors.ink }
     : state === 'busy'
       ? { fill: t.colors.surfaceSunken, ink: t.colors.accentText }
       : { fill: t.colors.surfaceSunken, ink: t.colors.textMuted };
@@ -46,12 +46,14 @@ export function StatusBadge({ label, state, icon }: {
 
 const makeStyles = (t: Theme) => StyleSheet.create({
   badge: {
+    height: t.minTouch,
+    borderWidth: t.border.control,
+    borderColor: t.colors.stroke,
     alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
     gap: t.space.xs,
-    paddingVertical: t.space.xs,
-    paddingHorizontal: t.space.md,
+    paddingHorizontal: t.space.lg,
     borderRadius: t.radius.pill,
   },
 })

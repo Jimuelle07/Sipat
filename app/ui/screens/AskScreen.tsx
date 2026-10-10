@@ -72,6 +72,7 @@ export function AskScreen(): JSX.Element {
   const [question, setQuestion] = useState('');
   const [asked, setAsked] = useState<string | null>(null);
   const [plan, setPlan] = useState<AnswerPlan>(EMPTY_PLAN);
+  const [history, setHistory] = useState<{ question: string; plan: AnswerPlan }[]>([]);
   const [sourceVisible, setSourceVisible] = useState(false);
   const [undoHidden, setUndoHidden] = useState(false);
   const mounted = useRef(true);
@@ -101,6 +102,7 @@ export function AskScreen(): JSX.Element {
     setQuestion('');
     setUndoHidden(false);
     setSourceVisible(false);
+    if (asked !== null) setHistory((turns) => [...turns, { question: asked, plan }]);
     setAsked(text);
     setPlan(EMPTY_PLAN);
     void (async () => {
@@ -306,22 +308,41 @@ export function AskScreen(): JSX.Element {
     );
   };
 
-  const answer = (
+  const renderAnswer = (p: AnswerPlan): JSX.Element => (
     <>
-      {plan.emergency ? (
+      {p.emergency ? (
         <EmergencyCard
-          title={plan.emergency.title}
-          steps={plan.emergency.steps}
-          hotlines={plan.emergency.hotlines}
+          title={p.emergency.title}
+          steps={p.emergency.steps}
+          hotlines={p.emergency.hotlines}
           callLabel={t.call}
           onCall={callHotline}
         />
       ) : null}
-      {plan.main ? mainNode(plan.main) : null}
-      {aiNode(plan.ai)}
-      {plan.failed ? <Txt role="bodySmall" tone="muted">{genericMessage(lang)}</Txt> : null}
-      {phaseNode(plan.phase)}
-      {plan.closing ? <ClosingLine text={plan.closing} /> : null}
+      {p.main ? mainNode(p.main) : null}
+      {aiNode(p.ai)}
+      {p.failed ? <Txt role="bodySmall" tone="muted">{genericMessage(lang)}</Txt> : null}
+      {phaseNode(p.phase)}
+      {p.closing ? <ClosingLine text={p.closing} /> : null}
+    </>
+  );
+
+  const bubble = (text: string): JSX.Element => (
+    <View style={styles.bubble} accessibilityRole="text">
+      <Txt role="body" color={theme.colors.selected.ink}>{text}</Txt>
+    </View>
+  );
+
+  const answer = (
+    <>
+      {history.map((turn, index) => (
+        <View key={index} style={styles.turn}>
+          {bubble(turn.question)}
+          {renderAnswer(turn.plan)}
+        </View>
+      ))}
+      {asked !== null ? bubble(asked) : null}
+      {renderAnswer(plan)}
     </>
   );
 
@@ -344,7 +365,10 @@ export function AskScreen(): JSX.Element {
         style={styles.scroll}
         contentContainerStyle={asked ? styles.answerContent : styles.emptyContent}
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
         onContentSizeChange={() => {
+          // Nothing to follow on the empty state; scrolling to its end hid the top of it.
+          if (asked === null) return;
           if (plan.emergency) {
             if (!emergencyPinned.current) {
               emergencyPinned.current = true;
@@ -398,6 +422,19 @@ const makeStyles = (t: Theme) => {
     answerContent: { gap: t.space.lg, paddingBottom: t.space.md },
     bulletinSourceGroup: { gap: t.space.sm },
     emptyContent: { flexGrow: 1, justifyContent: 'center' },
+    turn: { gap: t.space.lg },
+    bubble: {
+      alignSelf: 'flex-end',
+      maxWidth: '86%',
+      paddingVertical: t.space.md,
+      paddingHorizontal: t.space.xl,
+      borderRadius: t.radius.panel,
+      borderBottomRightRadius: t.radius.form / 2,
+      borderWidth: t.border.control,
+      borderColor: t.colors.stroke,
+      backgroundColor: t.colors.selected.fill,
+      boxShadow: t.shadow.sticker,
+    },
     empty: { gap: t.space.md },
     chips: { flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap', gap: t.space.sm },
     composer: {
@@ -422,10 +459,11 @@ const makeStyles = (t: Theme) => {
       minHeight: t.minTouch,
       maxHeight: inputMax,
       color: t.colors.text,
-      fontSize: t.type.roles.body.fontSize,
-      lineHeight: t.type.roles.body.lineHeight,
-      paddingHorizontal: t.space.md,
-      paddingVertical: t.space.md,
+      fontSize: t.type.roles.bodySmall.fontSize - 1,
+      lineHeight: t.type.roles.bodySmall.lineHeight,
+      fontFamily: t.type.families.medium,
+      paddingHorizontal: t.space.xl,
+      paddingVertical: (t.minTouch - t.border.control * 2 - t.type.roles.bodySmall.lineHeight) / 2,
       textAlignVertical: 'top',
       backgroundColor: t.colors.surfaceSunken,
       borderColor: t.colors.controlBorder,
