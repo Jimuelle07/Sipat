@@ -41,9 +41,12 @@ export function EngineProvider({ kind: requestedKind, children }: { kind?: Engin
     engine.init()
       .then((result) => {
         if (!active) return;
+        // The startup screen only says "May problema sa app"; the console names the cause in dev builds.
+        if (!result.ok && __DEV__) console.error('[engine.init]', result.error);
         setState(result.ok ? { kind: 'ready' } : { kind: 'error', code: result.error.code });
       })
-      .catch(() => {
+      .catch((cause: unknown) => {
+        if (__DEV__) console.error('[engine.init]', cause);
         if (active) setState({ kind: 'error', code: 'storage_failed' });
       });
     return () => { active = false; };
