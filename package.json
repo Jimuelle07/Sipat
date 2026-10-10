@@ -6,6 +6,7 @@
   "scripts": {
     "start": "expo start",
     "web": "expo start --web",
+    "demo": "tsx scripts/demo.ts",
     "android": "expo start --android",
     "test": "vitest run --passWithNoTests",
     "lint": "eslint app/ui",

@@ -105,13 +105,9 @@ export interface Radii {
 export type Bezier = readonly [number, number, number, number];
 
 export interface Motion {
-  style: 'full' | 'minimal'; // minimal: opacity only, no stagger (during, or reduce motion)
+  style: 'full' | 'minimal'; // minimal: opacity only (during, or reduce motion)
   fast: number;       // ms
   base: number;       // ms
-  reveal: number;     // ms, per-word reveal
-  stagger: number;    // ms between words
-  highlight: number;  // ms, highlighter sweep under the key word
-  rise: number;       // dp a revealed word travels upward
   enter: Bezier;      // crisp ease-out entrance
   exit: Bezier;       // ease-in exit
   calm: Bezier;       // balanced in-out for theme crossfades
@@ -122,6 +118,7 @@ export type HomeSection =
   | 'switchBanner'
   | 'emergency'
   | 'warnings'        // active chips plus "Ano ang narinig mo?"
+  | 'storm'           // latest bulletin summary; opens the Bagyo screen
   | 'center'          // household evacuation center
   | 'pendingPhotos'
   | 'checklist'

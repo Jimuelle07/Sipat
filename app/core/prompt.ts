@@ -32,7 +32,9 @@ export function answerSchema(ids: string[]) {
       used: { type: 'array', items: { enum: ids }, minItems: 1, maxItems: ids.length },
       in_guide: { type: 'boolean' },
       phase_hint: { enum: ['before', 'during', 'after', null] },
-      answer: { type: 'string', maxLength: 400 },
+      // Fits n_predict 110: the JSON keys take ~30 tokens, Tagalog runs ~3 chars per token. At 400 the
+      // answer outran the token cap mid-string and every long answer failed as invalid JSON.
+      answer: { type: 'string', maxLength: 240 },
     },
     required: ['used', 'in_guide', 'phase_hint', 'answer'],
     additionalProperties: false,
@@ -144,12 +146,14 @@ export const EXAMPLE_2_JSON = JSON.stringify({ used: [EXAMPLE_PASSAGE_ID], in_gu
 
 function assemble(input: PromptInput, passages: Passage[], lang: UiLanguage): BuiltPrompt {
   const header = `${PHASE_LABEL[input.context.phase]}; ${warningsSummary(input.context)}`;
+  // The refusal example comes first and the answered example last: a 1B model copies the nearest
+  // example, and with the refusal last it marked guide-backed answers "in_guide": false.
   const messages: ChatMessage[] = [
     { role: 'system', content: lang === 'en' ? SYSTEM_EN : SYSTEM_TL },
-    { role: 'user', content: EXAMPLE_1_USER },
-    { role: 'assistant', content: lang === 'en' ? EXAMPLE_1_JSON_EN : EXAMPLE_1_JSON },
     { role: 'user', content: EXAMPLE_2_USER },
     { role: 'assistant', content: EXAMPLE_2_JSON },
+    { role: 'user', content: EXAMPLE_1_USER },
+    { role: 'assistant', content: lang === 'en' ? EXAMPLE_1_JSON_EN : EXAMPLE_1_JSON },
     { role: 'user', content: userTurn(input.profile ? profileSummary(input.profile) : 'hindi pa naka-setup', header, passages, redactQuestion(input.question, input.profile)) },
   ];
   const allowedIds = passages.map((p) => p.id);

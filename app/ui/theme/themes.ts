@@ -181,10 +181,10 @@ function buildWarningTones(): WarningTones {
 
 function buildMotion(phase: Phase): Motion {
   const calm = phase === 'before'
-    ? { fast: 200, base: 300, reveal: 600, stagger: 40, highlight: 450, rise: 16 }
+    ? { fast: 200, base: 300 }
     : phase === 'after'
-      ? { fast: 200, base: 320, reveal: 700, stagger: 55, highlight: 600, rise: 12 }
-      : { fast: 150, base: 200, reveal: 200, stagger: 0, highlight: 0, rise: 0 };
+      ? { fast: 200, base: 320 }
+      : { fast: 150, base: 200 };
 
   return {
     style: phase === 'during' ? 'minimal' : 'full',
@@ -196,9 +196,9 @@ function buildMotion(phase: Phase): Motion {
 }
 
 const HOME_ORDER: Record<Phase, HomeSection[]> = {
-  before: ['hero', 'switchBanner', 'pendingPhotos', 'warnings', 'checklist', 'ask', 'guide', 'hotlines', 'battery'],
-  during: ['switchBanner', 'emergency', 'warnings', 'center', 'checklist', 'hotlines', 'battery', 'hero'],
-  after: ['switchBanner', 'hero', 'checklist', 'pendingPhotos', 'hotlines', 'guide', 'ask', 'battery'],
+  before: ['hero', 'switchBanner', 'pendingPhotos', 'warnings', 'storm', 'checklist', 'ask', 'guide', 'hotlines', 'battery'],
+  during: ['switchBanner', 'emergency', 'warnings', 'storm', 'center', 'checklist', 'hotlines', 'battery', 'hero'],
+  after: ['switchBanner', 'hero', 'checklist', 'pendingPhotos', 'storm', 'hotlines', 'guide', 'ask', 'battery'],
 };
 
 function buildShadow(scheme: Scheme): Theme['shadow'] {

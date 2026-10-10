@@ -931,10 +931,18 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
         }
         profiles = (store.get('profiles') ?? []).slice(0, 1);
         activeId = profiles[0]?.id ?? null;
+        // A context saved by an older build may lack newer fields: fill them from a fresh context
+        // instead of failing startup.
         const storedContext = store.get('context');
-        context = storedContext
-          ? { ...storedContext, warnings: storedContext.warnings ?? {} }
-          : emptyContext(iso(now()));
+        const freshContext = emptyContext(iso(now()));
+        context = storedContext && typeof storedContext === 'object'
+          ? {
+            ...freshContext,
+            ...storedContext,
+            suppressed: Array.isArray(storedContext.suppressed) ? storedContext.suppressed : [],
+            warnings: storedContext.warnings ?? {},
+          }
+          : freshContext;
         history = (store.get('questionLog') ?? []).slice(-200);
         settings = { ...DEFAULT_SETTINGS, ...(store.get('settings') ?? {}) };
         const storedInitialFeed = storedFeed();

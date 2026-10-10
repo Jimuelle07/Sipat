@@ -40,6 +40,17 @@ All of it comes through the existing `Engine` facade; no new API.
 
 Bulletin and storm timestamps follow the clock at seeding or refresh time, so the card is never stale during a demo. Pull to refresh re-issues the bulletin with new timestamps.
 
+Where it shows in the app (MVP stretch screens):
+
+| Screen | Seeded data shown |
+| :--- | :--- |
+| Home | Bulletin tile (storm name, category, `Signal 2 sa inyong lugar`, distance and direction now); household center with the meeting place; pending-photo reminders |
+| Bagyo at paglikas (tap the Home bulletin tile) | Bulletin card with signal areas named from `places.json`, readable issued and fetched times, the verbatim bulletin text, the map-free track view with the forecast points, and the three ranked centers under "Ang barangay ang magsasabi kung kailan lilikas." The family's center is marked "Plano ng pamilya". Pull to refresh or "I-refresh ang balita" calls `feed.refresh()` |
+| Ask ("nasaan na ang bagyo?") | The same bulletin card |
+| Hotlines, Family | Plan contacts, members and the area |
+
+On web, MMKV saves to the browser's `localStorage` (`bagyo-buddy\…` keys). If the app opens on "May problema sa app", the browser holds data from an older build: clear the site data for the dev server's origin (DevTools, Application, Clear site data) and reload. The console shows the cause as `[engine.init]` in dev builds.
+
 ## What stays a placeholder, on purpose
 
 AGENTS rule 10 forbids inventing official facts. The seed does not touch these:

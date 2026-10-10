@@ -27,6 +27,12 @@ describe('verify', () => {
     expect(r).not.toHaveProperty('text');
   });
 
+  it('drops an unfinished last sentence cut by the length cap', () => {
+    const r = verify(out('Ilagay sa go bag ang tubig at pagkain. Dalhin ito kapag lum'), [GOBAG]);
+    expect(r.ok).toBe(true);
+    expect(r.output?.answer).toBe('Ilagay sa go bag ang tubig at pagkain.');
+  });
+
   it('rejects non-JSON and malformed objects as schema', () => {
     expect(code('not json')).toBe('schema');
     expect(code(JSON.stringify({ used: ['before-gobag-01'], in_guide: true, phase_hint: null, answer: 'x', extra: 1 }))).toBe('schema');

@@ -18,6 +18,7 @@ export type RootStackParamList = {
   Photo: { memberId: string };                       // required photo; "Mamaya na" leaves the member pending
   MemberCard: { memberId: string };                  // "Hinahanap"
   Checklist: undefined;
+  Storm: undefined;                                  // bulletin, track view and recommended evacuation centers
   Emergency: { cardId?: string };
   Passage: { passageId: string };                    // "Saan galing ito?"
   Settings: undefined;

@@ -8,6 +8,8 @@ import { errorMessage } from '../strings/errors';
 import { commonStrings } from '../strings/common';
 import { fill } from '../strings/format';
 import { shouldShowSwitch } from '../screens/home/homeModel';
+import { clockText } from '../screens/storm/stormModel';
+import { stormStrings } from '../strings/storm';
 import { useTheme, useThemedStyles } from '../theme';
 import type { Theme } from '../theme';
 import { DevPanelEntry } from './DevPanel';
@@ -96,9 +98,10 @@ export function AppBanners(): JSX.Element | null {
     <View style={styles.banners}>
       {showSwitch && lastSwitch ? (
         <SwitchBanner
+          sender={t.alertSender}
+          time={clockText(lastSwitch.at, stormStrings[lang], true)}
           text={engine.copy('phase_switched', { lang, vars: { phase: engine.copy(phaseCopyKey, { lang }) } })}
           reason={context.reason.text}
-          emphasis={engine.copy(phaseCopyKey, { lang })}
           undoLabel={t.undo}
           onUndo={undoSwitch}
           dismissLabel={t.dismiss}

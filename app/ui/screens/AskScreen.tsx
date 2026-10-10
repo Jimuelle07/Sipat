@@ -1,5 +1,5 @@
 import type { JSX, ReactNode } from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import {
   Keyboard,
@@ -10,7 +10,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import type { BulletinCardView, TopicGroup } from '../../engine';
+import type { TopicGroup } from '../../engine';
 import { useEngine, useEngineChange } from '../context/useEngine';
 import { AppBanners, StatusBadges } from '../context/AppChrome';
 import { useLang, useT } from '../i18n';
@@ -36,11 +36,12 @@ import {
 import type { RootNavigation } from '../navigation/types';
 import { askStrings } from '../strings/ask';
 import { errorMessage, genericMessage } from '../strings/errors';
-import { fill } from '../strings/format';
+import { stormStrings } from '../strings/storm';
 import { guideTopicLabels } from '../strings/guide';
 import { canSend, counterText, usedIds } from './ask/chat';
 import { EMPTY_PLAN, applyEvent, canStop, failPlan } from './ask/answerPlan';
 import type { AnswerPlan, MainCard } from './ask/answerPlan';
+import { bulletinAge, bulletinLines } from './storm/stormModel';
 
 const EXAMPLES = ['example_go_bag', 'example_flood', 'example_evacuation'] as const;
 
@@ -65,9 +66,14 @@ export function AskScreen(): JSX.Element {
   const theme = useTheme();
   const t = useT(askStrings);
   const labels = useT(guideTopicLabels);
+  const stormCopy = useT(stormStrings);
   const { lang } = useLang();
   const styles = useThemedStyles(makeStyles);
   useEngineChange(['status', 'phase']);
+  const places = useMemo(
+    () => new Map(engine.family.location.places().map((place) => [place.psgc, place.name])),
+    [engine],
+  );
 
   const [question, setQuestion] = useState('');
   const [asked, setAsked] = useState<string | null>(null);
@@ -117,20 +123,6 @@ export function AskScreen(): JSX.Element {
     })();
   };
 
-  const bulletinLines = (view: BulletinCardView): Line[] => {
-    const { bulletin } = view;
-    const lines: Line[] = [
-      { label: t.bulletinName, value: bulletin.storm.name },
-      { label: t.bulletinCategory, value: bulletin.storm.category },
-      { label: t.bulletinPosition, value: bulletin.position.text },
-    ];
-    if (bulletin.movement) lines.push({ label: t.bulletinMovement, value: bulletin.movement.text });
-    for (const area of bulletin.signalAreas) {
-      lines.push({ label: fill(t.bulletinSignal, { level: area.level }), value: area.psgc.join(', ') });
-    }
-    return lines;
-  };
-
   const planContent = (main: Extract<MainCard, { kind: 'plan_answer' }>): { lines: Line[]; calls: Call[] } => {
     switch (main.field) {
       case 'evacuation_center': {
@@ -169,8 +161,8 @@ export function AskScreen(): JSX.Element {
           <View style={styles.bulletinSourceGroup}>
             <BulletinCard
               title={main.card.bulletin.source.title}
-              lines={bulletinLines(main.card)}
-              ageText={main.card.ageText}
+              lines={bulletinLines(main.card, stormCopy, places)}
+              ageText={bulletinAge(main.card, engine.copy, lang, stormCopy)}
               staleText={main.card.stale ? engine.copy('stale_warning', { lang }) : undefined}
               sourceLabel={sourceVisible ? t.hideSource : engine.copy('source_link', { lang })}
               onSource={() => setSourceVisible((visible) => !visible)}

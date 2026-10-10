@@ -1,21 +1,23 @@
 import type { JSX } from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Animated, Easing, Pressable, View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Button } from './Button';
 import { Txt } from './Txt';
-import { revealSchedule, useMinimalMotion, useTheme, useThemedStyles } from '../theme';
+import { useMinimalMotion, useTheme, useThemedStyles } from '../theme';
 import type { Theme } from '../theme';
 
 /**
- * The signature phase-switch announcement on Home: a capsule banner that reveals its copy
- * word by word and sweeps a highlighter under the emphasis word. It re-runs when `revealKey`
- * changes (the caller passes the switch timestamp).
+ * The phase-switch announcement, styled like a phone's emergency text alert: a red header strip
+ * with the sender and time, then the message in bold. It drops in from the top and pulses its
+ * icon twice; under minimal motion it only fades. Re-runs when `revealKey` (the switch time) changes.
+ * The sender is always the app, never an agency: the alert must not pass for an official broadcast.
  */
-export function SwitchBanner({ text, reason, emphasis, undoLabel, onUndo, dismissLabel, onDismiss, revealKey }: {
+export function SwitchBanner({ sender, time, text, reason, undoLabel, onUndo, dismissLabel, onDismiss, revealKey }: {
+  sender: string;
+  time: string;
   text: string;
   reason?: string;
-  emphasis?: string;
   undoLabel?: string;
   onUndo?: () => void;
   dismissLabel: string;
@@ -25,159 +27,92 @@ export function SwitchBanner({ text, reason, emphasis, undoLabel, onUndo, dismis
   const t = useTheme();
   const styles = useThemedStyles(makeStyles);
   const minimal = useMinimalMotion();
-
-  const words = useMemo(() => text.split(/\s+/).filter((word) => word.length > 0), [text]);
-  const wordCount = words.length;
-  const values = useMemo(() => words.map(() => new Animated.Value(0)), [wordCount]);
-  const highlight = useMemo(() => new Animated.Value(0), []);
-  const banner = useMemo(() => new Animated.Value(1), []);
-  const [emphasisWidth, setEmphasisWidth] = useState(0);
-
-  const emphasisIndex = useMemo(() => {
-    if (emphasis === undefined || emphasis.length === 0) return -1;
-    const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, '');
-    const target = normalize(emphasis);
-    if (target.length === 0) return -1;
-    return words.findIndex((word) => target.includes(normalize(word)));
-  }, [emphasis, words]);
+  const enter = useMemo(() => new Animated.Value(1), []);
+  const pulse = useMemo(() => new Animated.Value(0), []);
 
   useEffect(() => {
-    const schedule = revealSchedule(wordCount, t.motion);
-    const enter = Easing.bezier(t.motion.enter[0], t.motion.enter[1], t.motion.enter[2], t.motion.enter[3]);
-
-    if (minimal) {
-      values.forEach((value) => value.setValue(1));
-      highlight.setValue(1);
-      banner.setValue(0);
-      const fade = Animated.timing(banner, {
-        toValue: 1,
-        duration: t.motion.fast,
-        useNativeDriver: true,
-      });
-      fade.start();
-      return () => fade.stop();
-    }
-
-    values.forEach((value) => value.setValue(0));
-    highlight.setValue(0);
-    banner.setValue(1);
-
-    const wordAnims = values.map((value) => Animated.timing(value, {
+    enter.setValue(0);
+    pulse.setValue(0);
+    const drop = Animated.timing(enter, {
       toValue: 1,
-      duration: t.motion.reveal,
-      easing: enter,
-      useNativeDriver: true,
-    }));
-    const reveal = Animated.stagger(t.motion.stagger, wordAnims);
-    const sweep = Animated.timing(highlight, {
-      toValue: 1,
-      duration: t.motion.highlight,
-      delay: Math.max(0, schedule.total - t.motion.highlight),
-      easing: enter,
+      duration: minimal ? t.motion.fast : t.motion.base,
+      easing: Easing.bezier(...t.motion.enter),
       useNativeDriver: true,
     });
-    const anim = Animated.parallel([reveal, sweep]);
+    if (minimal) {
+      drop.start();
+      return () => drop.stop();
+    }
+    const beat = Animated.sequence([
+      Animated.timing(pulse, { toValue: 1, duration: t.motion.fast, useNativeDriver: true }),
+      Animated.timing(pulse, { toValue: 0, duration: t.motion.fast, useNativeDriver: true }),
+    ]);
+    const anim = Animated.sequence([drop, beat, beat]);
     anim.start();
     return () => anim.stop();
-  }, [revealKey, wordCount, minimal, t, values, highlight, banner]);
+  }, [revealKey, minimal, t, enter, pulse]);
 
-  const highlightTranslate = highlight.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-emphasisWidth / 2, 0],
-  });
-
-  const riseFor = (value: Animated.Value) => value.interpolate({
-    inputRange: [0, 1],
-    outputRange: [t.motion.rise, 0],
-  });
+  const ink = t.colors.danger.ink;
+  const slide = minimal
+    ? { opacity: enter }
+    : { opacity: enter, transform: [{ translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [-t.space.xxl, 0] }) }] };
 
   return (
-    <Animated.View style={[styles.banner, { opacity: banner }]}>
-      <View
-        accessible
-        accessibilityLiveRegion="polite"
-        accessibilityLabel={text}
-        style={styles.textRow}
-      >
-        {words.map((word, index) => {
-          const value = values[index] ?? highlight;
-          const wordStyle = minimal
-            ? null
-            : { opacity: value, transform: [{ translateY: riseFor(value) }] };
-          const isEmphasis = index === emphasisIndex;
-          return (
-            <Animated.View
-              key={`${index}-${word}`}
-              style={[styles.word, wordStyle]}
-              onLayout={isEmphasis ? (event) => setEmphasisWidth(event.nativeEvent.layout.width) : undefined}
-            >
-              {isEmphasis ? (
-                <Animated.View
-                  pointerEvents="none"
-                  style={[
-                    styles.highlightBar,
-                    {
-                      backgroundColor: t.colors.highlight.fill,
-                      transform: [{ translateX: highlightTranslate }, { scaleX: highlight }],
-                    },
-                  ]}
-                />
-              ) : null}
-              <Txt role="lead" color={isEmphasis ? t.colors.highlight.ink : t.colors.capsule.ink}>{word}</Txt>
-            </Animated.View>
-          );
-        })}
-      </View>
-      {reason ? <Txt role="bodySmall" color={t.colors.capsule.ink}>{reason}</Txt> : null}
-      <View style={styles.actions}>
-        {undoLabel !== undefined && onUndo !== undefined ? (
-          <Button label={undoLabel} onPress={onUndo} variant="text" />
-        ) : null}
+    <Animated.View
+      accessible={false}
+      accessibilityRole="alert"
+      accessibilityLiveRegion="assertive"
+      style={[styles.alert, slide]}
+    >
+      <View style={[styles.header, { backgroundColor: t.colors.danger.fill }]}>
+        <Animated.View style={{ transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.3] }) }] }}>
+          <Ionicons name="warning" size={t.type.roles.lead.fontSize} color={ink} />
+        </Animated.View>
+        <Txt role="label" color={ink} numberOfLines={1} style={styles.sender}>{sender}</Txt>
+        <Txt role="caption" color={ink}>{time}</Txt>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={dismissLabel}
-          hitSlop={t.space.sm}
+          hitSlop={t.space.md}
           onPress={onDismiss}
           style={styles.dismiss}
         >
-          <Ionicons name="close" size={t.type.roles.lead.fontSize} color={t.colors.capsule.ink} />
+          <Ionicons name="close" size={t.type.roles.lead.fontSize} color={ink} />
         </Pressable>
       </View>
+      <View style={styles.body} accessible accessibilityLabel={reason ? `${sender}. ${text} ${reason}` : `${sender}. ${text}`}>
+        <Txt role="title">{text}</Txt>
+        {reason ? <Txt role="body" tone="muted">{reason}</Txt> : null}
+      </View>
+      {undoLabel !== undefined && onUndo !== undefined ? (
+        <View style={styles.actions}>
+          <Button label={undoLabel} onPress={onUndo} variant="text" icon="arrow-undo" />
+        </View>
+      ) : null}
     </Animated.View>
   );
 }
 
 const makeStyles = (t: Theme) => StyleSheet.create({
-  banner: {
-    gap: t.space.lg,
-    paddingVertical: t.space.lg,
-    paddingHorizontal: t.space.tile,
-    borderRadius: t.radius.capsule,
-    backgroundColor: t.colors.capsule.fill,
+  alert: {
+    overflow: 'hidden',
+    borderRadius: t.radius.menu,
+    borderWidth: t.border.emphasis,
+    borderColor: t.colors.danger.fill,
+    backgroundColor: t.colors.surface,
+    boxShadow: t.shadow.float,
   },
-  textRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'flex-end',
-    rowGap: t.space.xs,
-  },
-  word: {
-    position: 'relative',
-    marginRight: t.space.sm,
-  },
-  highlightBar: {
-    position: 'absolute',
-    left: -t.space.xs,
-    right: -t.space.xs,
-    top: 0,
-    bottom: 0,
-    borderRadius: t.radius.pill,
-  },
-  actions: {
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-end',
     gap: t.space.md,
+    minHeight: t.minTouch,
+    paddingLeft: t.space.xl,
+  },
+  sender: {
+    flex: 1,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
   },
   dismiss: {
     minWidth: t.minTouch,
@@ -185,4 +120,15 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-})
+  body: {
+    gap: t.space.xs,
+    paddingHorizontal: t.space.xl,
+    paddingTop: t.space.lg,
+    paddingBottom: t.space.md,
+  },
+  actions: {
+    alignItems: 'flex-end',
+    paddingHorizontal: t.space.md,
+    paddingBottom: t.space.sm,
+  },
+});

@@ -13,10 +13,10 @@ export const MODEL_IDLE_UNLOAD_MS = 2 * 60 * 1000;
 /** The fixed system + worked-example turns (section 8). Cached as the session prefix; the last user turn is variable. */
 export const FIXED_INSTRUCTION_PREFIX: BuiltPrompt['messages'] = [
   { role: 'system', content: SYSTEM_TL },
-  { role: 'user', content: EXAMPLE_1_USER },
-  { role: 'assistant', content: EXAMPLE_1_JSON },
   { role: 'user', content: EXAMPLE_2_USER },
   { role: 'assistant', content: EXAMPLE_2_JSON },
+  { role: 'user', content: EXAMPLE_1_USER },
+  { role: 'assistant', content: EXAMPLE_1_JSON },
 ];
 
 type CompletionParams = {
