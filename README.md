@@ -5,24 +5,14 @@
 <h1 align="center">Sipat</h1>
 
 <p align="center">
-  <img alt="Expo: SDK 57" src="https://img.shields.io/badge/Expo-SDK%2057-4630EB?style=flat-square&labelColor=1B1F3B&logo=expo&logoColor=white">
-  <img alt="React Native: 0.86 | New Arch" src="https://img.shields.io/badge/React%20Native-0.86%20%7C%20New%20Arch-149ECA?style=flat-square&labelColor=20232A&logo=react&logoColor=white">
-  <img alt="TypeScript: 6.0 strict" src="https://img.shields.io/badge/TypeScript-6.0%20strict-3178C6?style=flat-square&labelColor=1E3A5F&logo=typescript&logoColor=white">
-  <img alt="Hermes: JS engine" src="https://img.shields.io/badge/Hermes-JS%20engine-6E4CB8?style=flat-square&labelColor=3B2A63">
-  <img alt="React Navigation: 7" src="https://img.shields.io/badge/React%20Navigation-7-6B52AE?style=flat-square&labelColor=3B2A63"><br>
-  <img alt="On-device AI: Llama 3.2 1B | llama.rn" src="https://img.shields.io/badge/On--device%20AI-Llama%203.2%201B%20%7C%20llama.rn-D97706?style=flat-square&labelColor=7C3A06&logo=meta&logoColor=white">
-  <img alt="Retrieval: MiniSearch BM25+" src="https://img.shields.io/badge/Retrieval-MiniSearch%20BM25%2B-0E9F6E?style=flat-square&labelColor=065F46">
-  <img alt="Storage: react-native-mmkv" src="https://img.shields.io/badge/Storage-react--native--mmkv-DB2777?style=flat-square&labelColor=831843">
-  <img alt="Photos: ML Kit face detection" src="https://img.shields.io/badge/Photos-ML%20Kit%20face%20detection-1A73E8?style=flat-square&labelColor=174EA6&logo=google&logoColor=white"><br>
-  <img alt="Device: expo-battery | expo-location | expo-sharing" src="https://img.shields.io/badge/Device-expo--battery%20%7C%20expo--location%20%7C%20expo--sharing-4630EB?style=flat-square&labelColor=1B1F3B&logo=expo&logoColor=white">
-  <img alt="Feed security: ed25519 | noble hashes" src="https://img.shields.io/badge/Feed%20security-ed25519%20%7C%20noble%20hashes-B91C1C?style=flat-square&labelColor=7F1D1D"><br>
-  <img alt="Scripts: Node | tsx" src="https://img.shields.io/badge/Scripts-Node%20%7C%20tsx-5FA04E?style=flat-square&labelColor=2F5130&logo=nodedotjs&logoColor=white">
-  <img alt="Tests: Vitest" src="https://img.shields.io/badge/Tests-Vitest-6E9F18?style=flat-square&labelColor=3A5410&logo=vitest&logoColor=white">
-  <img alt="Lint: ESLint" src="https://img.shields.io/badge/Lint-ESLint-4B32C3?style=flat-square&labelColor=2A1B70&logo=eslint&logoColor=white">
-  <img alt="E2E: Playwright" src="https://img.shields.io/badge/E2E-Playwright-2EAD33?style=flat-square&labelColor=1B5E20">
-  <img alt="Film: Remotion | Python" src="https://img.shields.io/badge/Film-Remotion%20%7C%20Python-0B84F3?style=flat-square&labelColor=0A3A66&logo=remotion&logoColor=white"><br>
-  <img alt="Platform: Android first" src="https://img.shields.io/badge/Platform-Android%20first-3DDC84?style=flat-square&labelColor=1B5E20&logo=android&logoColor=white">
-  <img alt="Works: offline | airplane mode" src="https://img.shields.io/badge/Works-offline%20%7C%20airplane%20mode-2E5181?style=flat-square&labelColor=213B5E">
+  <img alt="Expo: SDK 57" src="https://img.shields.io/badge/Expo-SDK%2057-4630EB?style=flat&labelColor=1B1F3B&logo=expo&logoColor=white">
+  <img alt="React Native: 0.86 | New Arch" src="https://img.shields.io/badge/React%20Native-0.86%20%7C%20New%20Arch-149ECA?style=flat&labelColor=20232A&logo=react&logoColor=white">
+  <img alt="TypeScript: 6.0 strict" src="https://img.shields.io/badge/TypeScript-6.0%20strict-3178C6?style=flat&labelColor=1E3A5F&logo=typescript&logoColor=white">
+  <img alt="Platform: Android first" src="https://img.shields.io/badge/Platform-Android%20first-3DDC84?style=flat&labelColor=1B5E20&logo=android&logoColor=white"><br>
+  <img alt="On-device AI: Llama 3.2 1B" src="https://img.shields.io/badge/On--device%20AI-Llama%203.2%201B-D97706?style=flat&labelColor=7C3A06&logo=meta&logoColor=white">
+  <img alt="Retrieval: MiniSearch BM25+" src="https://img.shields.io/badge/Retrieval-MiniSearch%20BM25%2B-0E9F6E?style=flat&labelColor=065F46">
+  <img alt="Works: offline | airplane mode" src="https://img.shields.io/badge/Works-offline%20%7C%20airplane%20mode-4E83C4?style=flat&labelColor=213B5E">
+  <img alt="Film: Remotion" src="https://img.shields.io/badge/Film-Remotion-0B84F3?style=flat&labelColor=0A3A66&logo=remotion&logoColor=white">
 </p>
 
 > Offline typhoon companion for Filipino households on budget Android phones. Sourced answers in Taglish, fitted to your family, with no signal.
