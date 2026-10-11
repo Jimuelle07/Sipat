@@ -89,6 +89,29 @@ Sipat runs in three bagyo phases (**Bago**, **Habang may bagyo**, **Pagkatapos**
 - **Safety lives in code.** Routing, answer checks and phase switching are enforced in code; hotlines and bulletins are rendered from data, never from the model.
 - **Hybrid when there is signal.** A signed feed from our server is cached for offline use. Households never pay; LGUs pay for a localized pack.
 
+## FAQ
+
+**What is Sipat?**
+Sipat is a free, offline-first typhoon (bagyo) preparedness app for Filipino families on budget Android phones. It turns the PAGASA warning you heard into a checklist for your household and answers Taglish questions from official guides, with no signal.
+
+**Does Sipat work without internet?**
+Yes. Household setup, phases, warnings, checklists, Ask in Taglish, hotlines and the bundled guide all work in airplane mode. The network is used only when you tap an action while the app is open.
+
+**Where do the answers come from?**
+Only from official guides bundled in the app: PAGASA, NDRRMC and OCD, DOH, PHIVOLCS and BFP. Every answer links to its source. When nothing matches, Sipat says "Wala ito sa gabay" instead of guessing.
+
+**Which warnings does it cover?**
+PAGASA tropical cyclone wind signals 1 to 5, rainfall warnings, storm surge and gale warnings.
+
+**Does it need AI?**
+No. The vetted summary always shows first. Llama 3.2 1B runs on the phone to put it in plain words, and is an optional one-time download.
+
+**Is my family's data private?**
+Yes. No account is needed and there are no analytics. Names, face photos and location stay on the phone; face detection only crops photos and never identifies anyone.
+
+**Who pays for it?**
+Households never pay. LGUs pay for a localized pack with their evacuation centers, hotlines and advisories ([docs/BMC.md](docs/BMC.md)).
+
 ## Quick start
 
 **Demo, no device needed** (Node.js 22+):

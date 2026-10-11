@@ -10,6 +10,9 @@ Map of the important docs and files. Start with [AGENTS.md](AGENTS.md) for the r
 | [README.md](README.md) | Requirements and how to run the app |
 | [package.json](package.json) | Dependencies and scripts: `start`, `android`, `web`, `test`, `typecheck`, `validate:content` |
 | [app.config.ts](app.config.ts) | Expo app config |
+| [llms.txt](llms.txt) | Plain-text project summary for AI assistants (copy also served from `public/`) |
+| [CITATION.cff](CITATION.cff) | How to cite the project; GitHub shows a "Cite this repository" button |
+| [public/](public/) | Web preview `index.html` (meta tags, JSON-LD, crawler text), `robots.txt`, `llms.txt` |
 | [index.ts](index.ts) | App entry point |
 | [tsconfig.json](tsconfig.json) | TypeScript (strict) config |
 | [vitest.config.ts](vitest.config.ts) | Unit test config |

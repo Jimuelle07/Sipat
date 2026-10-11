@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="fil">
+  <head>
+    <meta charset="utf-8" />
+    <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <title>Sipat: offline typhoon guide for Filipino families (Gabay kahit walang signal)</title>
+    <meta name="description" content="Sipat is a free, offline-first typhoon companion for Filipino households on budget Android phones. Tap the PAGASA warning you heard, get a checklist fitted to your family, and ask in Taglish. Answers come only from official PAGASA, NDRRMC, DOH, PHIVOLCS and BFP guides, even with no signal." />
+    <meta name="keywords" content="Sipat, bagyo, typhoon app Philippines, offline typhoon guide, PAGASA signal, disaster preparedness app, Taglish, NDRRMC, evacuation, offline AI, Llama 3.2 1B" />
+    <meta name="theme-color" content="#62788F" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <link rel="alternate" type="text/plain" href="llms.txt" title="LLM summary" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Sipat" />
+    <meta property="og:locale" content="fil_PH" />
+    <meta property="og:locale:alternate" content="en_PH" />
+    <meta property="og:title" content="Sipat: Gabay kahit walang signal" />
+    <meta property="og:description" content="Offline typhoon companion for Filipino families: PAGASA warning checklists fitted to your household and Taglish answers from official guides, no signal needed." />
+    <meta property="og:image" content="https://raw.githubusercontent.com/Jimuelle07/Sipat/main/docs/media/sipat-showreel-30-poster.jpg" />
+    <meta property="og:image:alt" content="Sipat product film poster" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Sipat: Gabay kahit walang signal" />
+    <meta name="twitter:description" content="Offline typhoon companion for Filipino families, with answers only from official PAGASA, NDRRMC, DOH, PHIVOLCS and BFP guides." />
+    <meta name="twitter:image" content="https://raw.githubusercontent.com/Jimuelle07/Sipat/main/docs/media/sipat-showreel-30-poster.jpg" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "MobileApplication",
+            "name": "Sipat",
+            "alternateName": "Sipat: Gabay kahit walang signal",
+            "description": "Offline-first typhoon companion for Filipino households on budget Android phones. The app runs in three bagyo phases (before, during, after), turns the PAGASA warning the user heard into a checklist fitted to the household, and answers Taglish questions only from official preparedness guides bundled in the app.",
+            "operatingSystem": "Android",
+            "applicationCategory": "UtilitiesApplication",
+            "inLanguage": ["fil", "en"],
+            "isAccessibleForFree": true,
+            "offers": { "@type": "Offer", "price": "0", "priceCurrency": "PHP" },
+            "audience": { "@type": "Audience", "audienceType": "Filipino households", "geographicArea": { "@type": "Country", "name": "Philippines" } },
+            "featureList": [
+                "Works in airplane mode with no signal",
+                "Three bagyo phases: Bago, Habang may bagyo, Pagkatapos",
+                "Checklists for PAGASA wind signals 1 to 5, rainfall, storm surge and gale warnings",
+                "Household profile fitted to infants, seniors, pregnancy, pets and homes near rivers",
+                "Ask in Taglish; answers only from bundled PAGASA, NDRRMC and OCD, DOH, PHIVOLCS and BFP guides",
+                "Optional on-device AI (Llama 3.2 1B); vetted summary always shows first",
+                "No accounts, no analytics; family data and photos stay on the phone"
+            ],
+            "screenshot": [
+              "https://raw.githubusercontent.com/Jimuelle07/Sipat/main/docs/media/screens/phase-1-bago.jpg",
+              "https://raw.githubusercontent.com/Jimuelle07/Sipat/main/docs/media/screens/04-checklist.jpg",
+              "https://raw.githubusercontent.com/Jimuelle07/Sipat/main/docs/media/screens/05-ask.jpg"
+            ],
+            "video": { "@type": "VideoObject", "name": "Sipat product film", "contentUrl": "https://youtube.com/shorts/iQ4W9_A_QU0", "thumbnailUrl": "https://raw.githubusercontent.com/Jimuelle07/Sipat/main/docs/media/sipat-showreel-30-poster.jpg" },
+            "codeRepository": "https://github.com/Jimuelle07/Sipat",
+            "sameAs": ["https://github.com/Jimuelle07/Sipat"]
+          },
+          {
+            "@type": "FAQPage",
+            "mainEntity": [
+              { "@type": "Question", "name": "Does Sipat work without internet or signal?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Household setup, the three phases, warnings, checklists, Ask in Taglish, hotlines and the bundled guide all work in airplane mode. The network is used only when the user taps an action while the app is open." } },
+              { "@type": "Question", "name": "Where do Sipat's answers come from?", "acceptedAnswer": { "@type": "Answer", "text": "Only from official preparedness guides bundled in the app (PAGASA, NDRRMC and OCD, DOH, PHIVOLCS, BFP), with the source one tap away. When nothing matches, the app says \"Wala ito sa gabay\" instead of guessing." } },
+              { "@type": "Question", "name": "Does Sipat need AI to work?", "acceptedAnswer": { "@type": "Answer", "text": "No. The vetted summary from the guide always shows first. Llama 3.2 1B runs on the phone to put it in plain words, but on low battery, with AI off or without the model, Sipat shows the vetted summary only." } },
+              { "@type": "Question", "name": "Is Sipat free, and does family data leave the phone?", "acceptedAnswer": { "@type": "Answer", "text": "Households never pay; LGUs pay for a localized pack. The household profile needs no account, and member names, photos and location stay on the phone." } }
+            ]
+          }
+        ]
+      }
+    </script>
+
+    <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
+    <style id="expo-reset">
+      /* These styles make the body full-height */
+      html,
+      body {
+        height: 100%;
+      }
+      /* These styles disable body scrolling if you are using <ScrollView> */
+      body {
+        overflow: hidden;
+      }
+      /* These styles make the root element full-height */
+      #root {
+        display: flex;
+        height: 100%;
+        flex: 1;
+      }
+    </style>
+  </head>
+
+  <body>
+    <noscript>
+      You need to enable JavaScript to run the Sipat preview.
+    </noscript>
+    <!-- The root element for the app. The static summary below is for crawlers and AI assistants
+         that do not run JavaScript; React replaces it on the first render. -->
+    <div id="root">
+      <main style="font-family: system-ui, sans-serif; max-width: 40rem; margin: 2rem auto; padding: 0 16px; line-height: 1.5; overflow: auto;">
+        <h1 style="font-size: 2rem; line-height: 1.2;">Sipat: Gabay kahit walang signal</h1>
+        <p>Sipat is an offline-first typhoon companion for Filipino households on budget Android phones: sourced answers in Taglish, fitted to your family, with no signal.</p>
+        <h2 style="font-size: 1.375rem;">How it works</h2>
+        <ul>
+          <li><strong>Three bagyo phases.</strong> Bago ang bagyo, Habang may bagyo and Pagkatapos ng bagyo each change the theme, the checklist and the answers.</li>
+          <li><strong>Tap the warning you heard on the radio.</strong> PAGASA wind signal 1 to 5, rainfall, storm surge or gale, and get a checklist fitted to your household.</li>
+          <li><strong>Ask in Taglish.</strong> Answers come only from official guides bundled in the app (PAGASA, NDRRMC and OCD, DOH, PHIVOLCS, BFP), with the source one tap away. When nothing matches: "Wala ito sa gabay."</li>
+          <li><strong>Useful without AI.</strong> The vetted summary shows first; Llama 3.2 1B on the phone puts it in plain words second.</li>
+          <li><strong>Private by design.</strong> No account needed, no analytics. Family names, photos and location stay on the phone.</li>
+        </ul>
+        <p>Households never pay; LGUs pay for a localized pack. Source code and docs: <a href="https://github.com/Jimuelle07/Sipat">github.com/Jimuelle07/Sipat</a>. Product film: <a href="https://youtube.com/shorts/iQ4W9_A_QU0">YouTube</a>.</p>
+      </main>
+    </div>
+  </body>
+</html>
