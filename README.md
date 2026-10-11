@@ -37,6 +37,25 @@ An offline typhoon companion for Filipino households on budget Android phones: s
   <img src="docs/media/demo.gif" alt="Sipat demo: tap the warning, the app switches to Habang may bagyo, the checklist fits the family, answers come from the official guide" width="480">
 </p>
 
+### Three phases, one app
+
+<p align="center">
+  <img src="docs/media/screens/phase-1-bago.jpg" alt="Bago ang bagyo: green theme, the mascot with a backpack" width="250">
+  <img src="docs/media/screens/phase-2-habang.jpg" alt="Habang may bagyo: yellow theme, the mascot in a raincoat" width="250">
+  <img src="docs/media/screens/phase-3-pagkatapos.jpg" alt="Pagkatapos ng bagyo: lavender theme, the mascot resting with a towel" width="250">
+</p>
+<p align="center"><b>Bago ang bagyo</b> · <b>Habang may bagyo</b> · <b>Pagkatapos ng bagyo</b></p>
+
+### Screens
+
+<p align="center">
+  <img src="docs/media/screens/04-checklist.jpg" alt="Mga dapat gawin: checklist fitted to the household" width="190">
+  <img src="docs/media/screens/05-ask.jpg" alt="Magtanong: vetted summary from the official guide" width="190">
+  <img src="docs/media/screens/06-pamilya.jpg" alt="Pamilya: household profile" width="190">
+  <img src="docs/media/screens/07-gabay.jpg" alt="Gabay: the bundled guide" width="190">
+</p>
+<p align="center">Checklist · Ask · Family · Guide</p>
+
 ## The problem
 
 When a typhoon cuts power and signal, Filipino households lose preparedness guidance exactly when they need it. Official guidance exists, but it lives online, is written for a general reader, and rarely says what a family with an infant, a senior on maintenance medicine and a house by a river should do at Signal No. 2 with an orange rainfall warning.

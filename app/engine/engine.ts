@@ -3,7 +3,7 @@ import type {
   EngineChange, EngineOverrides, EngineInfo, EngineStatus, EvalSummary, FaceBox, FeedError, FeedState, Member,
   MemberPhoto, FaceDetection, HomePoint, LocationService, PhotoDraft, PhotoError, Phase, PickedPhoto, Profile, Result,
   SaveMemberResult, SaveProfileResult, ScreenService, Settings, Store, StoreSchema, StormMeasure, UpdateClient,
-  WarningInput, WarningKind, TopicGroup,
+  WarningInput, WarningKind, TopicGroup, PlaceOption,
 } from '../types/index.ts';
 import type { ContentFileName, EvacuationCenter, PhaseRules, Place } from '../types/content.ts';
 import { ENGINE_API_VERSION } from '../types/engine.ts';
@@ -297,6 +297,48 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
   };
   const getPlaces = (): Place[] =>
     content.places?.items ?? [];
+  // places.json holds about 44k entries. Group them by parent once per list (content can be swapped
+  // by a pack), so each drill-down level is a map lookup instead of full scans per row.
+  let placeIndex: { items: Place[]; groups: Map<string | null, Place[]>; parents: Set<string>;
+    levels: Map<string | null, PlaceOption[]> } | null = null;
+  const ROOT = null;
+  function placeLevel(parentPsgc: string | undefined): PlaceOption[] {
+    const items = getPlaces();
+    if (placeIndex?.items !== items) {
+      const regions = new Set(items.filter((place) => place.level === 'region').map((place) => place.psgc));
+      const groups = new Map<string | null, Place[]>();
+      const parents = new Set<string>();
+      const add = (key: string | null, place: Place) => {
+        const list = groups.get(key);
+        if (list) list.push(place); else groups.set(key, [place]);
+      };
+      for (const place of items) {
+        if (place.parent !== null) {
+          parents.add(place.parent);
+          add(place.parent, place);
+        }
+        // Section 3.2: provinces at the top, then municipalities and cities, then barangays.
+        // A city or municipality whose parent is a region (e.g. NCR) is listed at the top too, so those
+        // areas stay reachable even though they have no province (contract gap: the doc says "provinces").
+        if (place.level === 'province'
+          || ((place.level === 'city' || place.level === 'municipality') && place.parent !== null && regions.has(place.parent))) {
+          add(ROOT, place);
+        }
+      }
+      placeIndex = { items, groups, parents, levels: new Map() };
+    }
+    const key = parentPsgc ?? ROOT;
+    let level = placeIndex.levels.get(key);
+    if (!level) {
+      const { parents } = placeIndex;
+      level = (placeIndex.groups.get(key) ?? [])
+        .slice()
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((place) => ({ psgc: place.psgc, name: place.name, level: place.level, hasChildren: parents.has(place.psgc) }));
+      placeIndex.levels.set(key, level);
+    }
+    return level;
+  }
   const homePoint = (): HomePoint | null => {
     const location = active()?.location;
     if (!location) return null;
@@ -670,23 +712,7 @@ export function createEngine(overrides: EngineOverrides = {}): Engine {
     location: {
       get: () => active()?.location ?? null,
       places(parentPsgc) {
-        // Section 3.2: provinces when omitted, then municipalities and cities, then barangays.
-        // A city or municipality whose parent is a region (e.g. NCR) is listed too, so those areas
-        // stay reachable even though they have no province (contract gap: the doc says "provinces").
-        const places = getPlaces();
-        const regionPsgc = new Set(places
-          .filter((place) => place.level === 'region')
-          .map((place) => place.psgc));
-        const level = parentPsgc === undefined
-          ? places.filter((place) => place.level === 'province'
-            || ((place.level === 'city' || place.level === 'municipality')
-              && place.parent !== null && regionPsgc.has(place.parent)))
-          : places.filter((place) => place.parent === parentPsgc);
-        return level
-          .slice()
-          .sort((a, b) => a.name.localeCompare(b.name))
-          .map((place) => ({ psgc: place.psgc, name: place.name, level: place.level,
-            hasChildren: places.some((child) => child.parent === place.psgc) }));
+        return placeLevel(parentPsgc).slice();
       },
       setArea(psgc) {
         const place = getPlaces().find((item) => item.psgc === psgc && item.level === 'barangay');

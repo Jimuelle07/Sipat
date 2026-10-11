@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, startTransition, useContext, useEffect, useMemo, useState } from 'react';
 import type { JSX, ReactNode } from 'react';
 import type { UiLanguage } from '../../engine';
 import { useEngine } from '../context/useEngine';
@@ -20,8 +20,11 @@ export function LanguageProvider({ children }: { children: ReactNode }): JSX.Ele
   const value = useMemo<LangContextValue>(() => ({
     lang,
     setLang: (next) => {
-      const result = engine.settings.update({ language: next });
-      if (result.ok) setLanguage(next);
+      // Every mounted screen re-renders in the new language; a transition keeps the toggle responsive meanwhile.
+      startTransition(() => {
+        const result = engine.settings.update({ language: next });
+        if (result.ok) setLanguage(next);
+      });
     },
   }), [engine, lang]);
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;

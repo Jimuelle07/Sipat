@@ -1,5 +1,5 @@
 import type { JSX } from 'react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { PlaceOption } from '../../../engine';
@@ -49,7 +49,8 @@ export function AreaPicker({ onPicked }: AreaPickerProps): JSX.Element {
 
   const places = (parent?: string): PlaceOption[] => engine.family.location.places(parent);
   const location = engine.family.location.get();
-  const currentPath = location ? pathTo(places, location.psgc) : [];
+  // The search walks the place tree, so only redo it when the saved barangay changes.
+  const currentPath = useMemo(() => (location ? pathTo(places, location.psgc) : []), [engine, location?.psgc]);
   const currentName = currentPath.length > 0 ? currentPath[currentPath.length - 1]?.name : undefined;
 
   const parentPsgc = path.length > 0 ? path[path.length - 1]?.psgc : undefined;

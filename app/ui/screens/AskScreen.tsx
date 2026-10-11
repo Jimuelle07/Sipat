@@ -457,7 +457,7 @@ const makeStyles = (t: Theme) => {
       paddingHorizontal: t.space.xl,
       paddingVertical: (t.minTouch - t.border.control * 2 - t.type.roles.bodySmall.lineHeight) / 2,
       textAlignVertical: 'top',
-      backgroundColor: t.colors.surfaceSunken,
+      backgroundColor: 'transparent',
       borderColor: t.colors.controlBorder,
       borderWidth: t.border.control,
       borderRadius: t.radius.panel,
