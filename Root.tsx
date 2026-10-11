@@ -1,29 +1,39 @@
-import type { JSX, ReactNode } from 'react';
-import { Platform, StyleSheet, View, useWindowDimensions } from 'react-native';
+import type { JSX } from 'react';
+import { Image, Platform, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useFonts } from 'expo-font';
 import { BowlbyOne_400Regular } from '@expo-google-fonts/bowlby-one';
 import { Inter_500Medium, Inter_700Bold } from '@expo-google-fonts/inter';
 import { LibreBaskerville_400Regular, LibreBaskerville_400Regular_Italic, LibreBaskerville_700Bold } from '@expo-google-fonts/libre-baskerville';
 import App from './app/ui/App';
 import palette from './assets/color-palette/palette.json';
+import frameArt from './assets/phone-frame-only.png';
 
 const PHONE_WIDTH = 390;
 const PHONE_HEIGHT = 844;
-const BEZEL = 10;
+// assets/phone-frame-only.png is 1200 x 2364 with a 998 x 2162 screen opening at (101, 101), corners
+// about 150 px and the island ending 121 px below the opening's top. Scaled so the opening is 390 dp wide.
+const FRAME_SCALE = PHONE_WIDTH / 998;
+const FRAME = { width: 1200 * FRAME_SCALE, height: 2364 * FRAME_SCALE, inset: 101 * FRAME_SCALE, radius: 150 * FRAME_SCALE };
+const FRAME_INSETS = { top: 54, bottom: 20, left: 0, right: 0 };
 
 /**
- * On a wide web window the app is shown inside a fixed phone body (390 x 844 plus a bezel) on a
- * desk-coloured backdrop, so desktop reviewers see the real phone layout. On a phone-width window,
- * and on the device itself, the app fills the screen.
+ * On a wide web window the app is shown inside the phone frame artwork on a desk-coloured backdrop,
+ * so desktop reviewers see the real phone layout; the frame shrinks to fit short windows. On a
+ * phone-width window, and on the device itself, the app fills the screen.
  */
-function PhoneFrame({ children }: { children: ReactNode }): JSX.Element {
+function PhoneFrame(): JSX.Element {
   const { width, height } = useWindowDimensions();
-  if (Platform.OS !== 'web' || width <= PHONE_WIDTH + BEZEL * 2 + 40) return <>{children}</>;
-  const frameHeight = Math.min(PHONE_HEIGHT, height - 48);
+  if (Platform.OS !== 'web' || width <= FRAME.width + 40) return <App />;
+  const fit = Math.min(1, (height - 32) / FRAME.height);
   return (
     <View style={styles.desk}>
-      <View style={[styles.phone, { width: PHONE_WIDTH + BEZEL * 2, height: frameHeight + BEZEL * 2 }]}>
-        <View style={styles.screen}>{children}</View>
+      <View style={{ width: FRAME.width, height: FRAME.height, transform: [{ scale: fit }] }}>
+        <View style={[styles.screen, { left: FRAME.inset, top: FRAME.inset, width: PHONE_WIDTH, height: PHONE_HEIGHT, borderRadius: FRAME.radius }]}>
+          <App insets={FRAME_INSETS} />
+        </View>
+        <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+          <Image source={frameArt} style={styles.art} />
+        </View>
       </View>
     </View>
   );
@@ -32,7 +42,7 @@ function PhoneFrame({ children }: { children: ReactNode }): JSX.Element {
 /** Fonts ship inside the app, so loading never touches the network. Renders once they are ready or failed. */
 export default function Root(): JSX.Element | null {
   const [ready, error] = useFonts({ BowlbyOne_400Regular, Inter_500Medium, Inter_700Bold, LibreBaskerville_400Regular, LibreBaskerville_400Regular_Italic, LibreBaskerville_700Bold });
-  return ready || error ? <PhoneFrame><App /></PhoneFrame> : null;
+  return ready || error ? <PhoneFrame /> : null;
 }
 
 const styles = StyleSheet.create({
@@ -42,20 +52,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: palette.blue['200'],
   },
-  phone: {
-    padding: BEZEL,
-    borderRadius: 54,
-    backgroundColor: palette.blue['900'],
-    boxShadow: [
-      { offsetX: 0, offsetY: 30, blurRadius: 60, spreadDistance: -10, color: `${palette.blue['900']}66` },
-      { offsetX: 0, offsetY: 6, blurRadius: 12, spreadDistance: 0, color: `${palette.blue['900']}40` },
-    ],
-  },
   // overflow hidden clips the absolute dock and floating header to the rounded glass.
   screen: {
-    flex: 1,
+    position: 'absolute',
     overflow: 'hidden',
-    borderRadius: 44,
     backgroundColor: palette.blue['50'],
   },
+  art: { width: '100%', height: '100%', resizeMode: 'stretch' },
 });

@@ -3,7 +3,7 @@ import { useRef, useState } from 'react';
 import { Animated, Image, Pressable, RefreshControl, View, StyleSheet } from 'react-native';
 import logo from '../../../assets/agi-sipat-logo.png';
 import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDockInset } from '../context/DockInset';
 import { useTheme, useThemedStyles } from '../theme';
 import type { Theme } from '../theme';
@@ -38,6 +38,8 @@ export interface ScreenProps {
  */
 export function Screen({ title, children, scroll = true, right, mascot, back, banner, masthead, hideLanguage = false, refresh }: ScreenProps): JSX.Element {
   const t = useTheme();
+  // The floating header is absolute, so it would ignore the SafeAreaView padding; offset it by the top inset.
+  const insets = useSafeAreaInsets();
   const styles = useThemedStyles(makeStyles);
   // The tab dock floats over the screen, so tab screens reserve its height at the end of the body.
   const dockHeight = useDockInset();
@@ -93,7 +95,7 @@ export function Screen({ title, children, scroll = true, right, mascot, back, ba
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       {body}
-      <View pointerEvents="box-none" style={styles.overlay} onLayout={(e) => setOverlayHeight(e.nativeEvent.layout.height)}>
+      <View pointerEvents="box-none" style={[styles.overlay, { top: insets.top }]} onLayout={(e) => setOverlayHeight(e.nativeEvent.layout.height)}>
         <Animated.View pointerEvents="box-none" style={[styles.header, { opacity: controlsOpacity }]}>
           {back ? (
             <Pressable

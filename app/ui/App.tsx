@@ -1,7 +1,8 @@
 import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/native';
 import type { JSX } from 'react';
 import { StatusBar } from 'react-native';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaInsetsContext, SafeAreaProvider } from 'react-native-safe-area-context';
+import type { EdgeInsets } from 'react-native-safe-area-context';
 import { RootStack } from './navigation/RootStack';
 import { EngineProvider } from './context/EngineProvider';
 import { LanguageProvider } from './i18n';
@@ -38,9 +39,9 @@ function ThemedNavigation(): JSX.Element {
   );
 }
 
-export default function App(): JSX.Element {
-  return (
-    <SafeAreaProvider>
+/** `insets` overrides the measured safe area: the web phone frame passes its notch and home-bar space. */
+export default function App({ insets }: { insets?: EdgeInsets } = {}): JSX.Element {
+  const tree = (
       <EngineProvider>
         <LanguageProvider>
           <DevOverridesProvider>
@@ -52,6 +53,10 @@ export default function App(): JSX.Element {
           </DevOverridesProvider>
         </LanguageProvider>
       </EngineProvider>
+  );
+  return (
+    <SafeAreaProvider>
+      {insets ? <SafeAreaInsetsContext.Provider value={insets}>{tree}</SafeAreaInsetsContext.Provider> : tree}
     </SafeAreaProvider>
   );
 }
