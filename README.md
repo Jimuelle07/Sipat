@@ -27,15 +27,18 @@ An offline typhoon companion for Filipino households on budget Android phones: s
 
 ## See it
 
-<p align="center">
-  <a href="https://youtube.com/shorts/iQ4W9_A_QU0"><img src="docs/media/sipat-showreel-30-poster.jpg" alt="Sipat product film: watch on YouTube" width="480"></a>
-  <br>
-  <b><a href="https://youtube.com/shorts/iQ4W9_A_QU0">Watch the 30-second product film on YouTube</a></b>
-</p>
-
-<p align="center">
-  <img src="docs/media/demo.gif" alt="Sipat demo: tap the warning, the app switches to Habang may bagyo, the checklist fits the family, answers come from the official guide" width="480">
-</p>
+<table align="center">
+  <tr>
+    <td align="center" width="50%">
+      <a href="https://youtube.com/shorts/iQ4W9_A_QU0"><img src="docs/media/sipat-showreel-30-poster.jpg" alt="Sipat product film: watch on YouTube" width="420"></a>
+      <br><b><a href="https://youtube.com/shorts/iQ4W9_A_QU0">Watch the 30-second film</a></b>
+    </td>
+    <td align="center" width="50%">
+      <img src="docs/media/demo.gif" alt="Sipat demo: tap the warning, the app switches to Habang may bagyo, the checklist fits the family, answers come from the official guide" width="420">
+      <br><b>Tap, switch, checklist, answer</b>
+    </td>
+  </tr>
+</table>
 
 ### Three phases, one app
 
