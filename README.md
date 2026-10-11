@@ -1,8 +1,18 @@
+<p align="center">
+  <img src="assets/agi-sipat-logo.png" alt="Sipat app icon" width="128">
+</p>
+
 # Sipat
 
 > Offline typhoon companion for Filipino households on budget Android phones. Sourced answers in Taglish, fitted to your family, with no signal.
 
 Product and design docs: [AGENTS.md](AGENTS.md) · [docs/](docs/README.md)
+
+## Product film
+
+[![Sipat product film: watch on YouTube](docs/media/sipat-showreel-30-poster.jpg)](https://youtube.com/shorts/iQ4W9_A_QU0)
+
+**[Watch on YouTube](https://youtube.com/shorts/iQ4W9_A_QU0)** (30 s, with sound). The signal drops, the family is set up before the storm, one tap on the warning heard on the radio switches the app to Habang may bagyo, the checklist fits the household, answers come only from the official guides, and "Wala ito sa gabay." when they don't. Built with Remotion from the app's own colours, components and copy: [motion/](motion/README.md).
 
 ## Problem
 
@@ -165,5 +175,14 @@ content/    bundled guide, checklist, warnings, hotlines, sources
 plugins/    Expo config plugins
 scripts/    content validation, feed and pack build, scraper, evaluation
 eval/       question sets and results
-docs/       product and system design
+docs/       product and system design (docs/media: the product film's poster)
+motion/     the product film's source (Remotion)
 ```
+
+## Team
+
+| GitHub | Name | Role |
+| :-- | :-- | :-- |
+| [@Jimuelle07](https://github.com/Jimuelle07) | Jimuelle Patron | Dev |
+| [@Mikael1206](https://github.com/Mikael1206) | An-joe Mikael Albino | Assets |
+| [@Kao-Kao04](https://github.com/Kao-Kao04) | Emmanuel Mutas | Research |
